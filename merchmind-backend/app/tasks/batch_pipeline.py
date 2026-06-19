@@ -30,6 +30,7 @@ from app.services.design.post_processor import process_image, image_to_bytes
 from app.services.design.quality_scorer import score_design_quality, assign_product_bundle
 from app.services.design.font_selector import select_font_pair
 from app.services.design.shopify_copy_generator import generate_shopify_copy
+from app.services.design.text_preview import generate_text_preview
 from app.services.pricing.pricing_engine import calculate_price
 from app.services.marketing.instagram_generator import generate_instagram_assets
 from app.services.marketing.tiktok_generator import generate_tiktok_assets
@@ -379,6 +380,22 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
         design.font_reasoning = font_result["reasoning"]
         design.design_style = archetype
         db.commit()
+
+        # 4f-2: Generate text preview for text_only/typographic designs without images
+        if not processed_url and archetype in ("text_only", "typographic"):
+            try:
+                preview_bytes = generate_text_preview(
+                    primary_text=text_content.get("primary_text", trend.raw_signal),
+                    secondary_text=text_content.get("secondary_text"),
+                    font_pair=font_result["font_pair"],
+                    color_palette=color_palette,
+                )
+                preview_path = storage.design_processed_path(design_id)
+                processed_url = storage.upload(preview_path, preview_bytes, "image/png")
+                design.processed_image_url = processed_url
+                db.commit()
+            except Exception as preview_err:
+                logger.warning(f"Text preview generation failed for design {design_id}: {preview_err}")
 
         # 4g: Quality score (only if we have a processed image)
         regen_count = 0

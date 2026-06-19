@@ -14,6 +14,9 @@ _ARCHETYPES = ("text_only", "illustration", "hybrid", "typographic", "text_icon"
 _SYSTEM = (
     "You are a print-on-demand merchandise design strategist. "
     "Your goal is to classify what design format best suits a given trend topic. "
+    "Visual designs (illustration, hybrid, text_icon) almost always outperform "
+    "pure text designs in merch sales. Prefer visual archetypes unless the topic "
+    "is truly best served by words alone. "
     "Always reply with valid JSON only."
 )
 
@@ -33,11 +36,13 @@ def classify_archetype(raw_signal: str, source: str, niche: str = "") -> str:
         f"Trend topic: \"{raw_signal}\"\n"
         f"Source: {source}{niche_ctx}\n\n"
         "Which design archetype best suits this topic for merch?\n"
-        "- text_only: Strong slogan, quote, or statement — no image needed\n"
+        "- illustration: Detailed character, scene, or object — image-first (PREFERRED for visual topics)\n"
+        "- hybrid: Illustration with supporting text (great for topics with both visual and verbal appeal)\n"
+        "- text_icon: Simple recognizable icon + short text (good default for most topics)\n"
         "- typographic: Letters/words styled as art (monogram, acronym, stylized word)\n"
-        "- text_icon: Simple recognizable icon + short text\n"
-        "- illustration: Detailed character, scene, or object — image-first\n"
-        "- hybrid: Illustration with supporting text\n\n"
+        "- text_only: ONLY when the topic is purely a verbal phrase, quote, or slogan with no visual element\n\n"
+        "Most topics can be represented visually. Choose illustration, hybrid, or text_icon unless "
+        "the topic is truly just a saying or phrase.\n\n"
         "Reply with JSON: {\"archetype\": \"<one of the five options>\", \"reason\": \"<10 words>\"}"
     )
     try:
@@ -49,13 +54,13 @@ def classify_archetype(raw_signal: str, source: str, niche: str = "") -> str:
         )
         match = re.search(r"\{.*\}", text, re.DOTALL)
         data = json.loads(match.group()) if match else {}
-        archetype = data.get("archetype", "text_only").lower()
+        archetype = data.get("archetype", "text_icon").lower()
         if archetype not in _ARCHETYPES:
-            archetype = "text_only"
+            archetype = "text_icon"
         return archetype
     except Exception as e:
         logger.error(f"Archetype classification failed for '{raw_signal}': {e}")
-        return "text_only"
+        return "text_icon"
 
 
 def select_image_api(archetype: str) -> str | None:

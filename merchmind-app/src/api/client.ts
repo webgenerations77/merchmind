@@ -1,14 +1,16 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
-import Config from 'react-native-config';
+import Constants from 'expo-constants';
 
-const isMock = Config.USE_MOCK_API === 'true';
+const extra = Constants.expoConfig?.extra ?? {};
+
+const isMock = extra.USE_MOCK_API === 'true';
 
 export function createApiClient(): AxiosInstance {
   const client = axios.create({
-    baseURL: Config.API_BASE_URL || 'http://localhost:8000',
+    baseURL: extra.API_BASE_URL || 'http://localhost:8000',
     timeout: 30000,
     headers: {
-      'X-API-Key': Config.APP_API_KEY || '',
+      'X-API-Key': extra.APP_API_KEY || '',
       'Content-Type': 'application/json',
     },
   });

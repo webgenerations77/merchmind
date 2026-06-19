@@ -1,5 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
-import Config from 'react-native-config';
+import Constants from 'expo-constants';
+
+const extra = Constants.expoConfig?.extra ?? {};
 
 export function useSSE<T = unknown>(
   path: string | null,
@@ -16,8 +18,8 @@ export function useSSE<T = unknown>(
   const connect = useCallback(() => {
     if (!path) return;
 
-    const url = `${Config.API_BASE_URL}${path}`;
-    const headers = { 'X-API-Key': Config.APP_API_KEY || '' };
+    const url = `${extra.API_BASE_URL}${path}`;
+    const headers = { 'X-API-Key': extra.APP_API_KEY || '' };
 
     // React Native doesn't have native EventSource — use polyfill approach with fetch
     let cancelled = false;

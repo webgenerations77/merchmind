@@ -24,13 +24,13 @@ class TestArchetypeClassifier:
     def test_falls_back_on_invalid_archetype(self, mock_claude):
         mock_claude.haiku.return_value = ('{"archetype": "watercolor", "reason": "test"}', MagicMock())
         result = classify_archetype("test signal", "google")
-        assert result == "text_only"
+        assert result == "text_icon"
 
     @patch("app.services.design.archetype_classifier.claude")
     def test_falls_back_on_api_error(self, mock_claude):
         mock_claude.haiku.side_effect = Exception("API error")
         result = classify_archetype("test signal", "google")
-        assert result == "text_only"
+        assert result == "text_icon"
 
     def test_select_image_api_for_illustration(self):
         assert select_image_api("illustration") == "stable_diffusion"
