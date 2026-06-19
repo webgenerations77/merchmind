@@ -1,16 +1,15 @@
 """
 Image generation via DALL-E 3 (OpenAI) and Stable Diffusion XL (Replicate).
-Async-first; falls back to the alternate provider on failure.
-Uploads raw output to Supabase Storage and returns the public URL.
+Uses sync clients for compatibility with Celery worker tasks.
+Falls back to the alternate provider on failure.
 """
-import asyncio
 import logging
 import time
 from dataclasses import dataclass
 from functools import lru_cache
 
 import httpx
-from openai import AsyncOpenAI, BadRequestError as OpenAIBadRequestError
+import openai
 
 from app.config import settings
 from app.utils.exceptions import (
@@ -24,10 +23,10 @@ from app.utils.storage import storage
 
 logger = logging.getLogger(__name__)
 
-_TIMEOUT = 30
+_TIMEOUT = 60
 _MAX_RETRIES = 3
 _REPLICATE_SDXL = "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b"
-_REPLICATE_POLL_INTERVAL = 2
+_REPLICATE_POLL_INTERVAL = 3
 _REPLICATE_MAX_WAIT = 120
 
 
@@ -39,14 +38,12 @@ class GeneratedImage:
 
 
 class DALLe3Service:
-    def __init__(self) -> None:
-        self._client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-
-    async def generate(self, prompt: str) -> bytes:
+    def generate(self, prompt: str) -> bytes:
         for attempt in range(_MAX_RETRIES):
             try:
                 openai_limiter.consume()
-                response = await self._client.images.generate(
+                client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+                response = client.images.generate(
                     model="dall-e-3",
                     prompt=prompt,
                     size="1024x1024",
@@ -56,29 +53,28 @@ class DALLe3Service:
                     response_format="url",
                 )
                 image_url = response.data[0].url
-                async with httpx.AsyncClient(timeout=_TIMEOUT) as http:
-                    r = await http.get(image_url)
+                with httpx.Client(timeout=_TIMEOUT) as http:
+                    r = http.get(image_url)
                     r.raise_for_status()
                 logger.info("dalle3.generate ok prompt_len=%d attempt=%d", len(prompt), attempt + 1)
                 return r.content
-            except OpenAIBadRequestError as e:
+            except openai.BadRequestError as e:
                 if "content_policy_violation" in str(e).lower() or "safety" in str(e).lower():
                     raise ContentPolicyRejectionError(f"DALL-E 3 content policy: {e}") from e
                 raise ImageGenerationError(f"DALL-E 3 bad request: {e}") from e
-            except asyncio.TimeoutError as e:
-                raise ImageGenerationTimeoutError("DALL-E 3 timed out") from e
+            except (ContentPolicyRejectionError, ImageGenerationError):
+                raise
             except Exception as e:
                 wait = 2 ** attempt * 3
                 logger.warning("dalle3.generate attempt=%d/%d failed error=%s wait=%ds", attempt + 1, _MAX_RETRIES, e, wait)
                 if attempt < _MAX_RETRIES - 1:
-                    await asyncio.sleep(wait)
+                    time.sleep(wait)
                 else:
                     raise ImageProviderUnavailableError(f"DALL-E 3 failed after {_MAX_RETRIES} attempts: {e}") from e
         raise ImageGenerationError("DALL-E 3: unreachable")
 
     def health_check(self) -> dict:
         try:
-            import openai
             client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
             client.models.list()
             return {"service": "dalle3", "ok": True}
@@ -87,14 +83,14 @@ class DALLe3Service:
 
 
 class StableDiffusionService:
-    async def generate(self, prompt: str) -> bytes:
+    def generate(self, prompt: str) -> bytes:
         for attempt in range(_MAX_RETRIES):
             try:
                 replicate_limiter.consume()
-                prediction = await self._create_prediction(prompt)
-                image_url = await self._poll_prediction(prediction["id"])
-                async with httpx.AsyncClient(timeout=_TIMEOUT) as http:
-                    r = await http.get(image_url)
+                prediction = self._create_prediction(prompt)
+                image_url = self._poll_prediction(prediction["id"])
+                with httpx.Client(timeout=_TIMEOUT) as http:
+                    r = http.get(image_url)
                     r.raise_for_status()
                 logger.info("stable_diffusion.generate ok prompt_len=%d attempt=%d", len(prompt), attempt + 1)
                 return r.content
@@ -104,14 +100,14 @@ class StableDiffusionService:
                 wait = 2 ** attempt * 3
                 logger.warning("stable_diffusion.generate attempt=%d/%d failed error=%s wait=%ds", attempt + 1, _MAX_RETRIES, e, wait)
                 if attempt < _MAX_RETRIES - 1:
-                    await asyncio.sleep(wait)
+                    time.sleep(wait)
                 else:
                     raise ImageProviderUnavailableError(f"Stable Diffusion failed after {_MAX_RETRIES} attempts: {e}") from e
         raise ImageGenerationError("Stable Diffusion: unreachable")
 
-    async def _create_prediction(self, prompt: str) -> dict:
-        async with httpx.AsyncClient(timeout=30) as http:
-            r = await http.post(
+    def _create_prediction(self, prompt: str) -> dict:
+        with httpx.Client(timeout=30) as http:
+            r = http.post(
                 "https://api.replicate.com/v1/predictions",
                 headers={"Authorization": f"Token {settings.REPLICATE_API_KEY}"},
                 json={
@@ -133,12 +129,12 @@ class StableDiffusionService:
             r.raise_for_status()
             return r.json()
 
-    async def _poll_prediction(self, prediction_id: str) -> str:
+    def _poll_prediction(self, prediction_id: str) -> str:
         deadline = time.monotonic() + _REPLICATE_MAX_WAIT
         while time.monotonic() < deadline:
-            await asyncio.sleep(_REPLICATE_POLL_INTERVAL)
-            async with httpx.AsyncClient(timeout=30) as http:
-                r = await http.get(
+            time.sleep(_REPLICATE_POLL_INTERVAL)
+            with httpx.Client(timeout=30) as http:
+                r = http.get(
                     f"https://api.replicate.com/v1/predictions/{prediction_id}",
                     headers={"Authorization": f"Token {settings.REPLICATE_API_KEY}"},
                 )
@@ -155,8 +151,7 @@ class StableDiffusionService:
 
     def health_check(self) -> dict:
         try:
-            import httpx as _httpx
-            r = _httpx.get(
+            r = httpx.get(
                 "https://api.replicate.com/v1/models/stability-ai/sdxl",
                 headers={"Authorization": f"Token {settings.REPLICATE_API_KEY}"},
                 timeout=10,
@@ -170,31 +165,6 @@ class ImageGeneratorService:
     def __init__(self) -> None:
         self._dalle3 = DALLe3Service()
         self._sd = StableDiffusionService()
-
-    async def generate_and_upload(self, prompt: str, design_id: str, api: str = "dalle3") -> GeneratedImage:
-        """
-        Generate image with the specified provider, fall back to the other on failure.
-        Uploads raw bytes to Supabase and returns the public URL.
-        """
-        providers = [("dalle3", self._dalle3), ("stable_diffusion", self._sd)]
-        if api != "dalle3":
-            providers = list(reversed(providers))
-
-        last_error: Exception | None = None
-        for name, provider in providers:
-            try:
-                image_bytes = await provider.generate(prompt)
-                path = storage.design_raw_path(design_id)
-                url = storage.upload(path, image_bytes, "image/png")
-                logger.info("image_generator.generate_and_upload design_id=%s provider=%s url=%s", design_id, name, url)
-                return GeneratedImage(url=url, provider=name, prompt=prompt)
-            except ContentPolicyRejectionError:
-                raise
-            except Exception as e:
-                logger.warning("image_generator.generate_and_upload provider=%s failed error=%s, trying fallback", name, e)
-                last_error = e
-
-        raise ImageProviderUnavailableError(f"Both image providers failed. Last error: {last_error}") from last_error
 
     def health_check(self) -> dict:
         dalle_hc = self._dalle3.health_check()
@@ -211,19 +181,8 @@ def get_image_generator_service() -> ImageGeneratorService:
     return ImageGeneratorService()
 
 
-# ─── Sync backwards-compat wrappers (used by existing pipeline tasks) ─────────
-
-def generate_dalle3(prompt: str) -> bytes:
-    return asyncio.run(DALLe3Service().generate(prompt))
-
-
-def generate_stable_diffusion(prompt: str) -> bytes:
-    return asyncio.run(StableDiffusionService().generate(prompt))
-
-
 def generate_image(prompt: str, api: str) -> tuple[bytes, str]:
     svc = get_image_generator_service()
-    # For sync callers that don't have a design_id, upload is skipped; they get bytes directly
     providers = [("dalle3", svc._dalle3), ("stable_diffusion", svc._sd)]
     if api != "dalle3":
         providers = list(reversed(providers))
@@ -231,7 +190,7 @@ def generate_image(prompt: str, api: str) -> tuple[bytes, str]:
     last_error: Exception = RuntimeError("No providers")
     for name, provider in providers:
         try:
-            return asyncio.run(provider.generate(prompt)), name
+            return provider.generate(prompt), name
         except ContentPolicyRejectionError:
             raise
         except Exception as e:

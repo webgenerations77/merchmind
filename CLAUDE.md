@@ -10,6 +10,7 @@ MerchMind is an AI-powered print-on-demand merch pipeline. A weekly Celery batch
 
 - `merchmind-backend/` — FastAPI + Celery + PostgreSQL (Python 3.11)
 - `merchmind-app/` — React Native 0.73 + Expo + TypeScript mobile app
+- `merchmind-dashboard/` — React + Vite + TypeScript + Tailwind CSS web dashboard
 
 ## Backend Commands
 
@@ -65,12 +66,28 @@ npm run type-check     # tsc --noEmit
 
 The app defaults to mock mode (`USE_MOCK_API=true` in `.env`). Set it to `false` and configure `API_BASE_URL` to hit the real backend.
 
+**Note:** The mobile app uses `expo-constants` (not `react-native-config`) for env vars. Config is loaded via `app.config.js` which reads `.env` and exposes values through `Constants.expoConfig.extra`. EAS dev builds currently fail due to native module incompatibilities (`react-native-fast-image`, `react-native-haptic-feedback`, `react-native-mmkv`). These need swapping with Expo equivalents before EAS builds will work.
+
+## Web Dashboard Commands
+
+All commands run from `merchmind-dashboard/`.
+
+```bash
+npm install
+npm run dev            # Vite dev server at localhost:5173
+npm run build          # Production build to dist/
+npm run preview        # Preview production build
+```
+
+`.env` requires `VITE_API_BASE_URL` and `VITE_API_KEY`. The dashboard connects directly to the Railway backend API.
+
 ## Backend Architecture
 
 **Request flow:** FastAPI routers → service classes → database (SQLAlchemy) or external APIs. Long-running work is dispatched to Celery tasks.
 
 **Key patterns:**
-- All endpoints require `X-API-Key` header (validated by `app/routers/auth.py`).
+- All endpoints require `X-API-Key` header (validated by `app/routers/auth.py` using `APIKeyHeader` security scheme — Swagger UI shows an Authorize button).
+- Swagger UI is enabled in production at `/docs`.
 - Supabase Storage is used for all design/mockup file uploads via `app/utils/storage.py`. The `storage` singleton (`from app.utils.storage import storage`) exposes synchronous methods (`upload`, `upload_file`, `download`, `delete`, plus path helpers like `design_raw_path`, `mockup_path`). Callers throughout services and tasks use this singleton — do not change its interface.
 - The Supabase client and Firebase are initialized lazily (on first call, not at import). Maintain this pattern to avoid startup crashes when credentials are missing.
 - Config lives in `app/config.py` as a Pydantic `Settings` class reading from `.env`.
@@ -79,7 +96,7 @@ The app defaults to mock mode (`USE_MOCK_API=true` in `.env`). Set it to `false`
 
 **Service namespaces under `app/services/`:**
 - `intelligence/` — trend scraping and scoring (Reddit, Twitter, Google Trends, seasonal calendar)
-- `design/` — archetype classification, prompt building, image generation, post-processing, quality scoring
+- `design/` — archetype classification, prompt building, image generation, post-processing, quality scoring, text preview generation
 - `pricing/` — dynamic pricing engine with floor prices, markup, and trend-based adjustment
 - `marketing/` — social media asset generation (Instagram, TikTok, Pinterest, email, blog)
 - `publishing/` — Printify product creation and Shopify listing
@@ -105,10 +122,34 @@ designs/{design_id}/mockups/{product_type}/lifestyle.png
 
 ## Deployment
 
-Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), worker (Celery), beat (Celery Beat). The `Dockerfile` uses `python:3.11-slim` with system deps for Pillow, rembg, and psycopg2.
+Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), worker (Celery), beat (Celery Beat). The `Dockerfile` uses `python:3.11-slim` with system deps for Pillow, rembg, psycopg2, and DejaVu fonts (for text preview rendering).
+
+**Production URL:** `https://merchmind-production.up.railway.app`
+
+**Important:** Pushing to `main` triggers a Railway redeploy which restarts the Celery worker, killing in-progress design generation tasks. Avoid pushing while batches are actively generating designs. Designs killed mid-generation get stuck at `status: "generating"` permanently.
+
+**Phase 1 (current):** AI pipeline only — trend scraping, scoring, design generation, text previews. No Printify/Shopify publishing. Printify base costs use hardcoded fallbacks (`_FALLBACK_BASE_COSTS` in `printify_publisher.py`).
+
+**Phase 2 (future):** Add Printify product creation, Shopify listing, mockup generation, sales sync.
+
+## Web Dashboard Architecture
+
+- **Stack:** React 18 + TypeScript + Vite + Tailwind CSS
+- **Routing:** React Router with 5 pages: Dashboard, Review, Products, Batches, Settings
+- **State:** Zustand stores (mirrors mobile app pattern)
+- **API:** Axios client with retry interceptor, same `X-API-Key` auth
+- **Theme:** Dark theme matching mobile app design tokens from `merchmind-app/src/theme/colors.ts`
 
 ## Testing Notes
 
 - Tests use `unittest.mock` to stub all external API calls.
 - `tests/conftest.py` sets env var defaults (test DB on `merchmind_test`, Redis DB 1).
 - Some integration tests (printify auth, image generator content policy) have known intermittent failures unrelated to storage or core logic.
+- `test_seasonal_signals_are_included` has a known failure due to a mock pathing issue with the `intelligence` module.
+
+## Design Pipeline Notes
+
+- **Archetype classifier** (`app/services/design/archetype_classifier.py`): Biased toward visual archetypes (`illustration`, `hybrid`, `text_icon`). Falls back to `text_icon` (not `text_only`) on error.
+- **Image generation:** `illustration`/`hybrid` → Stable Diffusion (Replicate). `text_icon` → DALL-E 3 (OpenAI). `text_only`/`typographic` → no image gen, text preview rendered via Pillow instead.
+- **Text preview** (`app/services/design/text_preview.py`): Renders primary/secondary text with font pair label on a dark canvas using Pillow + DejaVu fonts. Uploaded to Supabase as the `processed_image_url`.
+- **COGS fallback:** When Printify API is unavailable, `get_base_cost()` returns industry-standard costs from `_FALLBACK_BASE_COSTS` (tshirt $8.50, mug $6.00, hat $10.00, phone_case $8.00, sticker $2.50, poster $12.00).

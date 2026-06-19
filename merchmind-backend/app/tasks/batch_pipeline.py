@@ -68,9 +68,10 @@ def _emit_progress(batch_id: str, step: int, total: int, message: str, data: dic
     acks_late=True,
     name="app.tasks.batch_pipeline.run_weekly_batch",
 )
-def run_weekly_batch(self, batch_id: Optional[str] = None):
+def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional[int] = None):
     """
     Main Sunday batch task. Creates or resumes a batch and runs all 8 pipeline steps.
+    Optional max_designs limits how many designs are generated (for testing).
     """
     db = SessionLocal()
     batch = None
@@ -202,9 +203,10 @@ def run_weekly_batch(self, batch_id: Optional[str] = None):
                 logger.error(f"Scoring failed for signal '{signal.get('raw_signal', '')}': {e}")
                 _log_batch_error(batch, db, f"Score error: {e}")
 
-        # Limit queue to max_queue, sorted by final_score descending
+        # Limit queue to max_queue (or max_designs for testing), sorted by final_score descending
         queued_trends.sort(key=lambda t: t.final_score, reverse=True)
-        queued_trends = queued_trends[:max_queue]
+        limit = min(max_queue, max_designs) if max_designs else max_queue
+        queued_trends = queued_trends[:limit]
 
         # Mark excess as rejected
         for trend in db.query(Trend).filter(
