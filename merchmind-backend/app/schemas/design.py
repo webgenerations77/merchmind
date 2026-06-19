@@ -1,0 +1,57 @@
+from pydantic import BaseModel, ConfigDict
+from datetime import date, datetime
+from typing import Optional, Any
+from uuid import UUID
+
+
+class DesignOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    trend_id: UUID
+    batch_id: UUID
+    concept_name: str
+    archetype: str
+    image_api_used: Optional[str]
+    image_prompt: Optional[str]
+    raw_image_url: Optional[str]
+    processed_image_url: Optional[str]
+    font_pair: Optional[str]
+    font_reasoning: Optional[str]
+    color_palette: Optional[list]
+    design_style: Optional[str]
+    quality_score: int
+    quality_breakdown: Optional[dict]
+    version: int
+    parent_design_id: Optional[UUID]
+    shopify_title: Optional[str]
+    shopify_description: Optional[str]
+    shopify_tags: Optional[list]
+    status: str
+    delayed_to_week: Optional[date]
+    approved_at: Optional[datetime]
+    rejected_at: Optional[datetime]
+    created_at: datetime
+
+
+class DesignQueueItem(BaseModel):
+    """Lightweight design card for the mobile review queue."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    concept_name: str
+    archetype: str
+    processed_image_url: Optional[str]
+    quality_score: int
+    shopify_title: Optional[str]
+    status: str
+    claude_reasoning: Optional[str] = None  # From joined trend
+
+
+class DelayRequest(BaseModel):
+    delayed_to_week: date
+
+
+class RegenerateRequest(BaseModel):
+    new_prompt: Optional[str] = None
+    force_archetype: Optional[str] = None

@@ -1,0 +1,71 @@
+"""
+Classifies design archetype from a trend signal using Claude Haiku.
+Archetypes: text_only, illustration, hybrid, typographic, text_icon.
+"""
+import json
+import logging
+import re
+from app.utils.claude_client import claude
+
+logger = logging.getLogger(__name__)
+
+_ARCHETYPES = ("text_only", "illustration", "hybrid", "typographic", "text_icon")
+
+_SYSTEM = (
+    "You are a print-on-demand merchandise design strategist. "
+    "Your goal is to classify what design format best suits a given trend topic. "
+    "Always reply with valid JSON only."
+)
+
+
+def classify_archetype(raw_signal: str, source: str, niche: str = "") -> str:
+    """
+    Classify the best design archetype for a trend signal.
+
+    - text_only: Pure typography, no illustration. Best for slogans/statements.
+    - typographic: Stylized letter-based design, text IS the art.
+    - text_icon: Simple icon + text combo. Bold and clean.
+    - illustration: Detailed vector illustration, no text in design.
+    - hybrid: Illustration + text overlay.
+    """
+    niche_ctx = f"\nNiche category: {niche}" if niche else ""
+    prompt = (
+        f"Trend topic: \"{raw_signal}\"\n"
+        f"Source: {source}{niche_ctx}\n\n"
+        "Which design archetype best suits this topic for merch?\n"
+        "- text_only: Strong slogan, quote, or statement — no image needed\n"
+        "- typographic: Letters/words styled as art (monogram, acronym, stylized word)\n"
+        "- text_icon: Simple recognizable icon + short text\n"
+        "- illustration: Detailed character, scene, or object — image-first\n"
+        "- hybrid: Illustration with supporting text\n\n"
+        "Reply with JSON: {\"archetype\": \"<one of the five options>\", \"reason\": \"<10 words>\"}"
+    )
+    try:
+        text, _ = claude.haiku(
+            "archetype_classification",
+            [{"role": "user", "content": prompt}],
+            system=_SYSTEM,
+            max_tokens=64,
+        )
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        data = json.loads(match.group()) if match else {}
+        archetype = data.get("archetype", "text_only").lower()
+        if archetype not in _ARCHETYPES:
+            archetype = "text_only"
+        return archetype
+    except Exception as e:
+        logger.error(f"Archetype classification failed for '{raw_signal}': {e}")
+        return "text_only"
+
+
+def select_image_api(archetype: str) -> str | None:
+    """
+    Select which image generation API to use based on archetype.
+    Returns 'dalle3', 'stable_diffusion', or None (skip image gen).
+    """
+    if archetype in ("text_only", "typographic"):
+        return None
+    if archetype in ("illustration", "hybrid"):
+        return "stable_diffusion"
+    # text_icon
+    return "dalle3"
