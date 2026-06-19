@@ -34,6 +34,15 @@ _BLUEPRINT_MAP = {
     "poster": 56,
 }
 
+_FALLBACK_BASE_COSTS = {
+    "tshirt": 8.50,
+    "mug": 6.00,
+    "hat": 10.00,
+    "phone_case": 8.00,
+    "sticker": 2.50,
+    "poster": 12.00,
+}
+
 
 class PrintifyService:
     def _headers(self) -> dict:
@@ -85,14 +94,15 @@ class PrintifyService:
         return data.get("data", [])
 
     def get_base_cost(self, product_type: str, print_provider_id: int = 99) -> float:
-        """Return minimum variant cost in dollars (or 0.0 on failure)."""
+        """Return minimum variant cost in dollars. Falls back to industry-standard costs when Printify is unavailable."""
         try:
             variants = self.get_blueprint_variants(product_type, print_provider_id)
             costs = [v.get("cost", 0) / 100.0 for v in variants if v.get("cost")]
-            return min(costs) if costs else 0.0
+            if costs:
+                return min(costs)
         except Exception as e:
-            logger.error("printify.get_base_cost product_type=%s error=%s", product_type, e)
-            return 0.0
+            logger.warning("printify.get_base_cost API failed, using fallback. product_type=%s error=%s", product_type, e)
+        return _FALLBACK_BASE_COSTS.get(product_type, 8.00)
 
     def get_base_costs(self, print_provider_id: int = 99) -> dict[str, float]:
         """Return base costs for all product types."""
