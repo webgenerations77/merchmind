@@ -95,6 +95,32 @@ def reset_data(db: Session = Depends(get_db), _: str = Depends(verify_api_key)) 
     return {"ok": True, "deleted": counts}
 
 
+@router.post("/health/test-image-gen")
+def test_image_gen(_: str = Depends(verify_api_key)) -> dict:
+    """Test image generation with a simple prompt and return detailed error if it fails."""
+    prompt = "A simple red circle on a white background, flat design, bold outlines, centered composition"
+    results = {}
+    # Test DALL-E 3
+    try:
+        from app.services.design.image_generator import DALLe3Service
+        dalle = DALLe3Service()
+        img_bytes = dalle.generate(prompt)
+        results["dalle3"] = {"ok": True, "bytes": len(img_bytes)}
+    except Exception as e:
+        results["dalle3"] = {"ok": False, "error": str(e), "type": type(e).__name__}
+
+    # Test Stable Diffusion
+    try:
+        from app.services.design.image_generator import StableDiffusionService
+        sd = StableDiffusionService()
+        img_bytes = sd.generate(prompt)
+        results["stable_diffusion"] = {"ok": True, "bytes": len(img_bytes)}
+    except Exception as e:
+        results["stable_diffusion"] = {"ok": False, "error": str(e), "type": type(e).__name__}
+
+    return {"ok": any(r["ok"] for r in results.values()), "results": results}
+
+
 def _check_printify() -> dict:
     from app.services.publishing.printify_publisher import get_printify_service
     return get_printify_service().health_check()
