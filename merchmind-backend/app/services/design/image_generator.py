@@ -8,6 +8,8 @@ import time
 from dataclasses import dataclass
 from functools import lru_cache
 
+import base64
+
 import httpx
 import openai
 
@@ -44,17 +46,14 @@ class DALLe3Service:
                 openai_limiter.consume()
                 client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
                 response = client.images.generate(
-                    model="dall-e-3",
+                    model="gpt-image-1",
                     prompt=prompt,
                     size="1024x1024",
                     n=1,
                 )
-                image_url = response.data[0].url
-                with httpx.Client(timeout=_TIMEOUT) as http:
-                    r = http.get(image_url)
-                    r.raise_for_status()
+                image_data = response.data[0].b64_json
                 logger.info("dalle3.generate ok prompt_len=%d attempt=%d", len(prompt), attempt + 1)
-                return r.content
+                return base64.b64decode(image_data)
             except openai.BadRequestError as e:
                 if "content_policy_violation" in str(e).lower() or "safety" in str(e).lower():
                     raise ContentPolicyRejectionError(f"DALL-E 3 content policy: {e}") from e
