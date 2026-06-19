@@ -20,7 +20,7 @@ class GoogleTrendsService:
 
     def _get_client(self) -> TrendReq:
         if self._client is None:
-            self._client = TrendReq(hl="en-US", tz=360, timeout=(30, 30), retries=3, backoff_factor=0.5)
+            self._client = TrendReq(hl="en-US", tz=360, timeout=(30, 30))
         return self._client
 
     def get_trending_searches(self) -> list[dict]:
