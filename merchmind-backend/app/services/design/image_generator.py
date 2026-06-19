@@ -50,7 +50,6 @@ class DALLe3Service:
                     quality="standard",
                     style="natural",
                     n=1,
-                    response_format="url",
                 )
                 image_url = response.data[0].url
                 with httpx.Client(timeout=_TIMEOUT) as http:
