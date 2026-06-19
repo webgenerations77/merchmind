@@ -8,7 +8,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from fastapi import APIRouter, Depends
 
+from sqlalchemy.orm import Session
+
 from app.config import settings
+from app.database import get_db
 from app.routers.auth import verify_api_key
 
 router = APIRouter(tags=["health"])
@@ -62,6 +65,34 @@ def health_integrations(_: str = Depends(verify_api_key)) -> dict:
         "any_service_reachable": any_ok,
         "services": results,
     }
+
+
+@router.post("/health/reset-data")
+def reset_data(db: Session = Depends(get_db), _: str = Depends(verify_api_key)) -> dict:
+    """Delete all pipeline data (products, designs, trends, batches, marketing assets, alerts). Keeps settings and niche clusters."""
+    from app.models.product import Product
+    from app.models.marketing_asset import MarketingAsset
+    from app.models.design import Design
+    from app.models.trend import Trend
+    from app.models.batch import Batch
+    from app.models.alert import Alert
+    from app.models.feedback_log import FeedbackLog
+
+    counts = {}
+    for model, name in [
+        (Product, "products"),
+        (MarketingAsset, "marketing_assets"),
+        (FeedbackLog, "feedback_logs"),
+        (Design, "designs"),
+        (Trend, "trends"),
+        (Alert, "alerts"),
+        (Batch, "batches"),
+    ]:
+        count = db.query(model).delete()
+        counts[name] = count
+    db.commit()
+    logger.info("reset_data counts=%s", counts)
+    return {"ok": True, "deleted": counts}
 
 
 def _check_printify() -> dict:
