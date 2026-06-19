@@ -51,7 +51,7 @@ app = FastAPI(
     title="MerchMind API",
     version="1.0.0",
     description="Automated print-on-demand merchandise pipeline backend",
-    docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
+    docs_url="/docs",
     redoc_url=None,
 )
 
