@@ -47,8 +47,6 @@ class DALLe3Service:
                     model="dall-e-3",
                     prompt=prompt,
                     size="1024x1024",
-                    quality="standard",
-                    style="natural",
                     n=1,
                 )
                 image_url = response.data[0].url
