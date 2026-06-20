@@ -330,6 +330,7 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
 
         # 4b: Select image API
         image_api = select_image_api(archetype)
+        _log(f"image_api={image_api}")
 
         # Create design record
         design = Design(
@@ -344,9 +345,12 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
         db.commit()
         db.refresh(design)
         design_id = str(design.id)
+        _log(f"design created id={design_id[:8]}")
 
         # 4c: Build image prompt
+        _log("building image prompt (claude sonnet)...")
         image_prompt = build_image_prompt(trend.raw_signal, archetype, niche_name, design.concept_name)
+        _log(f"prompt built, len={len(image_prompt) if image_prompt else 0}")
         design.image_prompt = image_prompt
         db.commit()
 
