@@ -131,6 +131,34 @@ def purge_queue(_: str = Depends(verify_api_key)) -> dict:
     return {"ok": True, "purged": purged}
 
 
+@router.post("/health/test-printify-mockup")
+def test_printify_mockup(db: Session = Depends(get_db), _: str = Depends(verify_api_key)) -> dict:
+    """Test Printify product creation + mockup for the first queued design."""
+    from app.models.design import Design
+    from app.models.product import Product
+    design = db.query(Design).filter(Design.status == "ready").first()
+    if not design:
+        return {"ok": False, "error": "No ready design found"}
+    image_url = design.processed_image_url or design.raw_image_url
+    if not image_url:
+        return {"ok": False, "error": "Design has no image URL"}
+    try:
+        from app.services.publishing.printify_publisher import _get
+        svc = _get()
+        img_id = svc.upload_image(image_url, "test_mockup.png")
+        printify_id = svc.create_product(
+            product_type="tshirt",
+            title=design.shopify_title or design.concept_name,
+            description="",
+            image_url=image_url,
+            retail_price=24.99,
+        )
+        mockups = svc.generate_mockups(printify_id)
+        return {"ok": True, "printify_image_id": img_id, "printify_product_id": printify_id, "mockups": mockups}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "type": type(e).__name__}
+
+
 @router.post("/health/test-image-gen")
 def test_image_gen(_: str = Depends(verify_api_key)) -> dict:
     """Test image generation with a simple prompt and return detailed error if it fails."""
