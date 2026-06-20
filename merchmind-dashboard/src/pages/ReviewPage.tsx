@@ -173,8 +173,8 @@ function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
 
           {currentMockup ? (
             <div className="space-y-2">
-              {Object.entries(currentMockup.mockup_urls).map(([position, url]) => (
-                <ClickableImage key={position} src={url as string} alt={`${position} mockup`} className="w-full rounded-xl" />
+              {['front', 'back'].filter((pos) => currentMockup.mockup_urls[pos]).map((pos) => (
+                <ClickableImage key={pos} src={currentMockup.mockup_urls[pos] as string} alt={`${pos} mockup`} className="w-full rounded-xl" />
               ))}
             </div>
           ) : design.processed_image_url ? (

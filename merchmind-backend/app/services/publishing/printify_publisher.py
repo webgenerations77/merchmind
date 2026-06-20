@@ -27,11 +27,11 @@ _MAX_RETRIES = 3
 
 _BLUEPRINT_MAP = {
     "tshirt": 5,
-    "mug": 77,
-    "hat": 54,
-    "phone_case": 194,
-    "sticker": 213,
-    "poster": 56,
+    "mug": 68,
+    "hat": 1447,
+    "phone_case": 269,
+    "sticker": 400,
+    "poster": 282,
 }
 
 _FALLBACK_BASE_COSTS = {

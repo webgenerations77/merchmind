@@ -46,8 +46,8 @@ function ProductDetail({ product, onBack }: { product: ProductOut; onBack: () =>
               <div className="flex gap-4">
                 {product.mockup_urls && Object.keys(product.mockup_urls).length > 0 ? (
                   <div className="flex gap-2 shrink-0">
-                    {Object.entries(product.mockup_urls).map(([position, url]) => (
-                      <ClickableImage key={position} src={url as string} alt={`${position} mockup`} className="w-48 h-48 object-cover rounded-lg" />
+                    {['front', 'back'].filter((pos) => (product.mockup_urls as Record<string, string>)[pos]).map((pos) => (
+                      <ClickableImage key={pos} src={(product.mockup_urls as Record<string, string>)[pos]} alt={`${pos} mockup`} className="w-48 h-48 object-cover rounded-lg" />
                     ))}
                   </div>
                 ) : design.processed_image_url ? (
