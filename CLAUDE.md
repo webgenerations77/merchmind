@@ -152,8 +152,10 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 - **Archetype classifier** (`app/services/design/archetype_classifier.py`): Balanced for a natural mix of visual and text designs. Falls back to `text_icon` (not `text_only`) on error. Archetypes: `illustration`, `hybrid`, `text_icon`, `typographic`, `text_only`.
 - **Image generation** (`app/services/design/image_generator.py`): Primary: Flux Schnell (Replicate, ~$0.003/image). Fallback: gpt-image-1 (OpenAI, ~$0.03/image with `quality="low"`). All visual archetypes route to `flux_schnell` by default. Uses **sync** clients (not async) for Celery compatibility. DB enum `image_api` includes: `dalle3`, `stable_diffusion`, `flux_schnell`.
 - **Text preview** (`app/services/design/text_preview.py`): Renders primary/secondary text with font pair label on a dark canvas using Pillow + DejaVu fonts. Uploaded to Supabase as the `processed_image_url`.
-- **Post-processing:** rembg background removal is **skipped** (caused OOM on Railway worker). Raw generated images are used directly as processed images.
-- **Printify mockups:** During batch generation, Printify draft products are created for tshirt, mug, and phone_case. Mockup images are fetched and stored in `product.mockup_urls`. Non-blocking — failures don't affect design completion.
+- **Post-processing:** rembg background removal re-enabled using lightweight `u2netp` model (~4MB). Pre-downloaded in Dockerfile. Falls back to raw image if removal fails.
+- **Printify mockups:** During batch generation, Printify draft products are created for ALL product types. Mockup images (front + back) fetched after 5s delay and stored in `product.mockup_urls` using Printify CDN URLs. Non-blocking — failures don't affect design completion.
+- **Printify publish:** Approve endpoint (`PATCH /designs/{id}/approve?publish=true`) publishes all products to Shopify via Printify's publish API. Products titled with product type (e.g. "Design Name — Mug").
+- **Blueprint IDs** (verified 2026-06-20): tshirt=5, mug=68, hat=1447, phone_case=269, sticker=400, poster=282.
 - **COGS fallback:** When Printify API is unavailable for cost lookups, `get_base_cost()` returns industry-standard costs from `_FALLBACK_BASE_COSTS` (tshirt $8.50, mug $6.00, hat $10.00, phone_case $8.00, sticker $2.50, poster $12.00).
 - **Product limit:** Max 4 product types per design (`assign_product_bundle` in `quality_scorer.py`).
 
@@ -170,5 +172,35 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 - `POST /health/reset-data` — delete all pipeline data (keeps settings/clusters)
 - `POST /health/purge-queue` — clear stuck Celery tasks
 - `POST /health/test-image-gen` — test DALL-E + Flux Schnell image generation
+- `POST /health/test-printify-mockup` — test full Printify product + mockup flow
 - `POST /health/run-migration` — apply DB enum changes
 - `GET /health/env-check` — show masked env var values
+
+## Authentication
+
+- **Dashboard:** Firebase Auth with Google Sign-in. Project: `merchmind-cb1f9`. Only two emails authorized: `webgenerations77@gmail.com` and `spinachthecow@gmail.com`. Config in `src/firebase.ts`. API key via `VITE_FIREBASE_API_KEY` env var.
+- **API:** `X-API-Key` header (unchanged).
+
+## Drew's Mind (Custom Ideas)
+
+- **Backend:** `POST /ideas` endpoint generates designs from custom text input, bypassing trend scraping/scoring. Supports archetype override via `preferences.archetype`.
+- **Frontend:** `/drews-mind` page with text input, archetype selector, idea history with design previews.
+- **Database:** `custom_ideas` table (migration 003). Design model `trend_id` and `batch_id` are nullable for custom ideas.
+
+## Next Steps (Priority Order)
+
+1. **Spinach the Cow back logo on clothing** — Upload `merchmind-app/assets/Logo.png` to Supabase as `branding/spinach_logo.png`. Add optional back print area to clothing products (tshirt, hat) with logo centered at top. Add `back_logo_enabled` toggle to AppSettings. Update COGS for dual-print (~$2-3 extra per item).
+
+2. **Themed collections** — Add Collection model with style guide (palette, mood, constraints). Generate coordinated but unique designs within a collection. New dashboard page for collection management.
+
+3. **Shopify direct API access** — Generate `shpat_` access token via Dev Dashboard custom app (Settings → Apps → Develop apps). Current workaround: publish through Printify → Shopify sync. Direct access needed for: sales sync, order tracking, product management.
+
+4. **Deploy dashboard to Vercel** — Static build, needs `VITE_API_BASE_URL`, `VITE_API_KEY`, `VITE_FIREBASE_API_KEY` env vars. Add `merchmind-cb1f9.firebaseapp.com` and Vercel domain to Firebase authorized domains.
+
+5. **Image quality improvements** — Tune Flux Schnell prompts for better merch designs. Consider Flux Pro (~$0.01/image) for higher quality. Test different prompt styles per archetype.
+
+6. **Product mockup dropdown on review page** — Already implemented (tab-based viewer). Need to verify all product types generate correct mockups with updated blueprint IDs.
+
+7. **Preference learning** — Track approve/reject patterns in Drew's Mind. Feed preferences back into classifier and prompt builder for personalized design generation.
+
+8. **Remove diagnostic endpoints** — Clean up `/health/reset-data`, `/health/purge-queue`, `/health/test-image-gen`, `/health/test-printify-mockup`, `/health/run-migration`, `/health/env-check` before production.
