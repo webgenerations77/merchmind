@@ -220,7 +220,7 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
         db.commit()
         logger.info(f"Queued {len(queued_trends)} trends for design generation")
 
-        # Steps 4-7: Generate designs for each queued trend
+        # Steps 4-7: Generate designs for each queued trend (run inline, not as subtasks)
         _emit_progress(bid, 4, 8, f"Generating {len(queued_trends)} designs")
         approved_count = 0
         for i, trend in enumerate(queued_trends):
@@ -230,7 +230,8 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                     f"Designing {i + 1}/{len(queued_trends)}: {trend.raw_signal[:40]}",
                     {"current": i + 1, "total": len(queued_trends)},
                 )
-                _generate_design_for_trend.delay(str(trend.id), str(batch.id), {
+                logger.info(f"Running design generation inline for trend {trend.id}")
+                _generate_design_for_trend(str(trend.id), str(batch.id), {
                     "quality_threshold": quality_threshold,
                     "trend_boost_max": trend_boost_max,
                     "base_markup": base_markup,
@@ -238,8 +239,8 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                 })
                 approved_count += 1
             except Exception as e:
-                logger.error(f"Failed to dispatch design task for trend {trend.id}: {e}")
-                _log_batch_error(batch, db, f"Design dispatch error for trend {trend.id}: {e}")
+                logger.error(f"Design generation failed for trend {trend.id}: {e}")
+                _log_batch_error(batch, db, f"Design error for trend {trend.id}: {type(e).__name__}: {e}")
 
         batch.approved_count = approved_count
         batch.status = "complete"
