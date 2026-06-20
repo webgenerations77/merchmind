@@ -1,8 +1,11 @@
 """
 Generate coordinated designs for a themed collection.
-Uses the collection's style guide to ensure visual cohesion.
+Uses the collection's style guide to ensure visual cohesion while
+producing unique, varied designs within the theme.
 """
+import json
 import logging
+import re
 from datetime import datetime
 
 from app.tasks.celery_app import celery_app
@@ -20,8 +23,36 @@ from app.services.design.shopify_copy_generator import generate_shopify_copy
 from app.services.pricing.pricing_engine import calculate_price
 from app.services.publishing.printify_publisher import get_base_cost, _DUAL_PRINT_SURCHARGE
 from app.utils.storage import storage
+from app.utils.claude_client import claude
 
 logger = logging.getLogger(__name__)
+
+
+def _generate_collection_concepts(theme: str, description: str, count: int, style_guide: dict) -> list[dict]:
+    """Use Claude to generate unique, varied concept names and angles for a collection."""
+    mood = style_guide.get("mood", "")
+    prompt = (
+        f"Collection theme: \"{theme}\"\n"
+        f"Description: \"{description or theme}\"\n"
+        f"Mood: {mood or 'general'}\n"
+        f"Number of designs needed: {count}\n\n"
+        f"Generate {count} unique merchandise design concepts for this collection.\n"
+        "Each should share the same theme/mood but have a DIFFERENT subject, angle, or visual approach.\n"
+        "For example, if the theme is 'Ocean Vibes', concepts might be: a sea turtle, a sunset wave, an anchor with coral, etc.\n\n"
+        "Reply with JSON array: [{\"name\": \"short concept name\", \"subject\": \"specific visual subject to illustrate\"}]"
+    )
+    try:
+        text, _ = claude.haiku(
+            "collection_concepts",
+            [{"role": "user", "content": prompt}],
+            max_tokens=300,
+        )
+        match = re.search(r"\[.*\]", text, re.DOTALL)
+        if match:
+            return json.loads(match.group())[:count]
+    except Exception as e:
+        logger.warning("Collection concept generation failed: %s", e)
+    return [{"name": f"{theme} #{i+1}", "subject": theme} for i in range(count)]
 
 
 def _build_collection_prompt(base_prompt: str, style_guide: dict, design_index: int, total: int) -> str:
@@ -34,7 +65,7 @@ def _build_collection_prompt(base_prompt: str, style_guide: dict, design_index: 
         parts.append(f"Mood/aesthetic: {style_guide['mood']}.")
     if style_guide.get("constraints"):
         parts.append(style_guide["constraints"])
-    parts.append(f"This is design {design_index + 1} of {total} in a coordinated collection — make it unique but visually cohesive with the set.")
+    parts.append(f"This is design {design_index + 1} of {total} in a coordinated collection — visually cohesive but unique.")
     return " ".join(parts)
 
 
@@ -58,20 +89,25 @@ def generate_collection_task(self, collection_id: str, count: int):
         back_logo_url = settings_row.back_logo_url if settings_row else None
         back_logo_products = settings_row.back_logo_products if settings_row else ["tshirt", "hat"]
 
-        theme = collection.name
-        generated = 0
+        concepts = _generate_collection_concepts(
+            collection.name, collection.description or "", count, style_guide
+        )
+        logger.info("Collection %s: generated %d unique concepts", collection_id[:8], len(concepts))
 
-        for i in range(count):
+        generated = 0
+        for i, concept_data in enumerate(concepts):
             try:
-                concept = f"{theme} #{i + 1}"
-                archetype = archetype_override or classify_archetype(theme, "collection")
+                concept_name = concept_data.get("name", f"{collection.name} #{i+1}")
+                concept_subject = concept_data.get("subject", concept_name)
+
+                archetype = archetype_override or classify_archetype(concept_subject, "collection")
                 image_api = select_image_api(archetype)
 
                 design = Design(
                     trend_id=None,
                     batch_id=None,
                     collection_id=collection.id,
-                    concept_name=concept,
+                    concept_name=concept_name,
                     archetype=archetype,
                     image_api_used=image_api,
                     status="generating",
@@ -81,7 +117,7 @@ def generate_collection_task(self, collection_id: str, count: int):
                 db.refresh(design)
                 design_id = str(design.id)
 
-                base_prompt = build_image_prompt(theme, archetype, "", concept)
+                base_prompt = build_image_prompt(concept_subject, archetype, "", concept_name)
                 image_prompt = _build_collection_prompt(base_prompt, style_guide, i, count)
                 design.image_prompt = image_prompt
                 db.commit()
@@ -93,8 +129,20 @@ def generate_collection_task(self, collection_id: str, count: int):
                         design.image_api_used = api_used
                         raw_path = storage.design_raw_path(design_id)
                         storage.upload(raw_path, raw_bytes)
-                        proc_path = storage.design_processed_path(design_id)
-                        processed_url = storage.upload(proc_path, raw_bytes)
+                        design.raw_image_url = storage.upload(raw_path, raw_bytes)
+
+                        # Background removal for clean mockups
+                        try:
+                            from rembg import remove, new_session
+                            session = new_session("u2netp")
+                            clean_bytes = remove(raw_bytes, session=session)
+                            proc_path = storage.design_processed_path(design_id)
+                            processed_url = storage.upload(proc_path, clean_bytes)
+                        except Exception as bg_err:
+                            logger.warning("Collection bg removal failed design=%s: %s", design_id[:8], bg_err)
+                            proc_path = storage.design_processed_path(design_id)
+                            processed_url = storage.upload(proc_path, raw_bytes)
+
                         design.processed_image_url = processed_url
                         db.commit()
                     except Exception as e:
@@ -102,8 +150,8 @@ def generate_collection_task(self, collection_id: str, count: int):
                         archetype = "text_only"
                         design.archetype = archetype
 
-                text_content = generate_text_content(theme, archetype, "")
-                font_result = select_font_pair(theme, archetype, "", text_content.get("primary_text", ""))
+                text_content = generate_text_content(concept_subject, archetype, "")
+                font_result = select_font_pair(concept_subject, archetype, "", text_content.get("primary_text", ""))
                 design.font_pair = font_result["font_pair"]
                 design.font_reasoning = font_result["reasoning"]
                 design.design_style = archetype
@@ -112,7 +160,7 @@ def generate_collection_task(self, collection_id: str, count: int):
                     try:
                         from app.services.design.text_preview import generate_text_preview
                         preview_bytes = generate_text_preview(
-                            primary_text=text_content.get("primary_text", theme),
+                            primary_text=text_content.get("primary_text", concept_name),
                             secondary_text=text_content.get("secondary_text"),
                             font_pair=font_result["font_pair"],
                         )
@@ -126,7 +174,7 @@ def generate_collection_task(self, collection_id: str, count: int):
                 design.quality_breakdown = {"concept_clarity": 8, "visual_appeal": 8, "merch_suitability": 8, "originality": 8}
 
                 product_types = assign_product_bundle(archetype, design.quality_breakdown)
-                copy = generate_shopify_copy(concept, theme, archetype, product_types, "")
+                copy = generate_shopify_copy(concept_name, collection.name, archetype, product_types, "")
                 design.shopify_title = copy["shopify_title"]
                 design.shopify_description = copy["shopify_description"]
                 design.shopify_tags = copy["shopify_tags"]
@@ -156,6 +204,7 @@ def generate_collection_task(self, collection_id: str, count: int):
                     db.add(product)
                 db.commit()
 
+                # Create Printify products + mockups for all product types
                 image_url = design.processed_image_url
                 if image_url:
                     from app.services.publishing.printify_publisher import _get as _get_printify
@@ -177,12 +226,12 @@ def generate_collection_task(self, collection_id: str, count: int):
                             product.mockup_urls = mockups
                             db.commit()
                         except Exception as e:
-                            logger.warning("Collection Printify failed design=%s pt=%s: %s", design_id, product.product_type, e)
+                            logger.warning("Collection Printify failed design=%s pt=%s: %s", design_id[:8], product.product_type, e)
 
                 design.status = "ready"
                 db.commit()
                 generated += 1
-                logger.info("Collection %s: generated design %d/%d (%s)", collection_id[:8], i + 1, count, design_id[:8])
+                logger.info("Collection %s: design %d/%d complete (%s) concept='%s'", collection_id[:8], i + 1, count, design_id[:8], concept_name)
 
             except Exception as e:
                 logger.error("Collection %s: design %d failed: %s", collection_id[:8], i + 1, e)
