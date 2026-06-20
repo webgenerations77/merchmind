@@ -168,6 +168,23 @@ class PrintifyService:
         logger.info("printify.create_product product_id=%s type=%s title=%r", product_id, product_type, title)
         return str(product_id)
 
+    def publish_product(self, printify_product_id: str) -> None:
+        """Publish a Printify product to the connected Shopify store."""
+        self._request(
+            "POST",
+            f"/shops/{settings.PRINTIFY_SHOP_ID}/products/{printify_product_id}/publish.json",
+            json={
+                "title": True,
+                "description": True,
+                "images": True,
+                "variants": True,
+                "tags": True,
+                "keyFeatures": True,
+                "shipping_template": True,
+            },
+        )
+        logger.info("printify.publish_product product_id=%s", printify_product_id)
+
     def delete_product(self, printify_product_id: str) -> None:
         try:
             self._request("DELETE", f"/shops/{settings.PRINTIFY_SHOP_ID}/products/{printify_product_id}.json")

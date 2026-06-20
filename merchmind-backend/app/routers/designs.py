@@ -59,7 +59,7 @@ def get_design(design_id: UUID, db: Session = Depends(get_db), _: str = Depends(
 
 
 @router.patch("/{design_id}/approve")
-def approve_design(design_id: UUID, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+def approve_design(design_id: UUID, publish: bool = True, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
     design = db.query(Design).filter(Design.id == design_id, Design.is_deleted == False).first()
     if not design:
         raise HTTPException(404, f"Design {design_id} not found")
@@ -67,7 +67,34 @@ def approve_design(design_id: UUID, db: Session = Depends(get_db), _: str = Depe
     design.approved_at = datetime.utcnow()
     _log_feedback(db, design, "approved")
     db.commit()
-    return _envelope({"id": str(design_id), "status": "approved"})
+
+    published = []
+    failed = []
+    if publish:
+        from app.models.product import Product
+        from app.services.publishing.printify_publisher import _get as _get_printify
+        svc = _get_printify()
+        products = db.query(Product).filter(Product.design_id == design_id).all()
+        for product in products:
+            if product.printify_product_id:
+                try:
+                    svc.publish_product(product.printify_product_id)
+                    product.publish_status = "live"
+                    product.published_at = datetime.utcnow()
+                    db.commit()
+                    published.append(product.product_type)
+                except Exception as e:
+                    product.publish_status = "failed"
+                    db.commit()
+                    failed.append({"type": product.product_type, "error": str(e)})
+                    logger.warning(f"Publish failed for {product.product_type}: {e}")
+
+    return _envelope({
+        "id": str(design_id),
+        "status": "approved",
+        "published": published,
+        "failed": failed,
+    })
 
 
 @router.patch("/{design_id}/reject")

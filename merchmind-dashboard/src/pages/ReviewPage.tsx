@@ -290,9 +290,12 @@ export default function ReviewPage() {
   };
 
   const handleAction = async (action: 'approve' | 'reject' | 'delay', id: string) => {
-    if (action === 'approve') await approveDesign(id);
-    else if (action === 'reject') await rejectDesign(id);
-    else {
+    if (action === 'approve') {
+      if (!confirm('Approve and publish to Shopify? This will make the products live in your store.')) return;
+      await approveDesign(id);
+    } else if (action === 'reject') {
+      await rejectDesign(id);
+    } else {
       const nextWeek = new Date();
       nextWeek.setDate(nextWeek.getDate() + 7);
       await delayDesign(id, nextWeek.toISOString().split('T')[0]);
