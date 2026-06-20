@@ -299,9 +299,11 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
     def _log(msg):
         logger.info(f"design_task[{trend_id[:8]}] {msg}")
         try:
-            batch = db.query(Batch).filter(Batch.id == batch_id).first()
+            log_db = SessionLocal()
+            batch = log_db.query(Batch).filter(Batch.id == batch_id).first()
             if batch:
-                _log_batch_error(batch, db, f"TRACE {trend_id[:8]}: {msg}")
+                _log_batch_error(batch, log_db, f"TRACE {trend_id[:8]}: {msg}")
+            log_db.close()
         except Exception:
             pass
 
