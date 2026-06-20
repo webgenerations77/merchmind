@@ -80,22 +80,24 @@ def score_design_quality(
         }
 
 
-def assign_product_bundle(archetype: str, quality_breakdown: dict, max_products: int = 4) -> list[str]:
+def assign_product_bundle(archetype: str, quality_breakdown: dict, max_products: int = 6) -> list[str]:
     """
     Assign product types based on archetype and quality.
-    Returns list of product type strings, capped at max_products.
+    Always includes at least 5 types. Returns list of product type strings.
     """
-    visual_appeal = quality_breakdown.get("visual_appeal", 5)
+    all_types = ["tshirt", "mug", "hat", "phone_case", "sticker", "poster"]
 
     if archetype == "illustration":
-        types = ["tshirt", "poster"]
+        types = ["tshirt", "mug", "poster", "phone_case", "sticker"]
     elif archetype in ("text_only", "typographic"):
         types = ["tshirt", "mug", "hat", "phone_case", "sticker", "poster"]
     elif archetype == "text_icon":
         types = ["tshirt", "mug", "hat", "phone_case", "sticker"]
-    elif visual_appeal >= 7:
-        types = ["tshirt", "mug", "hat", "phone_case", "sticker", "poster"]
     else:
-        types = ["tshirt", "mug", "hat", "sticker"]
+        types = ["tshirt", "mug", "hat", "phone_case", "sticker", "poster"]
+
+    for t in all_types:
+        if t not in types:
+            types.append(t)
 
     return types[:max_products]
