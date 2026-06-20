@@ -84,3 +84,11 @@ app.include_router(health.router)
 @app.on_event("startup")
 async def on_startup():
     logger.info("MerchMind API starting", extra={"environment": settings.ENVIRONMENT})
+    try:
+        from alembic.config import Config
+        from alembic import command
+        alembic_cfg = Config("alembic.ini")
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Alembic migrations applied")
+    except Exception as e:
+        logger.warning(f"Alembic migration skipped: {e}")

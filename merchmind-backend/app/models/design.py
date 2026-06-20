@@ -21,7 +21,7 @@ class Design(Base):
         nullable=False,
     )
     image_api_used = Column(
-        SAEnum("dalle3", "stable_diffusion", name="image_api"),
+        SAEnum("dalle3", "stable_diffusion", "flux_schnell", name="image_api"),
         nullable=True,
     )
     image_prompt = Column(Text, nullable=True)
