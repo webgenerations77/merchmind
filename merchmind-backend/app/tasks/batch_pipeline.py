@@ -32,11 +32,7 @@ from app.services.design.font_selector import select_font_pair
 from app.services.design.shopify_copy_generator import generate_shopify_copy
 from app.services.design.text_preview import generate_text_preview
 from app.services.pricing.pricing_engine import calculate_price
-from app.services.marketing.instagram_generator import generate_instagram_assets
-from app.services.marketing.tiktok_generator import generate_tiktok_assets
-from app.services.marketing.pinterest_generator import generate_pinterest_assets
-from app.services.marketing.email_generator import generate_email_assets
-from app.services.marketing.blog_generator import generate_blog_post
+from app.services.marketing.combined_generator import generate_all_marketing_assets
 from app.services.publishing.printify_publisher import get_base_cost, generate_mockups
 from app.services.notifications.push_notifications import notify_batch_ready
 from app.services.notifications.email_notifications import send_batch_ready_email
@@ -139,6 +135,19 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
             _log_batch_error(batch, db, f"Seasonal calendar failed: {e}")
 
         logger.info(f"Scraped {len(raw_signals)} raw signals")
+
+        # Pre-filter: deduplicate and remove low-value signals before scoring
+        seen = set()
+        filtered_signals = []
+        for signal in raw_signals:
+            text = signal["raw_signal"].lower().strip()
+            if text in seen or len(text) < 3 or len(text.split()) > 12:
+                continue
+            seen.add(text)
+            filtered_signals.append(signal)
+        logger.info(f"Pre-filter: {len(raw_signals)} → {len(filtered_signals)} signals")
+        raw_signals = filtered_signals
+
         batch.total_ideas = len(raw_signals)
         db.commit()
 
@@ -540,31 +549,13 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
 
 
 def _generate_marketing_assets(design: Design, trend: Trend, niche: str, product_types: list[str], db):
-    """Generate all 5 marketing channel assets for a design."""
-    channels = {
-        "instagram": lambda: generate_instagram_assets(
+    """Generate all 5 marketing channel assets in a single Claude call."""
+    try:
+        all_content = generate_all_marketing_assets(
             design.concept_name, trend.raw_signal, design.archetype, niche,
-            design.shopify_title or design.concept_name, product_types
-        ),
-        "tiktok": lambda: generate_tiktok_assets(
-            design.concept_name, trend.raw_signal, niche, design.shopify_title or design.concept_name
-        ),
-        "pinterest": lambda: generate_pinterest_assets(
-            design.concept_name, trend.raw_signal, niche,
-            design.shopify_title or design.concept_name, product_types
-        ),
-        "email": lambda: generate_email_assets(
-            design.concept_name, trend.raw_signal, niche,
-            design.shopify_title or design.concept_name, product_types
-        ),
-        "blog": lambda: generate_blog_post(
-            design.concept_name, trend.raw_signal, niche,
-            design.shopify_title or design.concept_name, product_types
-        ),
-    }
-    for channel, generator in channels.items():
-        try:
-            content = generator()
+            design.shopify_title or design.concept_name, product_types,
+        )
+        for channel, content in all_content.items():
             asset = MarketingAsset(
                 design_id=design.id,
                 channel=channel,
@@ -572,8 +563,9 @@ def _generate_marketing_assets(design: Design, trend: Trend, niche: str, product
                 status="pending",
             )
             db.add(asset)
-        except Exception as e:
-            logger.error(f"Marketing asset ({channel}) failed for design {design.id}: {e}")
+    except Exception as e:
+        logger.error(f"Marketing asset generation failed for design {design.id}: {e}")
+        for channel in ["instagram", "tiktok", "pinterest", "email", "blog"]:
             asset = MarketingAsset(
                 design_id=design.id,
                 channel=channel,

@@ -91,7 +91,7 @@ class PrintifyService:
             "GET",
             f"/catalog/blueprints/{blueprint_id}/print_providers/{print_provider_id}/variants.json",
         )
-        return data.get("data", [])
+        return data.get("variants", data.get("data", []))
 
     def get_base_cost(self, product_type: str, print_provider_id: int = 99) -> float:
         """Return minimum variant cost in dollars. Falls back to industry-standard costs when Printify is unavailable."""
@@ -136,13 +136,10 @@ class PrintifyService:
 
         printify_image_id = self.upload_image(image_url, f"{product_type}_design.png")
 
-        variants_data = self._request(
-            "GET",
-            f"/catalog/blueprints/{blueprint_id}/print_providers/{print_provider_id}/variants.json",
-        )
+        all_variants = self.get_blueprint_variants(product_type, print_provider_id)
         variants = [
             {"id": v["id"], "price": int(retail_price * 100), "is_enabled": True}
-            for v in variants_data.get("data", [])[:20]
+            for v in all_variants[:20]
         ]
 
         payload = {
@@ -153,7 +150,7 @@ class PrintifyService:
             "variants": variants,
             "print_areas": [
                 {
-                    "variant_ids": [v["id"] for v in variants_data.get("data", [])[:20]],
+                    "variant_ids": [v["id"] for v in all_variants[:20]],
                     "placeholders": [
                         {
                             "position": "front",
