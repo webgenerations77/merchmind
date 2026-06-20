@@ -173,7 +173,7 @@ class PrintifyService:
                 back_image_id = self.upload_image(back_logo_url, f"{product_type}_back_logo.png")
                 placeholders.append({
                     "position": "back",
-                    "images": [{"id": back_image_id, "x": 0.5, "y": 0.3, "scale": 0.25, "angle": 0}],
+                    "images": [{"id": back_image_id, "x": 0.5, "y": 0.15, "scale": 0.25, "angle": 0}],
                 })
                 logger.info("printify.create_product adding back logo type=%s", product_type)
             except Exception as e:
@@ -226,25 +226,34 @@ class PrintifyService:
 
     def generate_mockups(self, printify_product_id: str, design_id: str | None = None) -> dict:
         """
-        Fetch mockup URLs from Printify after a short delay for rendering.
-        Returns {front: url} dict using Printify CDN URLs directly.
+        Fetch mockup URLs from Printify after rendering delay.
+        Retries once if no images found (some providers are slower).
+        Returns {front: url, back?: url} dict using Printify CDN URLs.
         """
         try:
-            time.sleep(5)
-            result = self._request(
-                "GET",
-                f"/shops/{settings.PRINTIFY_SHOP_ID}/products/{printify_product_id}.json",
-            )
-            images = result.get("images", [])
+            for attempt in range(2):
+                time.sleep(5 if attempt == 0 else 10)
+                result = self._request(
+                    "GET",
+                    f"/shops/{settings.PRINTIFY_SHOP_ID}/products/{printify_product_id}.json",
+                )
+                images = result.get("images", [])
+                if images:
+                    break
+
             front_url = ""
             back_url = ""
             for img in images:
-                position = img.get("position", "front")
+                position = img.get("position", "")
                 src = img.get("src", "")
-                if position == "front" and src and not front_url:
+                if not src:
+                    continue
+                if position in ("front", "default") and not front_url:
                     front_url = src
-                elif position == "back" and src and not back_url:
+                elif position == "back" and not back_url:
                     back_url = src
+                elif not front_url and not position:
+                    front_url = src
 
             mockup_urls: dict[str, str] = {}
             if front_url:
@@ -252,7 +261,7 @@ class PrintifyService:
             if back_url:
                 mockup_urls["back"] = back_url
 
-            logger.info("printify.generate_mockups product_id=%s positions=%s", printify_product_id, list(mockup_urls))
+            logger.info("printify.generate_mockups product_id=%s positions=%s attempts=%d", printify_product_id, list(mockup_urls), attempt + 1)
             return mockup_urls
         except Exception as e:
             logger.error("printify.generate_mockups failed product_id=%s error=%s", printify_product_id, e)

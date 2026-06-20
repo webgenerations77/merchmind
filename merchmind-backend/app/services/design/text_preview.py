@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 _CANVAS_W = 1200
 _CANVAS_H = 1200
 _BG_COLOR = (0, 0, 0, 0)
-_TEXT_COLOR = (30, 30, 30)
+_TEXT_COLOR = (255, 255, 255)
 _ACCENT_COLOR = (99, 102, 241)
 
 _FONT_PATHS = [
@@ -91,7 +91,7 @@ def generate_text_preview(
             bbox = secondary_font.getbbox(line)
             text_w = bbox[2] - bbox[0]
             x = (_CANVAS_W - text_w) // 2
-            draw.text((x, sec_y), line, fill=(80, 80, 80), font=secondary_font)
+            draw.text((x, sec_y), line, fill=(200, 200, 200), font=secondary_font)
             sec_y += 36
 
     buf = io.BytesIO()

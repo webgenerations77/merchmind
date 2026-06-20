@@ -123,8 +123,23 @@ def reject_design(design_id: UUID, db: Session = Depends(get_db), _: str = Depen
     design.rejected_at = datetime.utcnow()
     design.is_deleted = True
     _log_feedback(db, design, "rejected")
+
+    deleted_products = []
+    from app.models.product import Product
+    from app.services.publishing.printify_publisher import _get as _get_printify
+    svc = _get_printify()
+    products = db.query(Product).filter(Product.design_id == design_id).all()
+    for product in products:
+        if product.printify_product_id:
+            try:
+                svc.delete_product(product.printify_product_id)
+                deleted_products.append(product.product_type)
+            except Exception as e:
+                logger.warning(f"Printify delete failed for {product.product_type}: {e}")
+        product.publish_status = "unpublished"
+
     db.commit()
-    return _envelope({"id": str(design_id), "status": "rejected"})
+    return _envelope({"id": str(design_id), "status": "rejected", "printify_deleted": deleted_products})
 
 
 @router.patch("/{design_id}/delay")
