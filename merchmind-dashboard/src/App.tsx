@@ -5,6 +5,7 @@ import ReviewPage from './pages/ReviewPage';
 import ProductsPage from './pages/ProductsPage';
 import BatchesPage from './pages/BatchesPage';
 import SettingsPage from './pages/SettingsPage';
+import DrewsMindPage from './pages/DrewsMindPage';
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/review" element={<ReviewPage />} />
+        <Route path="/drews-mind" element={<DrewsMindPage />} />
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/batches" element={<BatchesPage />} />
         <Route path="/settings" element={<SettingsPage />} />

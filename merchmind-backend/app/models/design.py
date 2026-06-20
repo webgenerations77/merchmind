@@ -10,8 +10,8 @@ class Design(Base):
     __tablename__ = "designs"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    trend_id = Column(UUID(as_uuid=True), ForeignKey("trends.id"), nullable=False)
-    batch_id = Column(UUID(as_uuid=True), ForeignKey("batches.id"), nullable=False)
+    trend_id = Column(UUID(as_uuid=True), ForeignKey("trends.id"), nullable=True)
+    batch_id = Column(UUID(as_uuid=True), ForeignKey("batches.id"), nullable=True)
     concept_name = Column(Text, nullable=False)
     archetype = Column(
         SAEnum(

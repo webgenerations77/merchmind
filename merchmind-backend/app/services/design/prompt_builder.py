@@ -10,38 +10,41 @@ from app.utils.claude_client import claude
 logger = logging.getLogger(__name__)
 
 _STYLE_LOCK = (
-    "flat design, bold outlines, limited color palette (max 4 colors), "
-    "white background, centered composition, no gradients, "
-    "suitable for screen printing, commercial merchandise style, "
-    "NO TEXT in the image"
+    "Professional merchandise artwork style. White or transparent background. "
+    "Centered composition with clean edges. High contrast, vibrant colors. "
+    "No text, no letters, no words, no watermarks. "
+    "Print-ready quality, sharp details, professional commercial design."
 )
 
 _ARCHETYPE_TEMPLATES = {
     "illustration": (
-        "A detailed flat-design illustration of {subject}. "
-        "Clean vector style, bold outlines, 3-4 solid colors, "
-        "centered on white background. {style_lock}"
+        "A striking, professional illustration of {subject}. "
+        "Bold graphic style with clean lines, rich saturated colors, "
+        "detailed but not cluttered. Modern commercial art quality. {style_lock}"
     ),
     "hybrid": (
-        "A flat-design illustration of {subject} with space for text overlay below. "
-        "Bold outlines, limited color palette, centered composition. {style_lock}"
+        "A bold, eye-catching graphic design of {subject}. "
+        "Strong visual impact, professional quality with space for text overlay. "
+        "Clean composition, vibrant colors, modern design aesthetic. {style_lock}"
     ),
     "text_icon": (
-        "A simple bold icon or symbol representing {subject}. "
-        "Single recognizable graphic, flat design, strong silhouette, "
-        "centered on white background. {style_lock}"
+        "A bold, iconic symbol representing {subject}. "
+        "Strong recognizable silhouette, modern and minimal. "
+        "Clean graphic design, professional quality. {style_lock}"
     ),
     "typographic": (
-        "A stylized typographic design based on the concept of {subject}. "
-        "Letters as art, bold and geometric, flat design. {style_lock}"
+        "A creative typographic art piece inspired by the concept of {subject}. "
+        "Letters and shapes as art, modern graphic design style. {style_lock}"
     ),
-    "text_only": None,  # No image generation for text_only
+    "text_only": None,
 }
 
 _SYSTEM = (
-    "You are an expert print-on-demand merchandise designer. "
-    "Write concise, vivid image generation prompts that produce clean, "
-    "screen-printable artwork. Never include text or words in image prompts. "
+    "You are an expert merchandise graphic designer who creates bestselling "
+    "print-on-demand designs. Write vivid, specific image generation prompts "
+    "that produce professional, eye-catching artwork people want to wear. "
+    "Focus on bold visual impact, emotional resonance, and commercial appeal. "
+    "Never include text or words in image prompts — the design should be purely visual. "
     "Reply with only the prompt text, no extra commentary."
 )
 
@@ -68,10 +71,12 @@ def build_image_prompt(
         f"Concept name: \"{concept_name or raw_signal}\"\n"
         f"Niche category: {niche or 'general'}\n"
         f"Design archetype: {archetype}\n\n"
-        f"Write a concise image generation prompt for this design. "
-        f"Must include these exact constraints: \"{_STYLE_LOCK}\"\n"
-        f"Be specific about the subject, style, and composition. "
-        f"Max 100 words."
+        f"Write an image generation prompt for a bestselling merchandise design.\n"
+        f"Think about what would look amazing on a t-shirt or hoodie — bold, eye-catching, "
+        f"something people would proudly wear.\n"
+        f"Be specific about the subject, visual style, color palette, and composition.\n"
+        f"Must include these constraints: \"{_STYLE_LOCK}\"\n"
+        f"Max 120 words."
     )
     try:
         text, _ = claude.sonnet(

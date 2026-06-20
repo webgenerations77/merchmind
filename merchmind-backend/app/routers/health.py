@@ -79,18 +79,26 @@ def reset_data(db: Session = Depends(get_db), _: str = Depends(verify_api_key)) 
     from app.models.feedback_log import FeedbackLog
 
     counts = {}
-    for model, name in [
-        (Product, "products"),
-        (MarketingAsset, "marketing_assets"),
-        (FeedbackLog, "feedback_logs"),
-        (Design, "designs"),
-        (Trend, "trends"),
-        (Alert, "alerts"),
-        (Batch, "batches"),
-    ]:
-        count = db.query(model).delete()
-        counts[name] = count
-    db.commit()
+    try:
+        for model, name in [
+            (Product, "products"),
+            (MarketingAsset, "marketing_assets"),
+            (FeedbackLog, "feedback_logs"),
+            (Alert, "alerts"),
+            (Design, "designs"),
+            (Trend, "trends"),
+            (Batch, "batches"),
+        ]:
+            count = db.query(model).delete(synchronize_session="fetch")
+            counts[name] = count
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        db.execute(__import__('sqlalchemy').text(
+            "TRUNCATE products, marketing_assets, feedback_logs, alerts, designs, trends, batches CASCADE"
+        ))
+        db.commit()
+        counts = {"truncated": "all tables via CASCADE"}
     logger.info("reset_data counts=%s", counts)
     return {"ok": True, "deleted": counts}
 

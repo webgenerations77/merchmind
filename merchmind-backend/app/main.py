@@ -24,6 +24,7 @@ from app.routers import (
     settings as settings_router,
     onboarding,
     health,
+    custom_ideas,
 )
 
 # JSON structured logging for Railway log aggregation
@@ -79,6 +80,7 @@ app.include_router(marketing.router)
 app.include_router(settings_router.router)
 app.include_router(onboarding.router)
 app.include_router(health.router)
+app.include_router(custom_ideas.router)
 
 
 @app.on_event("startup")
