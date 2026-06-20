@@ -17,6 +17,26 @@ def _envelope(data=None, error: str = None) -> dict:
     return {"success": error is None, "data": data, "error": error}
 
 
+@router.get("")
+def list_all_assets(db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    from app.models.design import Design
+    assets = (
+        db.query(MarketingAsset)
+        .join(Design, MarketingAsset.design_id == Design.id)
+        .filter(Design.is_deleted == False)
+        .order_by(MarketingAsset.created_at.desc())
+        .limit(200)
+        .all()
+    )
+    result = []
+    for a in assets:
+        data = MarketingAssetOut.model_validate(a).model_dump()
+        data["design_name"] = a.design.concept_name if a.design else None
+        data["design_image"] = a.design.processed_image_url if a.design else None
+        result.append(data)
+    return _envelope(result)
+
+
 @router.get("/{design_id}")
 def get_design_assets(design_id: UUID, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
     assets = db.query(MarketingAsset).filter(MarketingAsset.design_id == design_id).all()

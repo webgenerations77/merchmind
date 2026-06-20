@@ -7,6 +7,7 @@ const links = [
   { to: '/review', label: 'Review', icon: '#' },
   { to: '/collections', label: 'Collections', icon: '&' },
   { to: '/drews-mind', label: "Drew's Mind", icon: '!' },
+  { to: '/marketing', label: 'Marketing', icon: '^' },
   { to: '/products', label: 'Products', icon: '%' },
   { to: '/batches', label: 'Batches', icon: '@' },
   { to: '/api-usage', label: 'API Usage', icon: '$' },

@@ -37,7 +37,7 @@ _BLUEPRINT_MAP = {
 _PROVIDER_MAP = {
     "tshirt": 99,
     "mug": 1,
-    "hat": 99,
+    "hat": 410,
     "phone_case": 1,
     "sticker": 99,
     "poster": 99,

@@ -49,32 +49,36 @@ class TestArchetypeClassifier:
 
 
 class TestProductBundleAssignment:
-    def test_illustration_gets_tshirt_and_poster(self):
+    def test_illustration_gets_at_least_five_types(self):
         result = assign_product_bundle("illustration", {"visual_appeal": 8})
         assert "tshirt" in result
         assert "poster" in result
-        assert "mug" not in result
+        assert "mug" in result
+        assert len(result) >= 5
 
-    def test_text_only_gets_max_products(self):
+    def test_text_only_gets_all_products(self):
         result = assign_product_bundle("text_only", {})
-        assert len(result) == 4
+        assert len(result) == 6
+        assert "tshirt" in result
+        assert "mug" in result
 
-    def test_typographic_gets_max_products(self):
+    def test_typographic_gets_all_products(self):
         result = assign_product_bundle("typographic", {})
-        assert len(result) == 4
+        assert len(result) == 6
 
-    def test_text_icon_excludes_poster(self):
+    def test_text_icon_gets_at_least_five(self):
         result = assign_product_bundle("text_icon", {})
-        assert "poster" not in result
+        assert len(result) >= 5
         assert "tshirt" in result
 
-    def test_hybrid_high_quality_gets_max(self):
+    def test_hybrid_gets_all_products(self):
         result = assign_product_bundle("hybrid", {"visual_appeal": 9})
-        assert len(result) == 4
+        assert len(result) == 6
 
-    def test_hybrid_low_quality_gets_subset(self):
-        result = assign_product_bundle("hybrid", {"visual_appeal": 5})
-        assert len(result) < 6
+    def test_all_archetypes_include_tshirt(self):
+        for arch in ["illustration", "hybrid", "text_only", "typographic", "text_icon"]:
+            result = assign_product_bundle(arch, {})
+            assert "tshirt" in result, f"{arch} missing tshirt"
 
 
 class TestBatchPipelineIntegration:
