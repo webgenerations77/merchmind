@@ -502,32 +502,29 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
 
         db.commit()
 
-        # Step 6b: Generate Printify mockups for preview
-        mockup_types = ["tshirt", "mug", "phone_case"]
+        # Step 6b: Generate Printify t-shirt mockup for preview
         image_url = design.processed_image_url or design.raw_image_url
-        if image_url:
-            from app.services.publishing.printify_publisher import create_product as printify_create, generate_mockups as printify_mockups
-            for mock_type in mockup_types:
-                mock_product = db.query(Product).filter(
-                    Product.design_id == design.id, Product.product_type == mock_type
-                ).first()
-                if not mock_product:
-                    continue
-                try:
-                    printify_id = printify_create(
-                        product_type=mock_type,
-                        title=design.shopify_title or design.concept_name,
-                        description="",
-                        image_url=image_url,
-                        retail_price=float(mock_product.retail_price),
-                    )
-                    mock_product.printify_product_id = printify_id
-                    mockups = printify_mockups(printify_id, design_id)
-                    mock_product.mockup_urls = mockups
-                    db.commit()
-                    logger.info(f"design_task[{trend_id[:8]}] Printify mockup generated for {mock_type}")
-                except Exception as mock_err:
-                    logger.warning(f"design_task[{trend_id[:8]}] Printify mockup failed for {mock_type}: {mock_err}")
+        tshirt_product = db.query(Product).filter(
+            Product.design_id == design.id, Product.product_type == "tshirt"
+        ).first()
+        if image_url and tshirt_product:
+            try:
+                from app.services.publishing.printify_publisher import _get as _get_printify
+                svc = _get_printify()
+                printify_id = svc.create_product(
+                    product_type="tshirt",
+                    title=design.shopify_title or design.concept_name,
+                    description="",
+                    image_url=image_url,
+                    retail_price=float(tshirt_product.retail_price),
+                )
+                tshirt_product.printify_product_id = printify_id
+                mockups = svc.generate_mockups(printify_id)
+                tshirt_product.mockup_urls = mockups
+                db.commit()
+                logger.info(f"design_task[{trend_id[:8]}] Printify tshirt mockup generated")
+            except Exception as mock_err:
+                logger.warning(f"design_task[{trend_id[:8]}] Printify mockup failed: {mock_err}")
 
         # Step 7: Generate marketing assets
         _generate_marketing_assets(design, trend, niche_name, product_types, db)
