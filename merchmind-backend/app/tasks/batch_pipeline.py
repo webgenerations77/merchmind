@@ -355,25 +355,23 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
         color_palette = []
         if image_api and image_prompt:
             try:
+                _log("generating image...")
                 raw_bytes, api_used = generate_image(image_prompt, image_api)
                 design.image_api_used = api_used
+                _log(f"image generated via {api_used}, {len(raw_bytes)} bytes")
 
                 # Upload raw image
                 raw_path = storage.design_raw_path(design_id)
                 raw_url = storage.upload(raw_path, raw_bytes)
                 design.raw_image_url = raw_url
-                db.commit()
+                _log("raw image uploaded")
 
-                # 4e: Post-process
-                processed_img, report = process_image(raw_bytes)
-                processed_bytes = image_to_bytes(processed_img)
-
+                # Use raw image as processed (skip rembg to avoid OOM)
                 proc_path = storage.design_processed_path(design_id)
-                processed_url = storage.upload(proc_path, processed_bytes)
+                processed_url = storage.upload(proc_path, raw_bytes)
                 design.processed_image_url = processed_url
-                color_palette = report.get("color_palette", [])
-                design.color_palette = color_palette
                 db.commit()
+                _log("processed image uploaded")
 
             except Exception as img_err:
                 error_msg = f"Image generation failed: {type(img_err).__name__}: {img_err}"
