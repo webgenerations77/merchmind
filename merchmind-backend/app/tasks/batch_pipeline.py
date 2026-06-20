@@ -363,10 +363,13 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                 db.commit()
 
             except Exception as img_err:
-                logger.warning(f"Image generation failed for design {design_id}: {img_err}; forcing text_only")
+                error_msg = f"Image generation failed: {type(img_err).__name__}: {img_err}"
+                logger.warning(f"{error_msg} — design {design_id}; forcing text_only")
                 archetype = "text_only"
                 design.archetype = archetype
                 design.image_api_used = None
+                design.font_reasoning = error_msg[:500]
+                _log_batch_error(db.query(Batch).filter(Batch.id == batch_id).first(), db, error_msg[:300])
                 db.commit()
 
         design.color_palette = color_palette
