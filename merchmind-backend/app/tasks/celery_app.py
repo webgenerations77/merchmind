@@ -42,6 +42,50 @@ celery_app.conf.update(
     },
 )
 
+@celery_app.on_after_finalize.connect
+def cleanup_stuck_on_startup(sender, **kwargs):
+    """Mark stale running batches/ideas as failed on worker startup."""
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        from app.database import SessionLocal
+        from app.models.batch import Batch
+        from app.models.custom_idea import CustomIdea
+        from app.models.collection import Collection
+        from datetime import datetime, timezone, timedelta
+        import app.models  # noqa: F401
+
+        db = SessionLocal()
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
+
+        stuck_batches = db.query(Batch).filter(
+            Batch.status == "running",
+            Batch.run_started_at < cutoff,
+        ).all()
+        for b in stuck_batches:
+            b.status = "complete"
+            b.run_completed_at = datetime.now(timezone.utc)
+        if stuck_batches:
+            logger.info("Cleaned up %d stuck batches on startup", len(stuck_batches))
+
+        stuck_ideas = db.query(CustomIdea).filter(CustomIdea.status == "generating").all()
+        for i in stuck_ideas:
+            i.status = "failed"
+        if stuck_ideas:
+            logger.info("Cleaned up %d stuck ideas on startup", len(stuck_ideas))
+
+        stuck_collections = db.query(Collection).filter(Collection.status == "generating").all()
+        for c in stuck_collections:
+            c.status = "draft"
+        if stuck_collections:
+            logger.info("Cleaned up %d stuck collections on startup", len(stuck_collections))
+
+        db.commit()
+        db.close()
+    except Exception as e:
+        logger.warning("Startup cleanup failed (non-fatal): %s", e)
+
+
 celery_app.conf.beat_schedule = {
     "sunday-batch": {
         "task": "app.tasks.batch_pipeline.run_weekly_batch",
