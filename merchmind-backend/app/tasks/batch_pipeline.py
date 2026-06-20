@@ -101,7 +101,6 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
         trend_boost_max = float(settings_row.trend_boost_max) if settings_row else 0.20
         base_markup = settings_row.base_markup if settings_row else {}
         floor_prices = settings_row.floor_prices if settings_row else {}
-        back_logo_enabled = settings_row.back_logo_enabled if settings_row else False
         back_logo_url = settings_row.back_logo_url if settings_row else None
         back_logo_products = settings_row.back_logo_products if settings_row else ["tshirt", "hat"]
 
@@ -249,7 +248,7 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                     "trend_boost_max": trend_boost_max,
                     "base_markup": base_markup,
                     "floor_prices": floor_prices,
-                    "back_logo_enabled": back_logo_enabled,
+                    "back_logo_enabled": True,
                     "back_logo_url": back_logo_url,
                     "back_logo_products": back_logo_products,
                 })

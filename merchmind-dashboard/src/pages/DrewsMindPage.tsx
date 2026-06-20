@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { listIdeas, createIdea, type CustomIdea } from '../api/ideas';
+import { listIdeas, createIdea, generateSavedIdea, deleteIdea, type CustomIdea } from '../api/ideas';
 import { getDesign } from '../api/designs';
 import type { DesignOut } from '../types/api';
 import StatusBadge from '../components/shared/StatusBadge';
@@ -15,7 +15,7 @@ const ARCHETYPE_OPTIONS = [
   { value: 'text_only', label: 'Text Only — slogan/phrase' },
 ];
 
-function IdeaResult({ idea }: { idea: CustomIdea }) {
+function IdeaResult({ idea, onGenerate, onDelete }: { idea: CustomIdea; onGenerate: (id: string) => void; onDelete: (id: string) => void }) {
   const [design, setDesign] = useState<DesignOut | null>(null);
 
   useEffect(() => {
@@ -31,7 +31,24 @@ function IdeaResult({ idea }: { idea: CustomIdea }) {
           <p className="text-sm font-semibold text-text-primary">{idea.input_text}</p>
           <p className="text-xs text-text-tertiary mt-0.5">{formatTimeAgo(idea.created_at)}</p>
         </div>
-        <StatusBadge status={idea.status} />
+        <div className="flex items-center gap-2">
+          <StatusBadge status={idea.status} />
+          {idea.status === 'saved' && (
+            <>
+              <button onClick={() => onGenerate(idea.id)} className="px-3 py-1 rounded-lg bg-accent/15 text-accent text-xs font-medium hover:bg-accent/25 transition-colors">
+                Generate
+              </button>
+              <button onClick={() => onDelete(idea.id)} className="px-2 py-1 rounded-lg text-text-tertiary hover:text-confidence-low text-xs transition-colors">
+                Remove
+              </button>
+            </>
+          )}
+          {idea.status === 'failed' && (
+            <button onClick={() => onGenerate(idea.id)} className="px-3 py-1 rounded-lg bg-accent/15 text-accent text-xs font-medium hover:bg-accent/25 transition-colors">
+              Retry
+            </button>
+          )}
+        </div>
       </div>
 
       {design && (
@@ -72,24 +89,40 @@ export default function DrewsMindPage() {
   const [generating, setGenerating] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    listIdeas().then(setIdeas).catch(() => null).finally(() => setLoading(false));
-  }, []);
+  const load = () => listIdeas().then(setIdeas).catch(() => null).finally(() => setLoading(false));
 
-  const handleSubmit = async () => {
+  useEffect(() => { load(); }, []);
+
+  const handleSubmit = async (saveOnly: boolean) => {
     if (!inputText.trim() || generating) return;
     setGenerating(true);
     try {
       const prefs: Record<string, string> = {};
       if (archetype) prefs.archetype = archetype;
-      await createIdea(inputText.trim(), prefs);
+      await createIdea(inputText.trim(), prefs, saveOnly);
       setInputText('');
       setArchetype('');
-      const updated = await listIdeas();
-      setIdeas(updated);
+      await load();
     } catch { /* ignore */ }
     setGenerating(false);
   };
+
+  const handleGenerate = async (id: string) => {
+    try {
+      await generateSavedIdea(id);
+      await load();
+    } catch { /* ignore */ }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteIdea(id);
+      await load();
+    } catch { /* ignore */ }
+  };
+
+  const saved = ideas.filter((i) => i.status === 'saved');
+  const active = ideas.filter((i) => i.status !== 'saved');
 
   if (loading) return <div className="flex items-center justify-center h-64 text-text-secondary">Loading...</div>;
 
@@ -122,13 +155,22 @@ export default function DrewsMindPage() {
             ))}
           </select>
 
-          <button
-            onClick={handleSubmit}
-            disabled={!inputText.trim() || generating}
-            className="ml-auto px-5 py-2 rounded-lg bg-accent text-white font-semibold text-sm hover:bg-accent/80 transition-colors disabled:opacity-50"
-          >
-            {generating ? 'Creating...' : 'Generate Design'}
-          </button>
+          <div className="ml-auto flex gap-2">
+            <button
+              onClick={() => handleSubmit(true)}
+              disabled={!inputText.trim() || generating}
+              className="px-4 py-2 rounded-lg bg-bg-tertiary border border-border text-text-secondary font-medium text-sm hover:text-text-primary transition-colors disabled:opacity-50"
+            >
+              Save for Later
+            </button>
+            <button
+              onClick={() => handleSubmit(false)}
+              disabled={!inputText.trim() || generating}
+              className="px-5 py-2 rounded-lg bg-accent text-white font-semibold text-sm hover:bg-accent/80 transition-colors disabled:opacity-50"
+            >
+              {generating ? 'Creating...' : 'Generate Design'}
+            </button>
+          </div>
         </div>
 
         {generating && (
@@ -139,12 +181,23 @@ export default function DrewsMindPage() {
         )}
       </div>
 
-      {ideas.length > 0 && (
+      {saved.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold text-text-primary mb-3">Saved for Later ({saved.length})</h2>
+          <div className="space-y-3">
+            {saved.map((idea) => (
+              <IdeaResult key={idea.id} idea={idea} onGenerate={handleGenerate} onDelete={handleDelete} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {active.length > 0 && (
         <div>
           <h2 className="text-lg font-semibold text-text-primary mb-3">Your Ideas</h2>
           <div className="space-y-3">
-            {ideas.map((idea) => (
-              <IdeaResult key={idea.id} idea={idea} />
+            {active.map((idea) => (
+              <IdeaResult key={idea.id} idea={idea} onGenerate={handleGenerate} onDelete={handleDelete} />
             ))}
           </div>
         </div>
@@ -153,7 +206,7 @@ export default function DrewsMindPage() {
       {ideas.length === 0 && !generating && (
         <div className="text-center py-12 text-text-tertiary">
           <p className="text-lg">No ideas yet</p>
-          <p className="text-sm mt-1">Type something above and hit Generate</p>
+          <p className="text-sm mt-1">Type something above and hit Generate or Save for Later</p>
         </div>
       )}
     </div>

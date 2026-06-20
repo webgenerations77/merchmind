@@ -15,7 +15,16 @@ export async function listIdeas(): Promise<CustomIdea[]> {
   return data.data;
 }
 
-export async function createIdea(text: string, preferences?: Record<string, string>): Promise<{ id: string; status: string; design_id: string | null }> {
-  const { data } = await apiClient.post<ApiResponse<{ id: string; status: string; design_id: string | null }>>('/ideas', { text, preferences });
+export async function createIdea(text: string, preferences?: Record<string, string>, saveOnly?: boolean): Promise<{ id: string; status: string }> {
+  const { data } = await apiClient.post<ApiResponse<{ id: string; status: string }>>('/ideas', { text, preferences, save_only: saveOnly });
   return data.data;
+}
+
+export async function generateSavedIdea(id: string): Promise<{ id: string; status: string }> {
+  const { data } = await apiClient.post<ApiResponse<{ id: string; status: string }>>(`/ideas/${id}/generate`);
+  return data.data;
+}
+
+export async function deleteIdea(id: string): Promise<void> {
+  await apiClient.delete(`/ideas/${id}`);
 }

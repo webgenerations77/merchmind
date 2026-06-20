@@ -37,23 +37,47 @@ def list_ideas(db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
 def create_idea(body: dict, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
     """
     Submit a custom idea. Design generation runs async on the Celery worker.
-    Body: {text: "your idea", preferences: {archetype: "illustration", ...}}
+    Body: {text: "your idea", preferences: {archetype: "illustration", ...}, save_only: true}
     """
     text = body.get("text", "").strip()
     if not text:
         return _envelope(error="Text is required")
 
     preferences = body.get("preferences", {})
+    save_only = body.get("save_only", False)
 
     idea = CustomIdea(
         input_text=text,
         source="drews_mind",
-        status="pending",
+        status="saved" if save_only else "pending",
         preferences=preferences,
     )
     db.add(idea)
     db.commit()
     db.refresh(idea)
+
+    if not save_only:
+        from app.tasks.idea_generator import generate_idea_design
+        generate_idea_design.delay(str(idea.id))
+
+    return _envelope({
+        "id": str(idea.id),
+        "status": idea.status,
+        "message": "Thought saved for later" if save_only else "Design generation started — check back shortly",
+    })
+
+
+@router.post("/{idea_id}/generate")
+def generate_saved_idea(idea_id: str, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """Generate a design from a previously saved idea."""
+    idea = db.query(CustomIdea).filter(CustomIdea.id == idea_id).first()
+    if not idea:
+        return _envelope(error="Idea not found")
+    if idea.status not in ("saved", "failed"):
+        return _envelope(error=f"Idea is already {idea.status}")
+
+    idea.status = "pending"
+    db.commit()
 
     from app.tasks.idea_generator import generate_idea_design
     generate_idea_design.delay(str(idea.id))
@@ -61,5 +85,16 @@ def create_idea(body: dict, db: Session = Depends(get_db), _: str = Depends(veri
     return _envelope({
         "id": str(idea.id),
         "status": "pending",
-        "message": "Design generation started — check back shortly",
+        "message": "Design generation started",
     })
+
+
+@router.delete("/{idea_id}")
+def delete_idea(idea_id: str, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """Delete a saved idea."""
+    idea = db.query(CustomIdea).filter(CustomIdea.id == idea_id).first()
+    if not idea:
+        return _envelope(error="Idea not found")
+    db.delete(idea)
+    db.commit()
+    return _envelope({"deleted": True})

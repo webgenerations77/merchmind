@@ -21,6 +21,13 @@ def health() -> dict:
     return {"ok": True, "version": "1.0.0", "environment": settings.ENVIRONMENT}
 
 
+@router.get("/health/api-balance")
+def api_balance(_: str = Depends(verify_api_key)) -> dict:
+    """Check API credit balances for Claude, OpenAI, and Replicate."""
+    from app.services.api_balance import check_all_balances
+    return check_all_balances()
+
+
 @router.get("/health/integrations")
 def health_integrations(_: str = Depends(verify_api_key)) -> dict:
     """

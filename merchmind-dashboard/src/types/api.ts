@@ -14,6 +14,7 @@ export interface DesignQueueItem {
   status: string;
   collection_id: string | null;
   collection_name?: string;
+  source?: 'batch' | 'collection' | 'drews_mind';
   claude_reasoning: string | null;
 }
 

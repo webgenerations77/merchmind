@@ -44,6 +44,12 @@ def get_review_queue(db: Session = Depends(get_db), _: str = Depends(verify_api_
         data = item.model_dump()
         if d.collection:
             data["collection_name"] = d.collection.name
+        if d.collection_id:
+            data["source"] = "collection"
+        elif d.trend_id:
+            data["source"] = "batch"
+        else:
+            data["source"] = "drews_mind"
         result.append(data)
     return _envelope(result)
 

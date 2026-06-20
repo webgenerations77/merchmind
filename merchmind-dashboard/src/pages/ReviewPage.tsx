@@ -3,6 +3,7 @@ import { useReviewStore } from '../stores/reviewStore';
 import { getDesign } from '../api/designs';
 import { listBatches, triggerBatch } from '../api/batches';
 import { listProducts } from '../api/products';
+import { getApiBalance, type ApiBalanceResult } from '../api/health';
 import ClickableImage from '../components/shared/ClickableImage';
 import type { DesignOut, DesignQueueItem, BatchOut, ProductOut } from '../types/api';
 import ConfidenceBadge from '../components/shared/ConfidenceBadge';
@@ -337,6 +338,8 @@ export default function ReviewPage() {
   const [recentBatch, setRecentBatch] = useState<BatchOut | null>(null);
   const [productCount, setProductCount] = useState(0);
   const [triggering, setTriggering] = useState(false);
+  const [apiBalance, setApiBalance] = useState<ApiBalanceResult | null>(null);
+  const [balanceOverride, setBalanceOverride] = useState(false);
 
   const checkBatchStatus = useCallback(async () => {
     try {
@@ -370,6 +373,9 @@ export default function ReviewPage() {
   }, [runningBatch, checkBatchStatus]);
 
   const handleTrigger = async () => {
+    const balance = await getApiBalance().catch(() => null);
+    setApiBalance(balance);
+    if (balance && !balance.ok && !balanceOverride) return;
     if (!confirm('Run a new batch now?')) return;
     setTriggering(true);
     try {
@@ -384,19 +390,28 @@ export default function ReviewPage() {
     fetchQueue();
   };
 
+  const [reviewTab, setReviewTab] = useState<'batch' | 'collections' | 'drews_mind'>('batch');
+
   const pending = queue.filter((d) => !sessionActions[d.id]);
   const actioned = queue.filter((d) => sessionActions[d.id]);
 
-  const singlePending = pending.filter((d) => !d.collection_id);
-  const collectionPending = pending.filter((d) => !!d.collection_id);
-  const collectionGroups: Record<string, { name: string; designs: typeof collectionPending }> = {};
-  for (const d of collectionPending) {
-    const key = d.collection_id!;
+  const batchDesigns = pending.filter((d) => d.source === 'batch' || (!d.collection_id && !d.source));
+  const drewsDesigns = pending.filter((d) => d.source === 'drews_mind');
+  const collectionDesigns = pending.filter((d) => d.source === 'collection' || !!d.collection_id);
+  const collectionGroups: Record<string, { name: string; designs: typeof collectionDesigns }> = {};
+  for (const d of collectionDesigns) {
+    const key = d.collection_id || 'ungrouped';
     if (!collectionGroups[key]) {
       collectionGroups[key] = { name: d.collection_name || 'Collection', designs: [] };
     }
     collectionGroups[key].designs.push(d);
   }
+
+  const tabCounts = {
+    batch: batchDesigns.length,
+    collections: collectionDesigns.length,
+    drews_mind: drewsDesigns.length,
+  };
 
   const openDetail = async (id: string) => {
     setLoadingDetail(true);
@@ -462,44 +477,101 @@ export default function ReviewPage() {
         </div>
       </div>
 
+      {apiBalance && !apiBalance.ok && !balanceOverride && (
+        <div className="bg-confidence-low/10 border border-confidence-low/30 rounded-xl p-4 mb-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-confidence-low">API Balance Warning</h3>
+              <p className="text-xs text-text-secondary mt-1">One or more API services may be low on credits:</p>
+              <div className="flex gap-3 mt-2">
+                {Object.values(apiBalance.services).map((svc) => (
+                  <span key={svc.service} className={`text-xs font-medium ${svc.ok ? 'text-approve' : 'text-confidence-low'}`}>
+                    {svc.service}: {svc.ok ? 'OK' : svc.error || 'Issue'}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <button
+              onClick={() => { setBalanceOverride(true); handleTrigger(); }}
+              className="px-3 py-1.5 rounded-lg bg-confidence-low/20 text-confidence-low text-xs font-medium hover:bg-confidence-low/30 transition-colors shrink-0"
+            >
+              Continue Anyway
+            </button>
+          </div>
+        </div>
+      )}
+
       {runningBatch && <BatchProgress batch={runningBatch} productCount={productCount} />}
       {recentBatch && <BatchComplete batch={recentBatch} onRefresh={handleRefresh} />}
 
-      {pending.length === 0 && actioned.length === 0 && !runningBatch && !recentBatch && (
-        <div className="text-center py-20 text-text-tertiary">
-          <p className="text-lg">No designs to review</p>
-          <p className="text-sm mt-1">Click "Run Batch" to generate new designs</p>
-        </div>
-      )}
+      <div className="flex gap-1 mb-6 bg-bg-secondary rounded-lg p-1 border border-border">
+        {([['batch', 'Design Ideas'], ['collections', 'Collections'], ['drews_mind', "Drew's Mind"]] as const).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setReviewTab(key)}
+            className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              reviewTab === key ? 'bg-accent text-white' : 'text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            {label} {tabCounts[key] > 0 && <span className="ml-1 text-xs opacity-75">({tabCounts[key]})</span>}
+          </button>
+        ))}
+      </div>
 
-      {singlePending.length > 0 && (
-        <>
-          {Object.keys(collectionGroups).length > 0 && (
-            <h2 className="text-lg font-semibold text-text-primary mb-3">Single Designs</h2>
-          )}
+      {reviewTab === 'batch' && (
+        batchDesigns.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-            {singlePending.map((item) => (
+            {batchDesigns.map((item) => (
               <DesignCard key={item.id} item={item} onClick={() => openDetail(item.id)} />
             ))}
           </div>
-        </>
+        ) : (
+          <div className="text-center py-16 text-text-tertiary">
+            <p className="text-lg">No batch designs to review</p>
+            <p className="text-sm mt-1">Click "Run Batch" to generate designs from trending topics</p>
+          </div>
+        )
       )}
 
-      {Object.entries(collectionGroups).map(([collectionId, group]) => (
-        <div key={collectionId} className="mb-8">
-          <div className="flex items-center gap-3 mb-3">
-            <h2 className="text-lg font-semibold text-text-primary">{group.name}</h2>
-            <span className="text-xs text-text-tertiary bg-bg-tertiary px-2 py-0.5 rounded-full">
-              {group.designs.length} designs
-            </span>
+      {reviewTab === 'collections' && (
+        Object.keys(collectionGroups).length > 0 ? (
+          Object.entries(collectionGroups).map(([collectionId, group]) => (
+            <div key={collectionId} className="mb-8">
+              <div className="flex items-center gap-3 mb-3">
+                <h2 className="text-lg font-semibold text-text-primary">{group.name}</h2>
+                <span className="text-xs text-text-tertiary bg-bg-tertiary px-2 py-0.5 rounded-full">
+                  {group.designs.length} designs
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {group.designs.map((item) => (
+                  <DesignCard key={item.id} item={item} onClick={() => openDetail(item.id)} />
+                ))}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="text-center py-16 text-text-tertiary">
+            <p className="text-lg">No collection designs to review</p>
+            <p className="text-sm mt-1">Create a collection and generate designs from the Collections page</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {group.designs.map((item) => (
+        )
+      )}
+
+      {reviewTab === 'drews_mind' && (
+        drewsDesigns.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            {drewsDesigns.map((item) => (
               <DesignCard key={item.id} item={item} onClick={() => openDetail(item.id)} />
             ))}
           </div>
-        </div>
-      ))}
+        ) : (
+          <div className="text-center py-16 text-text-tertiary">
+            <p className="text-lg">No Drew's Mind designs to review</p>
+            <p className="text-sm mt-1">Create ideas from the Drew's Mind page</p>
+          </div>
+        )
+      )}
 
       {actioned.length > 0 && (
         <>
