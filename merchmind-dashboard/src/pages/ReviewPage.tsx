@@ -18,7 +18,7 @@ function BatchProgress({ batch, productCount }: { batch: BatchOut; productCount:
   const steps = [
     { label: 'Scraping trends', done: batch.total_ideas > 0 },
     { label: `Scoring ${batch.total_ideas} ideas`, done: batch.queued_count > 0 },
-    { label: `Generating ${batch.queued_count} designs`, done: productCount > 0 },
+    { label: `Generating ${batch.queued_count} designs`, done: batch.queued_count > 0 && productCount > 0 },
     { label: 'Creating products & marketing', done: batch.status === 'complete' },
   ];
 
@@ -338,7 +338,9 @@ export default function ReviewPage() {
         setRunningBatch(latest);
         setRecentBatch(null);
         const products = await listProducts();
-        setProductCount(products.length);
+        const batchStart = new Date(latest.run_started_at).getTime();
+        const batchProducts = products.filter((p) => new Date(p.created_at).getTime() >= batchStart);
+        setProductCount(batchProducts.length);
       } else if (latest?.status === 'complete') {
         setRunningBatch((prev) => {
           if (prev) setRecentBatch(latest);

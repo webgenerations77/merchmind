@@ -10,9 +10,10 @@ from app.models.feedback_log import FeedbackLog
 from app.models.settings import AppSettings
 from app.models.marketing_asset import MarketingAsset
 from app.models.email_subscriber import EmailSubscriber
+from app.models.custom_idea import CustomIdea
 
 __all__ = [
     "Trend", "Batch", "Collection", "Design", "Product", "Sale", "Alert",
     "NicheCluster", "FeedbackLog", "AppSettings", "MarketingAsset",
-    "EmailSubscriber",
+    "EmailSubscriber", "CustomIdea",
 ]
