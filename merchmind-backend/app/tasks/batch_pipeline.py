@@ -296,24 +296,12 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
     """
     db = SessionLocal()
     design = None
-    def _log(msg):
-        logger.info(f"design_task[{trend_id[:8]}] {msg}")
-        try:
-            log_db = SessionLocal()
-            batch = log_db.query(Batch).filter(Batch.id == batch_id).first()
-            if batch:
-                _log_batch_error(batch, log_db, f"TRACE {trend_id[:8]}: {msg}")
-            log_db.close()
-        except Exception:
-            pass
-
     try:
-        _log("started")
+        logger.info(f"design_task[{trend_id[:8]}] started")
         trend = db.query(Trend).filter(Trend.id == trend_id).first()
         if not trend:
             raise ValueError(f"Trend {trend_id} not found")
 
-        _log(f"trend found: {trend.raw_signal[:40]}")
         quality_threshold = pipeline_settings.get("quality_threshold", 28)
         trend_boost_max = pipeline_settings.get("trend_boost_max", 0.20)
         base_markup = pipeline_settings.get("base_markup", {})
@@ -326,13 +314,11 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                 niche_name = cluster.name
 
         # 4a: Classify archetype
-        _log("classifying archetype...")
         archetype = classify_archetype(trend.raw_signal, trend.source, niche_name)
-        _log(f"archetype={archetype}")
+        logger.info(f"design_task[{trend_id[:8]}] archetype={archetype}")
 
         # 4b: Select image API
         image_api = select_image_api(archetype)
-        _log(f"image_api={image_api}")
 
         # Create design record
         design = Design(
@@ -347,37 +333,35 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
         db.commit()
         db.refresh(design)
         design_id = str(design.id)
-        _log(f"design created id={design_id[:8]}")
+        logger.info(f"design_task[{trend_id[:8]}] design created id={design_id[:8]}")
 
         # 4c: Build image prompt
-        _log("building image prompt (claude sonnet)...")
         image_prompt = build_image_prompt(trend.raw_signal, archetype, niche_name, design.concept_name)
-        _log(f"prompt built, len={len(image_prompt) if image_prompt else 0}")
         design.image_prompt = image_prompt
         db.commit()
+        logger.info(f"design_task[{trend_id[:8]}] prompt built")
 
         # 4d: Generate image (if applicable)
         processed_url = None
         color_palette = []
         if image_api and image_prompt:
             try:
-                _log("generating image...")
+                logger.info(f"design_task[{trend_id[:8]}] generating image via {image_api}...")
                 raw_bytes, api_used = generate_image(image_prompt, image_api)
                 design.image_api_used = api_used
-                _log(f"image generated via {api_used}, {len(raw_bytes)} bytes")
+                logger.info(f"design_task[{trend_id[:8]}] image generated via {api_used}, {len(raw_bytes)} bytes")
 
                 # Upload raw image
                 raw_path = storage.design_raw_path(design_id)
                 raw_url = storage.upload(raw_path, raw_bytes)
                 design.raw_image_url = raw_url
-                _log("raw image uploaded")
 
                 # Use raw image as processed (skip rembg to avoid OOM)
                 proc_path = storage.design_processed_path(design_id)
                 processed_url = storage.upload(proc_path, raw_bytes)
                 design.processed_image_url = processed_url
                 db.commit()
-                _log("processed image uploaded")
+                logger.info(f"design_task[{trend_id[:8]}] images uploaded")
 
             except Exception as img_err:
                 error_msg = f"Image generation failed: {type(img_err).__name__}: {img_err}"
