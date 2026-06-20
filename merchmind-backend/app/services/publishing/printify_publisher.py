@@ -177,10 +177,11 @@ class PrintifyService:
 
     def generate_mockups(self, printify_product_id: str, design_id: str | None = None) -> dict:
         """
-        Fetch mockup URLs from Printify, upload to Supabase if design_id given.
-        Returns {front: url, back: url} dict (Supabase URLs when design_id provided).
+        Fetch mockup URLs from Printify after a short delay for rendering.
+        Returns {front: url} dict using Printify CDN URLs directly.
         """
         try:
+            time.sleep(5)
             result = self._request(
                 "GET",
                 f"/shops/{settings.PRINTIFY_SHOP_ID}/products/{printify_product_id}.json",
@@ -191,17 +192,8 @@ class PrintifyService:
             for img in images:
                 position = img.get("position", "front")
                 src = img.get("src", "")
-                if position in ("front", "back") and src:
-                    if design_id:
-                        # Download and re-upload to our Supabase bucket for CDN control
-                        with httpx.Client(timeout=_TIMEOUT) as http:
-                            r = http.get(src)
-                            r.raise_for_status()
-                        path = storage.mockup_path(design_id, "tshirt", position)
-                        url = storage.upload(path, r.content, "image/png")
-                        mockup_urls[position] = url
-                    else:
-                        mockup_urls[position] = src
+                if position in ("front", "back") and src and position not in mockup_urls:
+                    mockup_urls[position] = src
 
             logger.info("printify.generate_mockups product_id=%s positions=%s", printify_product_id, list(mockup_urls))
             return mockup_urls
