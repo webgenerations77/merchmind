@@ -49,6 +49,7 @@ class DALLe3Service:
                     model="gpt-image-1",
                     prompt=prompt,
                     size="1024x1024",
+                    quality="low",
                     n=1,
                 )
                 image_data = response.data[0].b64_json
