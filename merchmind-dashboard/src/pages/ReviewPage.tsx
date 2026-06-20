@@ -4,9 +4,10 @@ import { getDesign } from '../api/designs';
 import { listBatches, triggerBatch } from '../api/batches';
 import { listProducts } from '../api/products';
 import ClickableImage from '../components/shared/ClickableImage';
-import type { DesignOut, DesignQueueItem, BatchOut } from '../types/api';
+import type { DesignOut, DesignQueueItem, BatchOut, ProductOut } from '../types/api';
 import ConfidenceBadge from '../components/shared/ConfidenceBadge';
 import StatusBadge from '../components/shared/StatusBadge';
+import { formatCurrency, formatProductType } from '../utils/formatters';
 
 function BatchProgress({ batch, productCount }: { batch: BatchOut; productCount: number }) {
   const startTime = new Date(batch.run_started_at).getTime();
@@ -124,6 +125,26 @@ function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
   onReject: () => void;
   onDelay: () => void;
 }) {
+  const [products, setProducts] = useState<ProductOut[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<string>('design');
+
+  useEffect(() => {
+    listProducts().then((all) => {
+      const matched = all.filter((p) => p.design_id === design.id);
+      setProducts(matched);
+    }).catch(() => null);
+  }, [design.id]);
+
+  const productsWithMockups = products.filter((p) => p.mockup_urls && Object.keys(p.mockup_urls).length > 0);
+  const viewOptions = [
+    { key: 'design', label: 'Original Design' },
+    ...productsWithMockups.map((p) => ({ key: p.id, label: formatProductType(p.product_type) })),
+  ];
+
+  const currentMockup = selectedProduct === 'design'
+    ? null
+    : productsWithMockups.find((p) => p.id === selectedProduct);
+
   return (
     <div>
       <button onClick={onBack} className="text-text-secondary hover:text-text-primary text-sm mb-4">
@@ -132,17 +153,35 @@ function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
-          {design.processed_image_url ? (
+          {viewOptions.length > 1 && (
+            <div className="flex gap-2 mb-3 flex-wrap">
+              {viewOptions.map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => setSelectedProduct(opt.key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    selectedProduct === opt.key
+                      ? 'bg-accent text-white'
+                      : 'bg-bg-secondary text-text-secondary hover:text-text-primary border border-border'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {currentMockup ? (
+            <div className="space-y-2">
+              {Object.entries(currentMockup.mockup_urls).map(([position, url]) => (
+                <ClickableImage key={position} src={url as string} alt={`${position} mockup`} className="w-full rounded-xl" />
+              ))}
+            </div>
+          ) : design.processed_image_url ? (
             <ClickableImage src={design.processed_image_url} alt={design.concept_name} className="w-full rounded-xl" />
           ) : (
             <div className="w-full h-64 bg-bg-tertiary rounded-xl flex items-center justify-center text-text-tertiary">
               Text Only Design
-            </div>
-          )}
-          {design.image_prompt && (
-            <div className="mt-4 p-3 bg-bg-secondary rounded-lg border border-border">
-              <p className="text-xs text-text-tertiary mb-1">Image Prompt</p>
-              <p className="text-sm text-text-secondary">{design.image_prompt}</p>
             </div>
           )}
           {design.image_api_used && (
@@ -160,6 +199,20 @@ function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
             </div>
           </div>
 
+          {products.length > 0 && (
+            <div className="p-3 bg-bg-secondary rounded-lg border border-border">
+              <p className="text-xs text-text-tertiary mb-2">Products ({products.length})</p>
+              <div className="space-y-1.5">
+                {products.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between">
+                    <span className="text-sm text-text-primary">{formatProductType(p.product_type)}</span>
+                    <span className="text-sm font-medium text-accent">{formatCurrency(p.retail_price)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {design.quality_breakdown && (
             <div className="p-3 bg-bg-secondary rounded-lg border border-border">
               <p className="text-xs text-text-tertiary mb-2">Quality Breakdown</p>
@@ -171,14 +224,6 @@ function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-
-          {design.font_pair && (
-            <div className="p-3 bg-bg-secondary rounded-lg border border-border">
-              <p className="text-xs text-text-tertiary mb-1">Font Pair</p>
-              <p className="text-sm text-text-primary">{design.font_pair}</p>
-              {design.font_reasoning && <p className="text-xs text-text-secondary mt-1">{design.font_reasoning}</p>}
             </div>
           )}
 
@@ -215,7 +260,7 @@ function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
               Delay
             </button>
             <button onClick={onApprove} className="flex-1 py-2.5 rounded-lg bg-approve/20 text-approve font-semibold text-sm hover:bg-approve/30 transition-colors">
-              Approve
+              Approve & Publish
             </button>
           </div>
         </div>
