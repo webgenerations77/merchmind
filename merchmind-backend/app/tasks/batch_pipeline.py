@@ -72,7 +72,7 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
     db = SessionLocal()
     batch = None
     try:
-        # Step 1: Initialize batch
+        # Step 1: Initialize batch (skip if one is already running)
         logger.info("Batch pipeline starting")
         today = date.today()
         week_start = today - timedelta(days=today.weekday())
@@ -80,6 +80,10 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
         if batch_id:
             batch = db.query(Batch).filter(Batch.id == batch_id).first()
         if not batch:
+            existing = db.query(Batch).filter(Batch.status == "running").first()
+            if existing:
+                logger.warning("Batch already running id=%s — skipping duplicate", existing.id)
+                return
             batch = Batch(week_start=week_start, status="running", run_started_at=datetime.utcnow())
             db.add(batch)
             db.commit()
