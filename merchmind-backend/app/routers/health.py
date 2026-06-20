@@ -110,6 +110,19 @@ def env_check(_: str = Depends(verify_api_key)) -> dict:
     return result
 
 
+@router.post("/health/run-migration")
+def run_migration(db: Session = Depends(get_db), _: str = Depends(verify_api_key)) -> dict:
+    """Add flux_schnell to image_api enum if missing."""
+    try:
+        db.execute(
+            __import__('sqlalchemy').text("ALTER TYPE image_api ADD VALUE IF NOT EXISTS 'flux_schnell'")
+        )
+        db.commit()
+        return {"ok": True, "message": "flux_schnell added to image_api enum"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 @router.post("/health/purge-queue")
 def purge_queue(_: str = Depends(verify_api_key)) -> dict:
     """Purge all pending Celery tasks from the Redis queue."""
