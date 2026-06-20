@@ -95,6 +95,21 @@ def reset_data(db: Session = Depends(get_db), _: str = Depends(verify_api_key)) 
     return {"ok": True, "deleted": counts}
 
 
+@router.get("/health/env-check")
+def env_check(_: str = Depends(verify_api_key)) -> dict:
+    """Check which env vars are set (masked values for debugging)."""
+    import os
+    keys = ["SUPABASE_URL", "SUPABASE_KEY", "SUPABASE_BUCKET", "OPENAI_API_KEY", "REPLICATE_API_KEY", "ANTHROPIC_API_KEY"]
+    result = {}
+    for k in keys:
+        val = os.environ.get(k, "")
+        if val:
+            result[k] = f"{val[:8]}...{val[-4:]}" if len(val) > 12 else f"{val[:4]}..."
+        else:
+            result[k] = "(not set)"
+    return result
+
+
 @router.post("/health/test-image-gen")
 def test_image_gen(_: str = Depends(verify_api_key)) -> dict:
     """Test image generation with a simple prompt and return detailed error if it fails."""
