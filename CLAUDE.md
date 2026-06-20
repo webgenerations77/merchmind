@@ -135,7 +135,7 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 ## Web Dashboard Architecture
 
 - **Stack:** React 18 + TypeScript + Vite + Tailwind CSS
-- **Routing:** React Router with 5 pages: Dashboard, Review, Products, Batches, Settings
+- **Routing:** React Router with 6 pages: Dashboard, Review, Drew's Mind, Products, Batches, Settings
 - **State:** Zustand stores (mirrors mobile app pattern)
 - **API:** Axios client with retry interceptor, same `X-API-Key` auth
 - **Theme:** Dark theme matching mobile app design tokens from `merchmind-app/src/theme/colors.ts`
