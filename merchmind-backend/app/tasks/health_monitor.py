@@ -11,7 +11,7 @@ from app.tasks.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
-_CRITICAL_SERVICES = {"anthropic", "printify", "shopify"}
+_CRITICAL_SERVICES = {"anthropic", "printify"}
 
 
 @celery_app.task(name="tasks.health_monitor")
@@ -95,10 +95,7 @@ def _process_results(results: dict[str, dict]) -> None:
 def _check_anthropic() -> dict:
     try:
         from app.utils.claude_client import claude
-        # Lightweight: just check the client instantiates and can list models
-        import anthropic
-        client = anthropic.Anthropic(api_key=claude._api_key if hasattr(claude, '_api_key') else "")
-        client.models.list()
+        text, _ = claude.haiku("health_check", [{"role": "user", "content": "Reply with just OK"}], max_tokens=5)
         return {"service": "anthropic", "ok": True}
     except Exception as e:
         return {"service": "anthropic", "ok": False, "error": str(e)}
