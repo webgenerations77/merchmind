@@ -3,6 +3,7 @@ import { listIdeas, createIdea, type CustomIdea } from '../api/ideas';
 import { getDesign } from '../api/designs';
 import type { DesignOut } from '../types/api';
 import StatusBadge from '../components/shared/StatusBadge';
+import ClickableImage from '../components/shared/ClickableImage';
 import { formatTimeAgo } from '../utils/formatters';
 
 const ARCHETYPE_OPTIONS = [
@@ -36,7 +37,7 @@ function IdeaResult({ idea }: { idea: CustomIdea }) {
       {design && (
         <div className="flex gap-4 mt-3 pt-3 border-t border-border">
           {design.processed_image_url ? (
-            <img src={design.processed_image_url} alt={design.concept_name} className="w-24 h-24 object-cover rounded-lg shrink-0" />
+            <ClickableImage src={design.processed_image_url} alt={design.concept_name} className="w-24 h-24 object-cover rounded-lg shrink-0" />
           ) : (
             <div className="w-24 h-24 bg-bg-tertiary rounded-lg flex items-center justify-center text-text-tertiary text-xs shrink-0">
               {design.archetype}

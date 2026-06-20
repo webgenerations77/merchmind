@@ -3,6 +3,7 @@ import { useReviewStore } from '../stores/reviewStore';
 import { getDesign } from '../api/designs';
 import { listBatches, triggerBatch } from '../api/batches';
 import { listProducts } from '../api/products';
+import ClickableImage from '../components/shared/ClickableImage';
 import type { DesignOut, DesignQueueItem, BatchOut } from '../types/api';
 import ConfidenceBadge from '../components/shared/ConfidenceBadge';
 import StatusBadge from '../components/shared/StatusBadge';
@@ -93,7 +94,7 @@ function DesignCard({ item, action, onClick }: { item: DesignQueueItem; action?:
       className="bg-bg-secondary border border-border rounded-xl p-4 text-left hover:border-accent/50 transition-colors w-full"
     >
       {item.processed_image_url ? (
-        <img src={item.processed_image_url} alt={item.concept_name} className="w-full h-40 object-cover rounded-lg mb-3" />
+        <ClickableImage src={item.processed_image_url} alt={item.concept_name} className="w-full h-40 object-cover rounded-lg mb-3" />
       ) : (
         <div className="w-full h-40 bg-bg-tertiary rounded-lg mb-3 flex items-center justify-center text-text-tertiary text-sm">
           Text Only
@@ -132,7 +133,7 @@ function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
           {design.processed_image_url ? (
-            <img src={design.processed_image_url} alt={design.concept_name} className="w-full rounded-xl" />
+            <ClickableImage src={design.processed_image_url} alt={design.concept_name} className="w-full rounded-xl" />
           ) : (
             <div className="w-full h-64 bg-bg-tertiary rounded-xl flex items-center justify-center text-text-tertiary">
               Text Only Design

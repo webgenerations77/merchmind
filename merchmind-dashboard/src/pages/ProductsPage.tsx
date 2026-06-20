@@ -5,6 +5,7 @@ import { getDesign } from '../api/designs';
 import type { ProductOut, DesignOut } from '../types/api';
 import StatusBadge from '../components/shared/StatusBadge';
 import ConfidenceBadge from '../components/shared/ConfidenceBadge';
+import ClickableImage from '../components/shared/ClickableImage';
 import { formatCurrency, formatProductType, formatDate } from '../utils/formatters';
 
 const filters = ['all', 'pending', 'live', 'published', 'failed', 'unpublished'] as const;
@@ -46,11 +47,11 @@ function ProductDetail({ product, onBack }: { product: ProductOut; onBack: () =>
                 {product.mockup_urls && Object.keys(product.mockup_urls).length > 0 ? (
                   <div className="flex gap-2 shrink-0">
                     {Object.entries(product.mockup_urls).map(([position, url]) => (
-                      <img key={position} src={url as string} alt={`${position} mockup`} className="w-48 h-48 object-cover rounded-lg" />
+                      <ClickableImage key={position} src={url as string} alt={`${position} mockup`} className="w-48 h-48 object-cover rounded-lg" />
                     ))}
                   </div>
                 ) : design.processed_image_url ? (
-                  <img src={design.processed_image_url} alt={design.concept_name} className="w-48 h-48 object-cover rounded-lg shrink-0" />
+                  <ClickableImage src={design.processed_image_url} alt={design.concept_name} className="w-48 h-48 object-cover rounded-lg shrink-0" />
                 ) : (
                   <div className="w-48 h-48 bg-bg-tertiary rounded-lg flex items-center justify-center text-text-tertiary text-sm shrink-0">
                     Text Only
