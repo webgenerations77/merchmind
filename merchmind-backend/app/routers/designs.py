@@ -24,21 +24,15 @@ def _envelope(data=None, error: str = None) -> dict:
 
 @router.get("/queue")
 def get_review_queue(db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
-    """Return all non-deleted, non-rejected designs from the most recent batch."""
-    from app.models.batch import Batch
-    current_batch = db.query(Batch).order_by(Batch.created_at.desc()).first()
-    if not current_batch:
-        return _envelope([])
-
+    """Return all non-deleted, non-rejected designs across all batches."""
     designs = (
         db.query(Design)
         .options(joinedload(Design.trend))
         .filter(
-            Design.batch_id == current_batch.id,
             Design.is_deleted == False,
             Design.status.in_(["ready", "approved", "delayed"]),
         )
-        .order_by(Design.created_at.asc())
+        .order_by(Design.created_at.desc())
         .all()
     )
 
