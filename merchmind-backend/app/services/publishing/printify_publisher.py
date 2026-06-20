@@ -43,6 +43,11 @@ _FALLBACK_BASE_COSTS = {
     "poster": 12.00,
 }
 
+_DUAL_PRINT_SURCHARGE = {
+    "tshirt": 2.50,
+    "hat": 3.00,
+}
+
 
 class PrintifyService:
     def _headers(self) -> dict:
@@ -129,6 +134,7 @@ class PrintifyService:
         image_url: str,
         retail_price: float,
         print_provider_id: int = 99,
+        back_logo_url: str | None = None,
     ) -> str:
         blueprint_id = _BLUEPRINT_MAP.get(product_type)
         if not blueprint_id:
@@ -142,6 +148,24 @@ class PrintifyService:
             for v in all_variants[:20]
         ]
 
+        placeholders = [
+            {
+                "position": "front",
+                "images": [{"id": printify_image_id, "x": 0.5, "y": 0.5, "scale": 1.0, "angle": 0}],
+            }
+        ]
+
+        if back_logo_url:
+            try:
+                back_image_id = self.upload_image(back_logo_url, f"{product_type}_back_logo.png")
+                placeholders.append({
+                    "position": "back",
+                    "images": [{"id": back_image_id, "x": 0.5, "y": 0.3, "scale": 0.5, "angle": 0}],
+                })
+                logger.info("printify.create_product adding back logo type=%s", product_type)
+            except Exception as e:
+                logger.warning("printify.create_product back logo upload failed type=%s error=%s", product_type, e)
+
         payload = {
             "title": title,
             "description": description,
@@ -151,12 +175,7 @@ class PrintifyService:
             "print_areas": [
                 {
                     "variant_ids": [v["id"] for v in all_variants[:20]],
-                    "placeholders": [
-                        {
-                            "position": "front",
-                            "images": [{"id": printify_image_id, "x": 0.5, "y": 0.5, "scale": 1.0, "angle": 0}],
-                        }
-                    ],
+                    "placeholders": placeholders,
                 }
             ],
         }
@@ -165,7 +184,7 @@ class PrintifyService:
         product_id = result.get("id", "")
         if not product_id:
             raise PrintifyProductError(f"Printify create_product returned no ID: {result}")
-        logger.info("printify.create_product product_id=%s type=%s title=%r", product_id, product_type, title)
+        logger.info("printify.create_product product_id=%s type=%s title=%r back_logo=%s", product_id, product_type, title, bool(back_logo_url))
         return str(product_id)
 
     def publish_product(self, printify_product_id: str) -> None:
@@ -275,8 +294,9 @@ def create_product(
     image_url: str,
     retail_price: float,
     print_provider_id: int = 99,
+    back_logo_url: str | None = None,
 ) -> str:
-    return _get().create_product(product_type, title, description, image_url, retail_price, print_provider_id)
+    return _get().create_product(product_type, title, description, image_url, retail_price, print_provider_id, back_logo_url)
 
 
 def delete_product(printify_product_id: str) -> None:

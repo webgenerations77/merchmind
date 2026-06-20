@@ -17,6 +17,7 @@ celery_app = Celery(
         "app.tasks.analytics_sync",
         "app.tasks.health_monitor",
         "app.tasks.social_tasks",
+        "app.tasks.collection_generator",
     ],
 )
 

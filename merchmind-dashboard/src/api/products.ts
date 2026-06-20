@@ -12,6 +12,11 @@ export async function getProduct(id: string): Promise<ProductOut> {
   return data.data;
 }
 
+export async function updateProduct(id: string, updates: { retail_price?: number; publish_status?: string }): Promise<ProductOut> {
+  const { data } = await apiClient.patch<ApiResponse<ProductOut>>(`/products/${id}`, updates);
+  return data.data;
+}
+
 export async function unpublishProduct(id: string): Promise<void> {
   await apiClient.post(`/products/${id}/unpublish`);
 }

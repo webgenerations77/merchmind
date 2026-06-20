@@ -12,13 +12,16 @@ export interface DesignQueueItem {
   quality_score: number;
   shopify_title: string | null;
   status: string;
+  collection_id: string | null;
+  collection_name?: string;
   claude_reasoning: string | null;
 }
 
 export interface DesignOut {
   id: string;
-  trend_id: string;
-  batch_id: string;
+  trend_id: string | null;
+  batch_id: string | null;
+  collection_id: string | null;
   concept_name: string;
   archetype: string;
   image_api_used: string | null;
@@ -105,6 +108,9 @@ export interface AppSettings {
   quality_threshold: number;
   score_threshold: number;
   underperform_weeks: number;
+  back_logo_enabled: boolean;
+  back_logo_url: string | null;
+  back_logo_products: string[] | null;
   shopify_store_url: string | null;
   active_clusters: string[] | null;
   updated_at: string;
@@ -125,6 +131,31 @@ export interface IntegrationHealth {
   ok: boolean;
   any_service_reachable: boolean;
   services: Record<string, { service: string; ok: boolean; error?: string }>;
+}
+
+export interface CollectionOut {
+  id: string;
+  name: string;
+  description: string | null;
+  style_guide: {
+    palette?: string[];
+    mood?: string;
+    constraints?: string;
+    archetype_override?: string;
+  };
+  max_designs: number;
+  status: string;
+  design_count: number;
+  designs?: {
+    id: string;
+    concept_name: string;
+    archetype: string;
+    processed_image_url: string | null;
+    quality_score: number;
+    status: string;
+  }[];
+  created_at: string;
+  updated_at: string;
 }
 
 export interface SalesAnalytics {

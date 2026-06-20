@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { listProducts } from '../api/products';
+import { listProducts, updateProduct, unpublishProduct, retryPublish } from '../api/products';
 import { getDesign } from '../api/designs';
 import type { ProductOut, DesignOut } from '../types/api';
 import StatusBadge from '../components/shared/StatusBadge';
@@ -10,9 +10,10 @@ import { formatCurrency, formatProductType, formatDate } from '../utils/formatte
 
 const filters = ['all', 'pending', 'live', 'published', 'failed', 'unpublished'] as const;
 
-function ProductDetail({ product, onBack }: { product: ProductOut; onBack: () => void }) {
+function ProductDetail({ product, onBack, onUpdate }: { product: ProductOut; onBack: () => void; onUpdate: (p: ProductOut) => void }) {
   const [design, setDesign] = useState<DesignOut | null>(null);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     getDesign(product.design_id).then(setDesign).catch(() => null).finally(() => setLoading(false));
@@ -195,6 +196,76 @@ function ProductDetail({ product, onBack }: { product: ProductOut; onBack: () =>
               </div>
             </div>
           </div>
+
+          <div className="bg-bg-secondary border border-border rounded-xl p-5">
+            <h3 className="text-sm font-semibold text-text-primary mb-3">Actions</h3>
+            <div className="space-y-2">
+              {product.publish_status === 'pending' && (
+                <button
+                  disabled={actionLoading}
+                  onClick={async () => {
+                    setActionLoading(true);
+                    try {
+                      const updated = await updateProduct(product.id, { publish_status: 'unpublished' });
+                      onUpdate(updated);
+                    } catch { /* ignore */ }
+                    setActionLoading(false);
+                  }}
+                  className="w-full py-2 rounded-lg bg-bg-tertiary border border-border text-sm text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
+                >
+                  Cancel (set to Unpublished)
+                </button>
+              )}
+              {product.publish_status === 'live' && (
+                <button
+                  disabled={actionLoading}
+                  onClick={async () => {
+                    setActionLoading(true);
+                    try {
+                      await unpublishProduct(product.id);
+                      onUpdate({ ...product, publish_status: 'unpublished' });
+                    } catch { /* ignore */ }
+                    setActionLoading(false);
+                  }}
+                  className="w-full py-2 rounded-lg bg-confidence-low/15 text-confidence-low text-sm font-medium hover:bg-confidence-low/25 transition-colors disabled:opacity-50"
+                >
+                  Unpublish from Shopify
+                </button>
+              )}
+              {product.publish_status === 'failed' && (
+                <button
+                  disabled={actionLoading}
+                  onClick={async () => {
+                    setActionLoading(true);
+                    try {
+                      await retryPublish(product.id);
+                      onUpdate({ ...product, publish_status: 'pending' });
+                    } catch { /* ignore */ }
+                    setActionLoading(false);
+                  }}
+                  className="w-full py-2 rounded-lg bg-accent/15 text-accent text-sm font-medium hover:bg-accent/25 transition-colors disabled:opacity-50"
+                >
+                  Retry Publish
+                </button>
+              )}
+              {product.publish_status === 'unpublished' && (
+                <button
+                  disabled={actionLoading}
+                  onClick={async () => {
+                    setActionLoading(true);
+                    try {
+                      const updated = await updateProduct(product.id, { publish_status: 'pending' });
+                      onUpdate(updated);
+                    } catch { /* ignore */ }
+                    setActionLoading(false);
+                  }}
+                  className="w-full py-2 rounded-lg bg-approve/15 text-approve text-sm font-medium hover:bg-approve/25 transition-colors disabled:opacity-50"
+                >
+                  Re-queue for Publishing
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -221,7 +292,10 @@ export default function ProductsPage() {
   }, [location.state]);
 
   if (selected) {
-    return <ProductDetail product={selected} onBack={() => setSelected(null)} />;
+    return <ProductDetail product={selected} onBack={() => setSelected(null)} onUpdate={(p) => {
+      setSelected(p);
+      setProducts((prev) => prev.map((x) => x.id === p.id ? p : x));
+    }} />;
   }
 
   const filtered = filter === 'all' ? products : products.filter((p) => p.publish_status === filter);

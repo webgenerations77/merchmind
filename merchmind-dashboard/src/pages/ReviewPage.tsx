@@ -121,17 +121,20 @@ function DesignCard({ item, action, onClick }: { item: DesignQueueItem; action?:
 function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
   design: DesignOut;
   onBack: () => void;
-  onApprove: () => void;
+  onApprove: (productTypes?: string[]) => void;
   onReject: () => void;
   onDelay: () => void;
 }) {
   const [products, setProducts] = useState<ProductOut[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<string>('design');
+  const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [selectedPublishTypes, setSelectedPublishTypes] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     listProducts().then((all) => {
       const matched = all.filter((p) => p.design_id === design.id);
       setProducts(matched);
+      setSelectedPublishTypes(new Set(matched.map((p) => p.product_type)));
     }).catch(() => null);
   }, [design.id]);
 
@@ -268,10 +271,50 @@ function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
             <button onClick={onDelay} className="flex-1 py-2.5 rounded-lg bg-delay/20 text-delay font-semibold text-sm hover:bg-delay/30 transition-colors">
               Delay
             </button>
-            <button onClick={onApprove} className="flex-1 py-2.5 rounded-lg bg-approve/20 text-approve font-semibold text-sm hover:bg-approve/30 transition-colors">
+            <button onClick={() => setShowPublishDialog(true)} className="flex-1 py-2.5 rounded-lg bg-approve/20 text-approve font-semibold text-sm hover:bg-approve/30 transition-colors">
               Approve & Publish
             </button>
           </div>
+
+          {showPublishDialog && (
+            <div className="mt-4 p-4 bg-bg-tertiary rounded-xl border border-accent/30">
+              <p className="text-sm font-semibold text-text-primary mb-3">Select products to publish:</p>
+              <div className="space-y-2 mb-4">
+                {products.map((p) => (
+                  <label key={p.id} className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedPublishTypes.has(p.product_type)}
+                      onChange={(e) => {
+                        const next = new Set(selectedPublishTypes);
+                        if (e.target.checked) next.add(p.product_type);
+                        else next.delete(p.product_type);
+                        setSelectedPublishTypes(next);
+                      }}
+                      className="w-4 h-4 rounded accent-accent"
+                    />
+                    <span className="text-sm text-text-primary">{formatProductType(p.product_type)}</span>
+                    <span className="text-xs text-text-tertiary ml-auto">{formatCurrency(p.retail_price)}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowPublishDialog(false)}
+                  className="flex-1 py-2 rounded-lg bg-bg-secondary border border-border text-sm text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => onApprove(Array.from(selectedPublishTypes))}
+                  disabled={selectedPublishTypes.size === 0}
+                  className="flex-1 py-2 rounded-lg bg-approve text-white font-semibold text-sm hover:bg-approve/90 disabled:opacity-50 transition-colors"
+                >
+                  Publish {selectedPublishTypes.size} Product{selectedPublishTypes.size !== 1 ? 's' : ''}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -334,6 +377,17 @@ export default function ReviewPage() {
   const pending = queue.filter((d) => !sessionActions[d.id]);
   const actioned = queue.filter((d) => sessionActions[d.id]);
 
+  const singlePending = pending.filter((d) => !d.collection_id);
+  const collectionPending = pending.filter((d) => !!d.collection_id);
+  const collectionGroups: Record<string, { name: string; designs: typeof collectionPending }> = {};
+  for (const d of collectionPending) {
+    const key = d.collection_id!;
+    if (!collectionGroups[key]) {
+      collectionGroups[key] = { name: d.collection_name || 'Collection', designs: [] };
+    }
+    collectionGroups[key].designs.push(d);
+  }
+
   const openDetail = async (id: string) => {
     setLoadingDetail(true);
     try {
@@ -343,10 +397,9 @@ export default function ReviewPage() {
     setLoadingDetail(false);
   };
 
-  const handleAction = async (action: 'approve' | 'reject' | 'delay', id: string) => {
+  const handleAction = async (action: 'approve' | 'reject' | 'delay', id: string, productTypes?: string[]) => {
     if (action === 'approve') {
-      if (!confirm('Approve and publish to Shopify? This will make the products live in your store.')) return;
-      await approveDesign(id);
+      await approveDesign(id, productTypes);
     } else if (action === 'reject') {
       await rejectDesign(id);
     } else {
@@ -365,7 +418,7 @@ export default function ReviewPage() {
       <DesignDetail
         design={selectedDesign}
         onBack={() => setSelectedDesign(null)}
-        onApprove={() => handleAction('approve', selectedDesign.id)}
+        onApprove={(productTypes) => handleAction('approve', selectedDesign.id, productTypes)}
         onReject={() => handleAction('reject', selectedDesign.id)}
         onDelay={() => handleAction('delay', selectedDesign.id)}
       />
@@ -409,13 +462,34 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {pending.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-          {pending.map((item) => (
-            <DesignCard key={item.id} item={item} onClick={() => openDetail(item.id)} />
-          ))}
-        </div>
+      {singlePending.length > 0 && (
+        <>
+          {Object.keys(collectionGroups).length > 0 && (
+            <h2 className="text-lg font-semibold text-text-primary mb-3">Single Designs</h2>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            {singlePending.map((item) => (
+              <DesignCard key={item.id} item={item} onClick={() => openDetail(item.id)} />
+            ))}
+          </div>
+        </>
       )}
+
+      {Object.entries(collectionGroups).map(([collectionId, group]) => (
+        <div key={collectionId} className="mb-8">
+          <div className="flex items-center gap-3 mb-3">
+            <h2 className="text-lg font-semibold text-text-primary">{group.name}</h2>
+            <span className="text-xs text-text-tertiary bg-bg-tertiary px-2 py-0.5 rounded-full">
+              {group.designs.length} designs
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {group.designs.map((item) => (
+              <DesignCard key={item.id} item={item} onClick={() => openDetail(item.id)} />
+            ))}
+          </div>
+        </div>
+      ))}
 
       {actioned.length > 0 && (
         <>

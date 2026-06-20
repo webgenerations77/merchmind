@@ -102,18 +102,24 @@ class FluxSchnellService:
         raise ImageGenerationError("Flux Schnell: unreachable")
 
     def _create_prediction(self, prompt: str) -> dict:
+        enhanced_prompt = (
+            f"{prompt} "
+            "Professional vector art, flat design, clean crisp edges, "
+            "pure white background, no text, no watermark, print-ready merchandise design"
+        )
         with httpx.Client(timeout=30) as http:
             r = http.post(
                 "https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions",
                 headers={"Authorization": f"Bearer {settings.REPLICATE_API_KEY}"},
                 json={
                     "input": {
-                        "prompt": prompt,
+                        "prompt": enhanced_prompt,
                         "go_fast": True,
                         "num_outputs": 1,
                         "aspect_ratio": "1:1",
                         "output_format": "png",
-                        "output_quality": 90,
+                        "output_quality": 100,
+                        "num_inference_steps": 4,
                     },
                 },
             )

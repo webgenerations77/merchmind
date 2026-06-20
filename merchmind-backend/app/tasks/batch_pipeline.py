@@ -97,6 +97,9 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
         trend_boost_max = float(settings_row.trend_boost_max) if settings_row else 0.20
         base_markup = settings_row.base_markup if settings_row else {}
         floor_prices = settings_row.floor_prices if settings_row else {}
+        back_logo_enabled = settings_row.back_logo_enabled if settings_row else False
+        back_logo_url = settings_row.back_logo_url if settings_row else None
+        back_logo_products = settings_row.back_logo_products if settings_row else ["tshirt", "hat"]
 
         # Load active niche clusters
         active_clusters = db.query(NicheCluster).filter(NicheCluster.active == True).all()
@@ -349,8 +352,13 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
         design_id = str(design.id)
         logger.info(f"design_task[{trend_id[:8]}] design created id={design_id[:8]}")
 
-        # 4c: Build image prompt
+        # 4c: Build image prompt (with preference learning)
         image_prompt = build_image_prompt(trend.raw_signal, archetype, niche_name, design.concept_name)
+        if image_prompt:
+            from app.services.design.preference_learner import get_prompt_preferences
+            pref_suffix = get_prompt_preferences(db)
+            if pref_suffix:
+                image_prompt = f"{image_prompt} {pref_suffix}"
         design.image_prompt = image_prompt
         db.commit()
         logger.info(f"design_task[{trend_id[:8]}] prompt built")
@@ -485,8 +493,11 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
         db.commit()
 
         # Step 5: Generate mockups + Step 6: Pricing — create Product records
+        from app.services.publishing.printify_publisher import _DUAL_PRINT_SURCHARGE
         for pt in product_types:
             base_cost = get_base_cost(pt)
+            if back_logo_enabled and pt in back_logo_products:
+                base_cost += _DUAL_PRINT_SURCHARGE.get(pt, 2.50)
             pricing = calculate_price(
                 pt, base_cost, trend.final_score, base_markup, floor_prices, trend_boost_max
             )
@@ -523,12 +534,14 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                 try:
                     product_label = product.product_type.replace("_", " ").title()
                     base_name = design.concept_name or design.shopify_title or "Design"
+                    product_back_logo = back_logo_url if (back_logo_enabled and product.product_type in back_logo_products) else None
                     printify_id = printify_create(
                         product_type=product.product_type,
                         title=f"{base_name} — {product_label}",
                         description=design.shopify_description or "",
                         image_url=image_url,
                         retail_price=float(product.retail_price),
+                        back_logo_url=product_back_logo,
                     )
                     product.printify_product_id = printify_id
                     mockups = _get_printify().generate_mockups(printify_id)

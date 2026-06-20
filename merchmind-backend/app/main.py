@@ -15,6 +15,7 @@ from app.utils.error_handler import (
 )
 from app.routers import (
     batches,
+    collections,
     designs,
     products,
     sales,
@@ -71,6 +72,7 @@ app.add_exception_handler(Exception, unhandled_exception_handler)
 
 # Routers
 app.include_router(batches.router)
+app.include_router(collections.router)
 app.include_router(designs.router)
 app.include_router(products.router)
 app.include_router(sales.router)

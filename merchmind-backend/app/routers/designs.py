@@ -27,7 +27,7 @@ def get_review_queue(db: Session = Depends(get_db), _: str = Depends(verify_api_
     """Return all non-deleted, non-rejected designs across all batches."""
     designs = (
         db.query(Design)
-        .options(joinedload(Design.trend))
+        .options(joinedload(Design.trend), joinedload(Design.collection))
         .filter(
             Design.is_deleted == False,
             Design.status.in_(["ready", "approved", "delayed"]),
@@ -41,7 +41,10 @@ def get_review_queue(db: Session = Depends(get_db), _: str = Depends(verify_api_
         item = DesignQueueItem.model_validate(d)
         if d.trend:
             item.claude_reasoning = d.trend.claude_reasoning
-        result.append(item.model_dump())
+        data = item.model_dump()
+        if d.collection:
+            data["collection_name"] = d.collection.name
+        result.append(data)
     return _envelope(result)
 
 
@@ -59,7 +62,14 @@ def get_design(design_id: UUID, db: Session = Depends(get_db), _: str = Depends(
 
 
 @router.patch("/{design_id}/approve")
-def approve_design(design_id: UUID, publish: bool = True, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+def approve_design(
+    design_id: UUID,
+    publish: bool = True,
+    product_types: str | None = None,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key),
+):
+    """Approve a design. Optionally publish only selected product types (comma-separated)."""
     design = db.query(Design).filter(Design.id == design_id, Design.is_deleted == False).first()
     if not design:
         raise HTTPException(404, f"Design {design_id} not found")
@@ -68,7 +78,10 @@ def approve_design(design_id: UUID, publish: bool = True, db: Session = Depends(
     _log_feedback(db, design, "approved")
     db.commit()
 
+    selected_types = set(product_types.split(",")) if product_types else None
+
     published = []
+    skipped = []
     failed = []
     if publish:
         from app.models.product import Product
@@ -76,6 +89,9 @@ def approve_design(design_id: UUID, publish: bool = True, db: Session = Depends(
         svc = _get_printify()
         products = db.query(Product).filter(Product.design_id == design_id).all()
         for product in products:
+            if selected_types and product.product_type not in selected_types:
+                skipped.append(product.product_type)
+                continue
             if product.printify_product_id:
                 try:
                     svc.publish_product(product.printify_product_id)
@@ -93,6 +109,7 @@ def approve_design(design_id: UUID, publish: bool = True, db: Session = Depends(
         "id": str(design_id),
         "status": "approved",
         "published": published,
+        "skipped": skipped,
         "failed": failed,
     })
 
@@ -168,6 +185,12 @@ def get_design_versions(design_id: UUID, db: Session = Depends(get_db), _: str =
     versions = db.query(Design).filter(Design.parent_design_id == design_id).all()
     result = [DesignOut.model_validate(v).model_dump() for v in [design] + versions]
     return _envelope(result)
+
+
+@router.get("/preferences/summary")
+def get_preferences(db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    from app.services.design.preference_learner import get_preference_summary
+    return _envelope(get_preference_summary(db))
 
 
 def _log_feedback(db, design: Design, action: str, edited_prompt: str = None):

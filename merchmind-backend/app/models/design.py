@@ -12,6 +12,7 @@ class Design(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     trend_id = Column(UUID(as_uuid=True), ForeignKey("trends.id"), nullable=True)
     batch_id = Column(UUID(as_uuid=True), ForeignKey("batches.id"), nullable=True)
+    collection_id = Column(UUID(as_uuid=True), ForeignKey("collections.id"), nullable=True)
     concept_name = Column(Text, nullable=False)
     archetype = Column(
         SAEnum(
@@ -54,6 +55,7 @@ class Design(Base):
 
     trend = relationship("Trend", back_populates="designs")
     batch = relationship("Batch", back_populates="designs")
+    collection = relationship("Collection", back_populates="designs")
     products = relationship("Product", back_populates="design")
     marketing_assets = relationship("MarketingAsset", back_populates="design")
     feedback_logs = relationship("FeedbackLog", back_populates="design")

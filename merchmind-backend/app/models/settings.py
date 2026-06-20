@@ -33,5 +33,8 @@ class AppSettings(Base):
     score_threshold = Column(Integer, default=35)
     underperform_weeks = Column(Integer, default=4)
     shopify_store_url = Column(Text, nullable=True)
+    back_logo_enabled = Column(Boolean, default=False, nullable=False)
+    back_logo_url = Column(Text, nullable=True)
+    back_logo_products = Column(JSONB, default=lambda: ["tshirt", "hat"])
     active_clusters = Column(ARRAY(UUID(as_uuid=True)), default=list)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

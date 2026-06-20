@@ -8,8 +8,9 @@ class DesignOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    trend_id: UUID
-    batch_id: UUID
+    trend_id: Optional[UUID]
+    batch_id: Optional[UUID]
+    collection_id: Optional[UUID] = None
     concept_name: str
     archetype: str
     image_api_used: Optional[str]
@@ -45,6 +46,7 @@ class DesignQueueItem(BaseModel):
     quality_score: int
     shopify_title: Optional[str]
     status: str
+    collection_id: Optional[UUID] = None
     claude_reasoning: Optional[str] = None  # From joined trend
 
 

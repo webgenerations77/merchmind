@@ -8,6 +8,7 @@ import ReviewPage from './pages/ReviewPage';
 import ProductsPage from './pages/ProductsPage';
 import BatchesPage from './pages/BatchesPage';
 import SettingsPage from './pages/SettingsPage';
+import CollectionsPage from './pages/CollectionsPage';
 import DrewsMindPage from './pages/DrewsMindPage';
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
       <Route element={<Layout user={user} />}>
         <Route path="/" element={<DashboardPage />} />
         <Route path="/review" element={<ReviewPage />} />
+        <Route path="/collections" element={<CollectionsPage />} />
         <Route path="/drews-mind" element={<DrewsMindPage />} />
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/batches" element={<BatchesPage />} />

@@ -189,18 +189,16 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 
 ## Next Steps (Priority Order)
 
-1. **Spinach the Cow back logo on clothing** — Upload `merchmind-app/assets/Logo.png` to Supabase as `branding/spinach_logo.png`. Add optional back print area to clothing products (tshirt, hat) with logo centered at top. Add `back_logo_enabled` toggle to AppSettings. Update COGS for dual-print (~$2-3 extra per item).
+1. **Spinach the Cow back logo on clothing** — DONE. Migration 004 adds `back_logo_enabled`, `back_logo_url`, `back_logo_products` to AppSettings. Printify publisher adds back placeholder when enabled. COGS includes dual-print surcharge ($2.50 tshirt, $3.00 hat). Dashboard toggle in Settings page. Run `python scripts/upload_logo.py` to upload logo to Supabase and enable.
 
-2. **Themed collections** — Add Collection model with style guide (palette, mood, constraints). Generate coordinated but unique designs within a collection. New dashboard page for collection management.
+2. **Themed collections** — DONE. Migration 005 adds `collections` table + `collection_id` FK on designs. Collection model with style_guide JSONB (palette, mood, constraints, archetype_override). Router at `/collections` with CRUD + `POST /{id}/generate`. Celery task generates coordinated designs with style guide augmentation. Dashboard page at `/collections` with create form, generate button, design grid preview.
 
-3. **Shopify direct API access** — Generate `shpat_` access token via Dev Dashboard custom app (Settings → Apps → Develop apps). Current workaround: publish through Printify → Shopify sync. Direct access needed for: sales sync, order tracking, product management.
+3. **Deploy dashboard to Vercel** — DONE. Deployed to `merchmind-dashboard.vercel.app`. Project linked under `stc-dev-projects`. `VITE_API_BASE_URL` and `VITE_API_KEY` env vars set. Still needed: add `VITE_FIREBASE_API_KEY` env var (`vercel env add VITE_FIREBASE_API_KEY production`), add `merchmind-dashboard.vercel.app` to Firebase authorized domains, then `vercel --prod` to redeploy.
 
-4. **Deploy dashboard to Vercel** — Static build, needs `VITE_API_BASE_URL`, `VITE_API_KEY`, `VITE_FIREBASE_API_KEY` env vars. Add `merchmind-cb1f9.firebaseapp.com` and Vercel domain to Firebase authorized domains.
+4. **Image quality improvements** — DONE. Improved style lock (pure white bg, crisp edges, no gradients). Enhanced archetype templates with specific art direction per type. Better Claude system prompt for prompt generation. Flux Schnell now appends quality suffix and uses `output_quality=100`, `num_inference_steps=4`. Consider Flux Pro (~$0.01/image) for further quality gains.
 
-5. **Image quality improvements** — Tune Flux Schnell prompts for better merch designs. Consider Flux Pro (~$0.01/image) for higher quality. Test different prompt styles per archetype.
+5. **Preference learning** — DONE. `preference_learner.py` analyzes FeedbackLog patterns: archetype approval rates, preferred/avoided styles. Preferences injected into batch pipeline prompt building. API at `GET /designs/preferences/summary`. Needs 5+ reviews to activate. Learns over 8-week rolling window.
 
-6. **Product mockup dropdown on review page** — Already implemented (tab-based viewer). Need to verify all product types generate correct mockups with updated blueprint IDs.
+6. **Shopify store design** — DONE. Custom Dawn theme in `shopify-theme/`. Playful brand with Spinach the Cow: teal/coral palette, rounded cards, bounce animation, hero banner section, featured collections grid, announcement bar, "New Drop" badges. See `shopify-theme/SETUP.md` for installation guide.
 
-7. **Preference learning** — Track approve/reject patterns in Drew's Mind. Feed preferences back into classifier and prompt builder for personalized design generation.
-
-8. **Remove diagnostic endpoints** — Clean up `/health/reset-data`, `/health/purge-queue`, `/health/test-image-gen`, `/health/test-printify-mockup`, `/health/run-migration`, `/health/env-check` before production.
+7. **Remove diagnostic endpoints** — DONE. Removed `/health/reset-data`, `/health/purge-queue`, `/health/test-image-gen`, `/health/test-printify-mockup`, `/health/run-migration`, `/health/env-check`. Kept `/health` (liveness) and `/health/integrations` (deep check).

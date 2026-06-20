@@ -19,6 +19,9 @@ class SettingsOut(BaseModel):
     quality_threshold: int
     score_threshold: int
     underperform_weeks: int
+    back_logo_enabled: bool
+    back_logo_url: Optional[str]
+    back_logo_products: Optional[list]
     shopify_store_url: Optional[str]
     active_clusters: Optional[list]
     updated_at: datetime
@@ -33,5 +36,8 @@ class SettingsUpdate(BaseModel):
     quality_threshold: Optional[int] = None
     score_threshold: Optional[int] = None
     underperform_weeks: Optional[int] = None
+    back_logo_enabled: Optional[bool] = None
+    back_logo_url: Optional[str] = None
+    back_logo_products: Optional[list] = None
     shopify_store_url: Optional[str] = None
     active_clusters: Optional[list] = None

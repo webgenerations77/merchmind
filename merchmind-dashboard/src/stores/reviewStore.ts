@@ -11,7 +11,7 @@ interface ReviewState {
   isLoading: boolean;
   error: string | null;
   fetchQueue: () => Promise<void>;
-  approveDesign: (id: string) => Promise<void>;
+  approveDesign: (id: string, productTypes?: string[]) => Promise<void>;
   rejectDesign: (id: string) => Promise<void>;
   delayDesign: (id: string, week: string) => Promise<void>;
   goToNext: () => void;
@@ -37,10 +37,10 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     }
   },
 
-  approveDesign: async (id: string) => {
+  approveDesign: async (id: string, productTypes?: string[]) => {
     set((s) => ({ sessionActions: { ...s.sessionActions, [id]: 'approved' } }));
     try {
-      await apiApprove(id);
+      await apiApprove(id, productTypes);
     } catch {
       set((s) => { const { [id]: _, ...rest } = s.sessionActions; return { sessionActions: rest }; });
     }

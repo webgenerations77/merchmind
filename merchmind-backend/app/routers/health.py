@@ -8,10 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from fastapi import APIRouter, Depends
 
-from sqlalchemy.orm import Session
-
 from app.config import settings
-from app.database import get_db
 from app.routers.auth import verify_api_key
 
 router = APIRouter(tags=["health"])
@@ -65,132 +62,6 @@ def health_integrations(_: str = Depends(verify_api_key)) -> dict:
         "any_service_reachable": any_ok,
         "services": results,
     }
-
-
-@router.post("/health/reset-data")
-def reset_data(db: Session = Depends(get_db), _: str = Depends(verify_api_key)) -> dict:
-    """Delete all pipeline data (products, designs, trends, batches, marketing assets, alerts). Keeps settings and niche clusters."""
-    from app.models.product import Product
-    from app.models.marketing_asset import MarketingAsset
-    from app.models.design import Design
-    from app.models.trend import Trend
-    from app.models.batch import Batch
-    from app.models.alert import Alert
-    from app.models.feedback_log import FeedbackLog
-
-    counts = {}
-    try:
-        for model, name in [
-            (Product, "products"),
-            (MarketingAsset, "marketing_assets"),
-            (FeedbackLog, "feedback_logs"),
-            (Alert, "alerts"),
-            (Design, "designs"),
-            (Trend, "trends"),
-            (Batch, "batches"),
-        ]:
-            count = db.query(model).delete(synchronize_session="fetch")
-            counts[name] = count
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        db.execute(__import__('sqlalchemy').text(
-            "TRUNCATE products, marketing_assets, feedback_logs, alerts, designs, trends, batches CASCADE"
-        ))
-        db.commit()
-        counts = {"truncated": "all tables via CASCADE"}
-    logger.info("reset_data counts=%s", counts)
-    return {"ok": True, "deleted": counts}
-
-
-@router.get("/health/env-check")
-def env_check(_: str = Depends(verify_api_key)) -> dict:
-    """Check which env vars are set (masked values for debugging)."""
-    import os
-    keys = ["SUPABASE_URL", "SUPABASE_KEY", "SUPABASE_BUCKET", "OPENAI_API_KEY", "REPLICATE_API_KEY", "ANTHROPIC_API_KEY", "SHOPIFY_STORE_URL", "SHOPIFY_ACCESS_TOKEN", "PRINTIFY_API_KEY", "PRINTIFY_SHOP_ID"]
-    result = {}
-    for k in keys:
-        val = os.environ.get(k, "")
-        if val:
-            result[k] = f"{val[:8]}...{val[-4:]}" if len(val) > 12 else f"{val[:4]}..."
-        else:
-            result[k] = "(not set)"
-    return result
-
-
-@router.post("/health/run-migration")
-def run_migration(db: Session = Depends(get_db), _: str = Depends(verify_api_key)) -> dict:
-    """Add flux_schnell to image_api enum if missing."""
-    try:
-        db.execute(
-            __import__('sqlalchemy').text("ALTER TYPE image_api ADD VALUE IF NOT EXISTS 'flux_schnell'")
-        )
-        db.commit()
-        return {"ok": True, "message": "flux_schnell added to image_api enum"}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-
-
-@router.post("/health/purge-queue")
-def purge_queue(_: str = Depends(verify_api_key)) -> dict:
-    """Purge all pending Celery tasks from the Redis queue."""
-    from app.tasks.celery_app import celery_app
-    purged = celery_app.control.purge()
-    return {"ok": True, "purged": purged}
-
-
-@router.post("/health/test-printify-mockup")
-def test_printify_mockup(db: Session = Depends(get_db), _: str = Depends(verify_api_key)) -> dict:
-    """Test Printify product creation + mockup for the first queued design."""
-    from app.models.design import Design
-    from app.models.product import Product
-    design = db.query(Design).filter(Design.status == "ready").first()
-    if not design:
-        return {"ok": False, "error": "No ready design found"}
-    image_url = design.processed_image_url or design.raw_image_url
-    if not image_url:
-        return {"ok": False, "error": "Design has no image URL"}
-    try:
-        from app.services.publishing.printify_publisher import _get
-        svc = _get()
-        img_id = svc.upload_image(image_url, "test_mockup.png")
-        printify_id = svc.create_product(
-            product_type="tshirt",
-            title=design.shopify_title or design.concept_name,
-            description="",
-            image_url=image_url,
-            retail_price=24.99,
-        )
-        mockups = svc.generate_mockups(printify_id)
-        return {"ok": True, "printify_image_id": img_id, "printify_product_id": printify_id, "mockups": mockups}
-    except Exception as e:
-        return {"ok": False, "error": str(e), "type": type(e).__name__}
-
-
-@router.post("/health/test-image-gen")
-def test_image_gen(_: str = Depends(verify_api_key)) -> dict:
-    """Test image generation with a simple prompt and return detailed error if it fails."""
-    prompt = "A simple red circle on a white background, flat design, bold outlines, centered composition"
-    results = {}
-    # Test DALL-E 3
-    try:
-        from app.services.design.image_generator import DALLe3Service
-        dalle = DALLe3Service()
-        img_bytes = dalle.generate(prompt)
-        results["dalle3"] = {"ok": True, "bytes": len(img_bytes)}
-    except Exception as e:
-        results["dalle3"] = {"ok": False, "error": str(e), "type": type(e).__name__}
-
-    # Test Flux Schnell
-    try:
-        from app.services.design.image_generator import FluxSchnellService
-        flux = FluxSchnellService()
-        img_bytes = flux.generate(prompt)
-        results["flux_schnell"] = {"ok": True, "bytes": len(img_bytes)}
-    except Exception as e:
-        results["flux_schnell"] = {"ok": False, "error": str(e), "type": type(e).__name__}
-
-    return {"ok": any(r["ok"] for r in results.values()), "results": results}
 
 
 def _check_printify() -> dict:

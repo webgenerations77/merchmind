@@ -11,8 +11,12 @@ export async function getDesign(id: string): Promise<DesignOut> {
   return data.data;
 }
 
-export async function approveDesign(id: string): Promise<void> {
-  await apiClient.patch(`/designs/${id}/approve`);
+export async function approveDesign(id: string, productTypes?: string[]): Promise<void> {
+  const params: Record<string, string> = {};
+  if (productTypes && productTypes.length > 0) {
+    params.product_types = productTypes.join(',');
+  }
+  await apiClient.patch(`/designs/${id}/approve`, null, { params });
 }
 
 export async function rejectDesign(id: string): Promise<void> {

@@ -10,32 +10,38 @@ from app.utils.claude_client import claude
 logger = logging.getLogger(__name__)
 
 _STYLE_LOCK = (
-    "Professional merchandise artwork style. Isolated subject on a plain solid white background. "
-    "Centered composition with clean edges and plenty of whitespace around the subject. "
-    "High contrast, vibrant colors. No text, no letters, no words, no watermarks. "
-    "The design element should be clearly separated from the background. "
-    "Print-ready quality, sharp details, professional commercial design."
+    "Professional merchandise artwork style. Isolated subject on a plain solid white background (#FFFFFF). "
+    "Centered composition with clean edges and generous whitespace around the subject. "
+    "High contrast, vibrant saturated colors. No text, no letters, no words, no watermarks, no signatures. "
+    "The design element should be clearly separated from the background with crisp edges. "
+    "Print-ready quality at 300 DPI, sharp details, professional commercial design. "
+    "No gradients bleeding into background, no subtle textures on background, pure white background only."
 )
 
 _ARCHETYPE_TEMPLATES = {
     "illustration": (
-        "A striking, professional illustration of {subject}. "
-        "Bold graphic style with clean lines, rich saturated colors, "
-        "detailed but not cluttered. Modern commercial art quality. {style_lock}"
+        "A striking, highly detailed professional illustration of {subject}. "
+        "Bold graphic style with clean vector-like lines, rich saturated colors, "
+        "detailed but not cluttered. Flat design aesthetic with subtle depth through color layering. "
+        "Modern commercial art quality suitable for screen printing. "
+        "Strong focal point, balanced composition. {style_lock}"
     ),
     "hybrid": (
         "A bold, eye-catching graphic design of {subject}. "
-        "Strong visual impact, professional quality with space for text overlay. "
-        "Clean composition, vibrant colors, modern design aesthetic. {style_lock}"
+        "Strong visual impact with a clear central motif, professional quality with space for text overlay. "
+        "Clean layered composition, vibrant colors with limited palette (3-5 colors), modern design aesthetic. "
+        "Graphic poster style with strong shapes and contrast. {style_lock}"
     ),
     "text_icon": (
         "A bold, iconic symbol representing {subject}. "
-        "Strong recognizable silhouette, modern and minimal. "
-        "Clean graphic design, professional quality. {style_lock}"
+        "Strong recognizable silhouette, modern and minimal with geometric precision. "
+        "Flat design with 2-3 accent colors, clean graphic design, professional quality. "
+        "Think modern app icon or badge design — simple, memorable, striking. {style_lock}"
     ),
     "typographic": (
         "A creative typographic art piece inspired by the concept of {subject}. "
-        "Letters and shapes as art, modern graphic design style. {style_lock}"
+        "Decorative letterforms as art, modern graphic design style with artistic flourishes. "
+        "Hand-lettering aesthetic with clean execution. {style_lock}"
     ),
     "text_only": None,
 }
@@ -46,6 +52,11 @@ _SYSTEM = (
     "that produce professional, eye-catching artwork people want to wear. "
     "Focus on bold visual impact, emotional resonance, and commercial appeal. "
     "Never include text or words in image prompts — the design should be purely visual. "
+    "Always specify: the exact subject, art style (flat design, vector, graphic art), "
+    "color palette (name 3-5 specific colors), composition (centered, symmetrical), "
+    "and rendering quality (sharp, clean edges, print-ready). "
+    "Avoid: photorealism, 3D renders, complex scenes, busy backgrounds, gradients. "
+    "Best merch designs are bold, simple, and iconic — like a logo or badge. "
     "Reply with only the prompt text, no extra commentary."
 )
 
@@ -87,8 +98,7 @@ def build_image_prompt(
             max_tokens=200,
         )
         prompt = text.strip()
-        # Ensure style lock is always included
-        if "flat design" not in prompt.lower():
+        if "white background" not in prompt.lower():
             prompt += f". {_STYLE_LOCK}"
         return prompt
     except Exception as e:

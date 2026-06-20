@@ -101,6 +101,9 @@ def _generate_from_idea(idea: CustomIdea, db: Session) -> UUID:
     base_markup = settings_row.base_markup if settings_row else {}
     floor_prices = settings_row.floor_prices if settings_row else {}
     trend_boost_max = float(settings_row.trend_boost_max) if settings_row else 0.20
+    back_logo_enabled = settings_row.back_logo_enabled if settings_row else False
+    back_logo_url = settings_row.back_logo_url if settings_row else None
+    back_logo_products = settings_row.back_logo_products if settings_row else ["tshirt", "hat"]
 
     # Use preference overrides or classify
     forced_archetype = idea.preferences.get("archetype")
@@ -178,8 +181,11 @@ def _generate_from_idea(idea: CustomIdea, db: Session) -> UUID:
     db.commit()
 
     # Create products
+    from app.services.publishing.printify_publisher import _DUAL_PRINT_SURCHARGE
     for pt in product_types:
         base_cost = get_base_cost(pt)
+        if back_logo_enabled and pt in back_logo_products:
+            base_cost += _DUAL_PRINT_SURCHARGE.get(pt, 2.50)
         pricing = calculate_price(pt, base_cost, 50, base_markup, floor_prices, trend_boost_max)
         product = Product(
             design_id=design.id,
@@ -203,12 +209,14 @@ def _generate_from_idea(idea: CustomIdea, db: Session) -> UUID:
             try:
                 from app.services.publishing.printify_publisher import _get as _get_printify
                 svc = _get_printify()
+                product_back_logo = back_logo_url if (back_logo_enabled and "tshirt" in back_logo_products) else None
                 printify_id = svc.create_product(
                     product_type="tshirt",
                     title=design.shopify_title or design.concept_name,
                     description="",
                     image_url=image_url,
                     retail_price=float(tshirt[0].retail_price if hasattr(tshirt[0], 'retail_price') else 24.99),
+                    back_logo_url=product_back_logo,
                 )
                 tshirt_product = db.query(Product).filter(
                     Product.design_id == design.id, Product.product_type == "tshirt"
