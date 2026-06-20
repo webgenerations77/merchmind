@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getUsageSummary, type UsageSummary } from '../api/apiUsage';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatCostPrecise } from '../utils/formatters';
 
 const PERIODS = [
   { value: 'day', label: 'Today' },
@@ -64,7 +64,7 @@ export default function ApiUsagePage() {
             {summary.by_service.map((svc) => (
               <div key={svc.service} className="bg-bg-secondary border border-border rounded-xl p-4">
                 <p className={`text-xs ${SERVICE_COLORS[svc.service] || 'text-text-tertiary'} capitalize`}>{svc.service}</p>
-                <p className="text-xl font-bold text-text-primary mt-1">{formatCurrency(svc.total_cost)}</p>
+                <p className="text-xl font-bold text-text-primary mt-1">{formatCostPrecise(svc.total_cost)}</p>
                 <p className="text-xs text-text-tertiary">{svc.calls} calls</p>
               </div>
             ))}
@@ -85,7 +85,7 @@ export default function ApiUsagePage() {
                         {svc.input_tokens > 0 && (
                           <span className="text-xs text-text-tertiary">{(svc.input_tokens / 1000).toFixed(1)}K in / {(svc.output_tokens / 1000).toFixed(1)}K out</span>
                         )}
-                        <span className="text-sm font-semibold text-text-primary">{formatCurrency(svc.total_cost)}</span>
+                        <span className="text-sm font-semibold text-text-primary">{formatCostPrecise(svc.total_cost)}</span>
                       </div>
                     </div>
                     <div className="w-full bg-bg-tertiary rounded-full h-2">
@@ -118,7 +118,7 @@ export default function ApiUsagePage() {
                       <td className="px-3 py-2 text-sm text-text-secondary">{op.operation.replace(/_/g, ' ')}</td>
                       <td className="px-3 py-2 text-xs text-text-tertiary font-mono">{op.model || '-'}</td>
                       <td className="px-3 py-2 text-sm text-text-primary text-right">{op.calls}</td>
-                      <td className="px-3 py-2 text-sm font-medium text-text-primary text-right">{formatCurrency(op.total_cost)}</td>
+                      <td className="px-3 py-2 text-sm font-medium text-text-primary text-right">{formatCostPrecise(op.total_cost)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -149,11 +149,11 @@ export default function ApiUsagePage() {
                     <div className="flex items-center gap-4">
                       {Object.entries(data.services).map(([svc, cost]) => (
                         <span key={svc} className={`text-xs ${SERVICE_COLORS[svc] || 'text-text-tertiary'}`}>
-                          {svc}: {formatCurrency(cost)}
+                          {svc}: {formatCostPrecise(cost)}
                         </span>
                       ))}
                       <span className="text-xs text-text-tertiary">{data.calls} calls</span>
-                      <span className="text-sm font-semibold text-text-primary">{formatCurrency(data.cost)}</span>
+                      <span className="text-sm font-semibold text-text-primary">{formatCostPrecise(data.cost)}</span>
                     </div>
                   </div>
                 ))}

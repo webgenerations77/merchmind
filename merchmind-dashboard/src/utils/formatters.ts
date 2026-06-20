@@ -2,6 +2,10 @@ export function formatCurrency(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
+export function formatCostPrecise(value: number): string {
+  return `$${value.toFixed(5)}`;
+}
+
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
