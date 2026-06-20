@@ -131,18 +131,26 @@ function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [selectedPublishTypes, setSelectedPublishTypes] = useState<Set<string>>(new Set());
 
+  const clothingOrder = ['tshirt', 'hat', 'mug', 'phone_case', 'poster', 'sticker'];
+
   useEffect(() => {
     listProducts().then((all) => {
       const matched = all.filter((p) => p.design_id === design.id);
       setProducts(matched);
       setSelectedPublishTypes(new Set(matched.map((p) => p.product_type)));
+      const withMockups = matched.filter((p) => p.mockup_urls && Object.keys(p.mockup_urls).length > 0);
+      const clothing = withMockups.find((p) => clothingOrder.indexOf(p.product_type) <= 1);
+      const defaultMockup = clothing || withMockups[0];
+      if (defaultMockup) setSelectedProduct(defaultMockup.id);
     }).catch(() => null);
   }, [design.id]);
 
-  const productsWithMockups = products.filter((p) => p.mockup_urls && Object.keys(p.mockup_urls).length > 0);
+  const productsWithMockups = products
+    .filter((p) => p.mockup_urls && Object.keys(p.mockup_urls).length > 0)
+    .sort((a, b) => clothingOrder.indexOf(a.product_type) - clothingOrder.indexOf(b.product_type));
   const viewOptions = [
-    { key: 'design', label: 'Original Design' },
     ...productsWithMockups.map((p) => ({ key: p.id, label: formatProductType(p.product_type) })),
+    { key: 'design', label: 'Original Design' },
   ];
 
   const currentMockup = selectedProduct === 'design'

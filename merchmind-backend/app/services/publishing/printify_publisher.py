@@ -34,6 +34,15 @@ _BLUEPRINT_MAP = {
     "poster": 282,
 }
 
+_PROVIDER_MAP = {
+    "tshirt": 99,
+    "mug": 28,
+    "hat": 99,
+    "phone_case": 55,
+    "sticker": 27,
+    "poster": 27,
+}
+
 _FALLBACK_BASE_COSTS = {
     "tshirt": 8.50,
     "mug": 6.00,
@@ -88,17 +97,19 @@ class PrintifyService:
                 raise PrintifyError(f"Printify request failed after {_MAX_RETRIES} attempts: {e}") from e
         raise PrintifyError("Printify: max retries exceeded")
 
-    def get_blueprint_variants(self, product_type: str, print_provider_id: int = 99) -> list[dict]:
+    def get_blueprint_variants(self, product_type: str, print_provider_id: int | None = None) -> list[dict]:
         blueprint_id = _BLUEPRINT_MAP.get(product_type)
         if not blueprint_id:
             raise ValueError(f"Unknown Printify product type: '{product_type}'")
+        if print_provider_id is None:
+            print_provider_id = _PROVIDER_MAP.get(product_type, 99)
         data = self._request(
             "GET",
             f"/catalog/blueprints/{blueprint_id}/print_providers/{print_provider_id}/variants.json",
         )
         return data.get("variants", data.get("data", []))
 
-    def get_base_cost(self, product_type: str, print_provider_id: int = 99) -> float:
+    def get_base_cost(self, product_type: str, print_provider_id: int | None = None) -> float:
         """Return minimum variant cost in dollars. Falls back to industry-standard costs when Printify is unavailable."""
         try:
             variants = self.get_blueprint_variants(product_type, print_provider_id)
@@ -109,7 +120,7 @@ class PrintifyService:
             logger.warning("printify.get_base_cost API failed, using fallback. product_type=%s error=%s", product_type, e)
         return _FALLBACK_BASE_COSTS.get(product_type, 8.00)
 
-    def get_base_costs(self, print_provider_id: int = 99) -> dict[str, float]:
+    def get_base_costs(self, print_provider_id: int | None = None) -> dict[str, float]:
         """Return base costs for all product types."""
         return {pt: self.get_base_cost(pt, print_provider_id) for pt in _BLUEPRINT_MAP}
 
@@ -133,12 +144,14 @@ class PrintifyService:
         description: str,
         image_url: str,
         retail_price: float,
-        print_provider_id: int = 99,
+        print_provider_id: int | None = None,
         back_logo_url: str | None = None,
     ) -> str:
         blueprint_id = _BLUEPRINT_MAP.get(product_type)
         if not blueprint_id:
             raise ValueError(f"Unknown product type for Printify: '{product_type}'")
+        if print_provider_id is None:
+            print_provider_id = _PROVIDER_MAP.get(product_type, 99)
 
         printify_image_id = self.upload_image(image_url, f"{product_type}_design.png")
 
@@ -160,7 +173,7 @@ class PrintifyService:
                 back_image_id = self.upload_image(back_logo_url, f"{product_type}_back_logo.png")
                 placeholders.append({
                     "position": "back",
-                    "images": [{"id": back_image_id, "x": 0.5, "y": 0.3, "scale": 0.5, "angle": 0}],
+                    "images": [{"id": back_image_id, "x": 0.5, "y": 0.3, "scale": 0.25, "angle": 0}],
                 })
                 logger.info("printify.create_product adding back logo type=%s", product_type)
             except Exception as e:
@@ -283,7 +296,7 @@ def get_blueprint_variants(product_type: str) -> list[dict]:
     return _get().get_blueprint_variants(product_type)
 
 
-def get_base_cost(product_type: str, print_provider_id: int = 99) -> float:
+def get_base_cost(product_type: str, print_provider_id: int | None = None) -> float:
     return _get().get_base_cost(product_type, print_provider_id)
 
 
@@ -293,7 +306,7 @@ def create_product(
     description: str,
     image_url: str,
     retail_price: float,
-    print_provider_id: int = 99,
+    print_provider_id: int | None = None,
     back_logo_url: str | None = None,
 ) -> str:
     return _get().create_product(product_type, title, description, image_url, retail_price, print_provider_id, back_logo_url)

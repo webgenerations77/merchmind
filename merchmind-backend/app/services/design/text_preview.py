@@ -1,6 +1,6 @@
 """
 Generates preview images for text_only and typographic designs using Pillow.
-Renders primary text with the selected font on a dark background.
+Renders primary text with the selected font on a transparent background.
 """
 import io
 import logging
@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 
 _CANVAS_W = 1200
 _CANVAS_H = 1200
-_BG_COLOR = (20, 20, 20)
-_TEXT_COLOR = (249, 250, 251)
+_BG_COLOR = (0, 0, 0, 0)
+_TEXT_COLOR = (30, 30, 30)
 _ACCENT_COLOR = (99, 102, 241)
 
 _FONT_PATHS = [
@@ -57,19 +57,8 @@ def generate_text_preview(
     font_pair: str | None = None,
     color_palette: list[str] | None = None,
 ) -> bytes:
-    img = Image.new("RGB", (_CANVAS_W, _CANVAS_H), _BG_COLOR)
+    img = Image.new("RGBA", (_CANVAS_W, _CANVAS_H), _BG_COLOR)
     draw = ImageDraw.Draw(img)
-
-    accent = _ACCENT_COLOR
-    if color_palette and len(color_palette) > 0:
-        try:
-            hex_color = color_palette[0].lstrip("#")
-            accent = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-        except (ValueError, IndexError):
-            pass
-
-    draw.rectangle([(0, 0), (_CANVAS_W, 6)], fill=accent)
-    draw.rectangle([(0, _CANVAS_H - 6), (_CANVAS_W, _CANVAS_H)], fill=accent)
 
     primary_size = 72
     primary_font = _load_font(primary_size)
@@ -102,13 +91,8 @@ def generate_text_preview(
             bbox = secondary_font.getbbox(line)
             text_w = bbox[2] - bbox[0]
             x = (_CANVAS_W - text_w) // 2
-            draw.text((x, sec_y), line, fill=(156, 163, 175), font=secondary_font)
+            draw.text((x, sec_y), line, fill=(80, 80, 80), font=secondary_font)
             sec_y += 36
-
-    if font_pair:
-        label_font = _load_font(16)
-        label = f"Font: {font_pair}"
-        draw.text((40, _CANVAS_H - 50), label, fill=(107, 114, 128), font=label_font)
 
     buf = io.BytesIO()
     img.save(buf, format="PNG")
