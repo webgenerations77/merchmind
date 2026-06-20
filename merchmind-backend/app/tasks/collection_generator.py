@@ -156,6 +156,7 @@ def generate_collection_task(self, collection_id: str, count: int):
                 design.font_reasoning = font_result["reasoning"]
                 design.design_style = archetype
 
+                light_variant_url = None
                 if not processed_url and archetype in ("text_only", "typographic"):
                     try:
                         from app.services.design.text_preview import generate_text_preview
@@ -163,10 +164,19 @@ def generate_collection_task(self, collection_id: str, count: int):
                             primary_text=text_content.get("primary_text", concept_name),
                             secondary_text=text_content.get("secondary_text"),
                             font_pair=font_result["font_pair"],
+                            dark_mode=True,
                         )
                         proc_path = storage.design_processed_path(design_id)
                         processed_url = storage.upload(proc_path, preview_bytes)
                         design.processed_image_url = processed_url
+                        light_bytes = generate_text_preview(
+                            primary_text=text_content.get("primary_text", concept_name),
+                            secondary_text=text_content.get("secondary_text"),
+                            font_pair=font_result["font_pair"],
+                            dark_mode=False,
+                        )
+                        light_path = storage.design_light_variant_path(design_id)
+                        light_variant_url = storage.upload(light_path, light_bytes)
                     except Exception:
                         pass
 
@@ -208,16 +218,18 @@ def generate_collection_task(self, collection_id: str, count: int):
                 image_url = design.processed_image_url
                 if image_url:
                     from app.services.publishing.printify_publisher import _get as _get_printify
+                    from app.services.design.text_preview import _LIGHT_PRODUCT_TYPES
                     svc = _get_printify()
                     for product in db.query(Product).filter(Product.design_id == design.id).all():
                         try:
                             product_label = product.product_type.replace("_", " ").title()
                             product_back_logo = back_logo_url if (back_logo_enabled and product.product_type in back_logo_products) else None
+                            use_image = light_variant_url if (light_variant_url and product.product_type in _LIGHT_PRODUCT_TYPES) else image_url
                             printify_id = svc.create_product(
                                 product_type=product.product_type,
                                 title=f"{design.shopify_title} — {product_label}",
                                 description=design.shopify_description or "",
-                                image_url=image_url,
+                                image_url=use_image,
                                 retail_price=float(product.retail_price),
                                 back_logo_url=product_back_logo,
                             )

@@ -53,6 +53,7 @@ class DALLe3Service:
                 )
                 image_data = response.data[0].b64_json
                 logger.info("dalle3.generate ok prompt_len=%d attempt=%d", len(prompt), attempt + 1)
+                _log_image_usage("openai", "image_generate", "gpt-image-1", 0.03)
                 return base64.b64decode(image_data)
             except openai.BadRequestError as e:
                 if "content_policy_violation" in str(e).lower() or "safety" in str(e).lower():
@@ -89,6 +90,7 @@ class FluxSchnellService:
                     r = http.get(image_url)
                     r.raise_for_status()
                 logger.info("flux_schnell.generate ok prompt_len=%d attempt=%d", len(prompt), attempt + 1)
+                _log_image_usage("replicate", "image_generate", "flux-schnell", 0.003)
                 return r.content
             except (ImageGenerationError, ContentPolicyRejectionError, ImageGenerationTimeoutError):
                 raise
@@ -196,3 +198,15 @@ def generate_image(prompt: str, api: str) -> tuple[bytes, str]:
             logger.warning("generate_image fallback from %s error=%s", name, e)
 
     raise ImageProviderUnavailableError(f"Both providers failed: {last_error}") from last_error
+
+
+def _log_image_usage(service: str, operation: str, model: str, cost: float):
+    try:
+        from app.database import SessionLocal
+        from app.models.api_usage_log import ApiUsageLog
+        db = SessionLocal()
+        db.add(ApiUsageLog(service=service, operation=operation, model=model, estimated_cost=cost))
+        db.commit()
+        db.close()
+    except Exception:
+        pass

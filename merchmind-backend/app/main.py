@@ -15,6 +15,7 @@ from app.utils.error_handler import (
 )
 import app.models  # noqa: F401 — ensure all models are registered before routers
 from app.routers import (
+    api_usage,
     batches,
     collections,
     designs,
@@ -72,6 +73,7 @@ app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
 # Routers
+app.include_router(api_usage.router)
 app.include_router(batches.router)
 app.include_router(collections.router)
 app.include_router(designs.router)

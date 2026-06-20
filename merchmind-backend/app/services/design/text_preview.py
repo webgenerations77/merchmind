@@ -51,12 +51,21 @@ def _wrap_text(text: str, font: ImageFont.FreeTypeFont | ImageFont.ImageFont, ma
     return lines or [text]
 
 
+_LIGHT_PRODUCT_TYPES = {"mug", "poster", "sticker", "phone_case"}
+_DARK_PRODUCT_TYPES = {"tshirt", "hat"}
+
+
 def generate_text_preview(
     primary_text: str,
     secondary_text: str | None = None,
     font_pair: str | None = None,
     color_palette: list[str] | None = None,
+    dark_mode: bool = True,
 ) -> bytes:
+    """Generate text on transparent bg. dark_mode=True for white text (dark products), False for dark text (light products)."""
+    text_color = (255, 255, 255) if dark_mode else (30, 30, 30)
+    secondary_color = (200, 200, 200) if dark_mode else (80, 80, 80)
+
     img = Image.new("RGBA", (_CANVAS_W, _CANVAS_H), _BG_COLOR)
     draw = ImageDraw.Draw(img)
 
@@ -81,7 +90,7 @@ def generate_text_preview(
         bbox = primary_font.getbbox(line)
         text_w = bbox[2] - bbox[0]
         x = (_CANVAS_W - text_w) // 2
-        draw.text((x, y_start + i * line_height), line, fill=_TEXT_COLOR, font=primary_font)
+        draw.text((x, y_start + i * line_height), line, fill=text_color, font=primary_font)
 
     if secondary_text:
         secondary_font = _load_font(28)
@@ -91,7 +100,7 @@ def generate_text_preview(
             bbox = secondary_font.getbbox(line)
             text_w = bbox[2] - bbox[0]
             x = (_CANVAS_W - text_w) // 2
-            draw.text((x, sec_y), line, fill=(200, 200, 200), font=secondary_font)
+            draw.text((x, sec_y), line, fill=secondary_color, font=secondary_font)
             sec_y += 36
 
     buf = io.BytesIO()

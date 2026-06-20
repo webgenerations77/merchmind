@@ -8,6 +8,7 @@ import ReviewPage from './pages/ReviewPage';
 import ProductsPage from './pages/ProductsPage';
 import BatchesPage from './pages/BatchesPage';
 import SettingsPage from './pages/SettingsPage';
+import ApiUsagePage from './pages/ApiUsagePage';
 import CollectionsPage from './pages/CollectionsPage';
 import DrewsMindPage from './pages/DrewsMindPage';
 
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/drews-mind" element={<DrewsMindPage />} />
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/batches" element={<BatchesPage />} />
+        <Route path="/api-usage" element={<ApiUsagePage />} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
     </Routes>

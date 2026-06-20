@@ -144,6 +144,9 @@ class StorageClient:
     def design_processed_path(self, design_id: str) -> str:
         return f"designs/{design_id}/processed.png"
 
+    def design_light_variant_path(self, design_id: str) -> str:
+        return f"designs/{design_id}/processed_light.png"
+
     def mockup_path(self, design_id: str, product_type: str, variant: str = "front") -> str:
         return f"designs/{design_id}/mockups/{product_type}/{variant}.png"
 

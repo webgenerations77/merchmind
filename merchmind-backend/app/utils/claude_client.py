@@ -97,6 +97,7 @@ class ClaudeClient:
                         "duration_ms": elapsed_ms,
                     },
                 )
+                _persist_usage("claude", task_type, model, usage.input_tokens, usage.output_tokens, log.cost_estimate_usd)
                 return response.content[0].text, log
 
             except anthropic.RateLimitError as e:
@@ -170,6 +171,27 @@ class ClaudeClient:
             }
         ]
         return self._call(self._sonnet, task_type, messages, system, max_tokens)
+
+
+def _persist_usage(service: str, operation: str, model: str, input_tokens: int, output_tokens: int, cost: float):
+    """Log API usage to the database (fire-and-forget)."""
+    try:
+        from app.database import SessionLocal
+        from app.models.api_usage_log import ApiUsageLog
+        db = SessionLocal()
+        log = ApiUsageLog(
+            service=service,
+            operation=operation,
+            model=model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            estimated_cost=cost,
+        )
+        db.add(log)
+        db.commit()
+        db.close()
+    except Exception as e:
+        logger.debug("Failed to persist API usage: %s", e)
 
 
 claude = ClaudeClient()

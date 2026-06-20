@@ -9,6 +9,7 @@ const links = [
   { to: '/drews-mind', label: "Drew's Mind", icon: '!' },
   { to: '/products', label: 'Products', icon: '%' },
   { to: '/batches', label: 'Batches', icon: '@' },
+  { to: '/api-usage', label: 'API Usage', icon: '$' },
   { to: '/settings', label: 'Settings', icon: '*' },
 ];
 
