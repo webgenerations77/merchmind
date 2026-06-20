@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { listAlerts, resolveAlert } from '../api/alerts';
 import { listBatches } from '../api/batches';
 import { listProducts } from '../api/products';
+import { getReviewQueue } from '../api/designs';
 import type { AlertOut, BatchOut, ProductOut } from '../types/api';
 import StatusBadge from '../components/shared/StatusBadge';
 import { formatTimeAgo, formatCurrency, formatProductType } from '../utils/formatters';
@@ -11,16 +12,28 @@ export default function DashboardPage() {
   const [alerts, setAlerts] = useState<AlertOut[]>([]);
   const [batches, setBatches] = useState<BatchOut[]>([]);
   const [products, setProducts] = useState<ProductOut[]>([]);
+  const [queueCount, setQueueCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
     Promise.all([
       listAlerts(false).then(setAlerts),
       listBatches().then(setBatches),
       listProducts().then(setProducts),
+      getReviewQueue().then((q) => setQueueCount(q.length)).catch(() => null),
     ]).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  useEffect(() => {
+    const latestBatch = batches[0];
+    if (latestBatch?.status === 'running') {
+      const interval = setInterval(loadData, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [batches, loadData]);
 
   const handleResolve = async (id: string) => {
     await resolveAlert(id);
@@ -36,19 +49,38 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-text-primary">Dashboard</h1>
 
-      {latestBatch && latestBatch.queued_count > 0 && (
+      {latestBatch?.status === 'running' && (
+        <div className="p-4 bg-bg-secondary border border-accent/30 rounded-xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-3 h-3 rounded-full bg-accent animate-pulse" />
+              <div>
+                <p className="text-accent font-semibold">Batch in progress</p>
+                <p className="text-sm text-text-secondary mt-0.5">
+                  Generating designs — {latestBatch.total_ideas} trends scored, {products.length} products so far
+                </p>
+              </div>
+            </div>
+            <Link to="/review" className="px-3 py-1.5 rounded-lg bg-accent/20 text-accent text-sm font-medium hover:bg-accent/30 transition-colors">
+              View progress
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {latestBatch?.status === 'complete' && queueCount > 0 && (
         <Link
           to="/review"
-          className="block p-4 bg-accent/10 border border-accent/30 rounded-xl hover:bg-accent/15 transition-colors"
+          className="block p-4 bg-approve/10 border border-approve/30 rounded-xl hover:bg-approve/15 transition-colors"
         >
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-accent font-semibold">Designs ready for review</p>
+              <p className="text-approve font-semibold">Designs ready for review</p>
               <p className="text-sm text-text-secondary mt-0.5">
-                {latestBatch.queued_count} designs from batch {latestBatch.week_start}
+                {queueCount} designs waiting for your approval
               </p>
             </div>
-            <span className="text-accent text-2xl font-bold">{latestBatch.queued_count}</span>
+            <span className="text-approve text-2xl font-bold">{queueCount}</span>
           </div>
         </Link>
       )}
