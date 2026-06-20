@@ -51,11 +51,11 @@ def get_batch(batch_id: UUID, db: Session = Depends(get_db), _: str = Depends(ve
 
 
 @router.post("/trigger")
-def trigger_batch(max_designs: Optional[int] = None, _: str = Depends(verify_api_key)):
-    """Manually trigger the weekly batch pipeline now. Optional max_designs to limit output for testing."""
+def trigger_batch(max_designs: Optional[int] = None, max_trends: Optional[int] = None, _: str = Depends(verify_api_key)):
+    """Manually trigger the weekly batch pipeline. Optional max_designs and max_trends for testing."""
     from app.tasks.batch_pipeline import run_weekly_batch
-    task = run_weekly_batch.delay(None, max_designs)
-    return _envelope({"task_id": task.id, "message": "Batch pipeline triggered", "max_designs": max_designs})
+    task = run_weekly_batch.delay(None, max_designs, max_trends)
+    return _envelope({"task_id": task.id, "message": "Batch pipeline triggered", "max_designs": max_designs, "max_trends": max_trends})
 
 
 @router.get("/{batch_id}/progress")

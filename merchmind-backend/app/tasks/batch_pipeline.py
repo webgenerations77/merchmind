@@ -64,10 +64,10 @@ def _emit_progress(batch_id: str, step: int, total: int, message: str, data: dic
     acks_late=True,
     name="app.tasks.batch_pipeline.run_weekly_batch",
 )
-def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional[int] = None):
+def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional[int] = None, max_trends: Optional[int] = None):
     """
     Main Sunday batch task. Creates or resumes a batch and runs all 8 pipeline steps.
-    Optional max_designs limits how many designs are generated (for testing).
+    Optional max_designs/max_trends limit output for testing.
     """
     db = SessionLocal()
     batch = None
@@ -147,6 +147,10 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
             filtered_signals.append(signal)
         logger.info(f"Pre-filter: {len(raw_signals)} → {len(filtered_signals)} signals")
         raw_signals = filtered_signals
+
+        if max_trends and len(raw_signals) > max_trends:
+            raw_signals = raw_signals[:max_trends]
+            logger.info(f"max_trends limit: capped at {max_trends} signals")
 
         batch.total_ideas = len(raw_signals)
         db.commit()
