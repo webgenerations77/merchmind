@@ -10,7 +10,7 @@ healthcheckTimeout = 30
 
 [[services]]
 name = "worker"
-startCommand = "celery -A app.tasks.celery_app.celery_app worker --loglevel=info --concurrency=1 --max-memory-per-child=400000"
+startCommand = "celery -A app.tasks.celery_app.celery_app worker --loglevel=info --pool=solo"
 
 [[services]]
 name = "beat"

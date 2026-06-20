@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useReviewStore } from '../stores/reviewStore';
-import { getDesign } from '../api/designs';
+import { getDesign, getReviewQueue } from '../api/designs';
 import { listBatches, triggerBatch } from '../api/batches';
 import { listProducts } from '../api/products';
 import { getApiBalance, type ApiBalanceResult } from '../api/health';
@@ -11,20 +11,35 @@ import StatusBadge from '../components/shared/StatusBadge';
 import { formatCurrency, formatProductType } from '../utils/formatters';
 import { calculateCostBreakdown } from '../utils/profitCalc';
 
-function BatchProgress({ batch, productCount }: { batch: BatchOut; productCount: number }) {
-  const startTime = new Date(batch.run_started_at).getTime();
-  const elapsed = Math.floor((Date.now() - startTime) / 1000);
-  const estimatedProducts = batch.queued_count * 4;
-  const progress = estimatedProducts > 0 ? Math.min(95, (productCount / estimatedProducts) * 100) : 0;
+function BatchProgress({ batch, productCount, designCount }: { batch: BatchOut; productCount: number; designCount: number }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const start = new Date(batch.run_started_at).getTime();
+    setElapsed(Math.floor((Date.now() - start) / 1000));
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [batch.run_started_at]);
+
+  const totalDesigns = batch.queued_count || 1;
+  const designsDone = designCount;
+  const progressPct = batch.queued_count > 0
+    ? Math.min(95, ((designsDone / totalDesigns) * 80) + (batch.total_ideas > 0 ? 10 : 0) + (batch.queued_count > 0 ? 10 : 0))
+    : batch.total_ideas > 0 ? 15 : 5;
 
   const steps = [
-    { label: 'Scraping trends', done: batch.total_ideas > 0 },
-    { label: `Scoring ${batch.total_ideas} ideas`, done: batch.queued_count > 0 },
-    { label: `Generating ${batch.queued_count} designs`, done: batch.queued_count > 0 && productCount > 0 },
-    { label: 'Creating products & marketing', done: batch.status === 'complete' },
+    { label: 'Scraping trends', detail: batch.total_ideas > 0 ? `${batch.total_ideas} found` : '', done: batch.total_ideas > 0 },
+    { label: 'Scoring & filtering', detail: batch.queued_count > 0 ? `${batch.queued_count} qualified` : '', done: batch.queued_count > 0 },
+    { label: 'Generating designs', detail: batch.queued_count > 0 ? `${designsDone}/${totalDesigns}` : '', done: designsDone >= totalDesigns && totalDesigns > 0 },
+    { label: 'Creating products', detail: productCount > 0 ? `${productCount} created` : '', done: productCount > 0 && designsDone >= totalDesigns },
+    { label: 'Marketing copy', detail: '', done: batch.status === 'complete' },
   ];
 
   const currentStep = steps.findIndex((s) => !s.done);
+
+  const formatTime = (s: number) => {
+    if (s < 60) return `${s}s`;
+    return `${Math.floor(s / 60)}m ${s % 60}s`;
+  };
 
   return (
     <div className="bg-bg-secondary border border-accent/30 rounded-xl p-5 mb-6">
@@ -34,8 +49,9 @@ function BatchProgress({ batch, productCount }: { batch: BatchOut; productCount:
           <div>
             <h3 className="text-sm font-semibold text-text-primary">Batch Running</h3>
             <p className="text-xs text-text-secondary">
-              {elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`} elapsed
-              {productCount > 0 && ` · ${productCount} products created`}
+              {formatTime(elapsed)} elapsed
+              {designsDone > 0 && ` · ${designsDone}/${totalDesigns} designs`}
+              {productCount > 0 && ` · ${productCount} products`}
             </p>
           </div>
         </div>
@@ -45,13 +61,13 @@ function BatchProgress({ batch, productCount }: { batch: BatchOut; productCount:
       <div className="w-full bg-bg-tertiary rounded-full h-2 mb-4">
         <div
           className="bg-accent rounded-full h-2 transition-all duration-1000"
-          style={{ width: `${Math.max(5, progress)}%` }}
+          style={{ width: `${Math.max(3, progressPct)}%` }}
         />
       </div>
 
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-5 gap-2">
         {steps.map((step, i) => (
-          <div key={i} className="flex items-center gap-2">
+          <div key={i} className="flex items-center gap-1.5">
             <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
               step.done ? 'bg-approve/20 text-approve' :
               i === currentStep ? 'bg-accent/20 text-accent' :
@@ -59,9 +75,16 @@ function BatchProgress({ batch, productCount }: { batch: BatchOut; productCount:
             }`}>
               {step.done ? '✓' : i + 1}
             </span>
-            <span className={`text-xs ${step.done ? 'text-text-secondary' : i === currentStep ? 'text-accent' : 'text-text-tertiary'}`}>
-              {step.label}
-            </span>
+            <div>
+              <span className={`text-xs ${step.done ? 'text-text-secondary' : i === currentStep ? 'text-accent' : 'text-text-tertiary'}`}>
+                {step.label}
+              </span>
+              {step.detail && (
+                <span className={`text-xs ml-1 ${i === currentStep ? 'text-accent font-medium' : 'text-text-tertiary'}`}>
+                  {step.detail}
+                </span>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -337,6 +360,7 @@ export default function ReviewPage() {
   const [runningBatch, setRunningBatch] = useState<BatchOut | null>(null);
   const [recentBatch, setRecentBatch] = useState<BatchOut | null>(null);
   const [productCount, setProductCount] = useState(0);
+  const [batchDesignCount, setBatchDesignCount] = useState(0);
   const [triggering, setTriggering] = useState(false);
   const [apiBalance, setApiBalance] = useState<ApiBalanceResult | null>(null);
   const [balanceOverride, setBalanceOverride] = useState(false);
@@ -352,6 +376,8 @@ export default function ReviewPage() {
         const batchStart = new Date(latest.run_started_at).getTime();
         const batchProducts = products.filter((p) => new Date(p.created_at).getTime() >= batchStart);
         setProductCount(batchProducts.length);
+        const latestQueue = await getReviewQueue();
+        setBatchDesignCount(latestQueue.filter((d) => d.source === 'batch').length);
       } else if (latest?.status === 'complete') {
         setRunningBatch((prev) => {
           if (prev) setRecentBatch(latest);
@@ -501,7 +527,7 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {runningBatch && <BatchProgress batch={runningBatch} productCount={productCount} />}
+      {runningBatch && <BatchProgress batch={runningBatch} productCount={productCount} designCount={batchDesignCount} />}
       {recentBatch && <BatchComplete batch={recentBatch} onRefresh={handleRefresh} />}
 
       <div className="flex gap-1 mb-6 bg-bg-secondary rounded-lg p-1 border border-border">
