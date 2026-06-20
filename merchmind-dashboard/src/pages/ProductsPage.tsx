@@ -43,7 +43,13 @@ function ProductDetail({ product, onBack }: { product: ProductOut; onBack: () =>
               <div className="h-48 flex items-center justify-center text-text-tertiary">Loading design...</div>
             ) : design ? (
               <div className="flex gap-4">
-                {design.processed_image_url ? (
+                {product.mockup_urls && Object.keys(product.mockup_urls).length > 0 ? (
+                  <div className="flex gap-2 shrink-0">
+                    {Object.entries(product.mockup_urls).map(([position, url]) => (
+                      <img key={position} src={url as string} alt={`${position} mockup`} className="w-48 h-48 object-cover rounded-lg" />
+                    ))}
+                  </div>
+                ) : design.processed_image_url ? (
                   <img src={design.processed_image_url} alt={design.concept_name} className="w-48 h-48 object-cover rounded-lg shrink-0" />
                 ) : (
                   <div className="w-48 h-48 bg-bg-tertiary rounded-lg flex items-center justify-center text-text-tertiary text-sm shrink-0">
