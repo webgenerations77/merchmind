@@ -1,14 +1,13 @@
 """
-Image generation via DALL-E 3 (OpenAI) and Stable Diffusion XL (Replicate).
+Image generation via Flux Schnell (Replicate) and GPT Image (OpenAI).
 Uses sync clients for compatibility with Celery worker tasks.
-Falls back to the alternate provider on failure.
+Flux Schnell is primary (~$0.003/image), DALL-E is fallback (~$0.03/image).
 """
+import base64
 import logging
 import time
 from dataclasses import dataclass
 from functools import lru_cache
-
-import base64
 
 import httpx
 import openai
@@ -27,8 +26,8 @@ logger = logging.getLogger(__name__)
 
 _TIMEOUT = 60
 _MAX_RETRIES = 3
-_REPLICATE_SDXL = "stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b"
-_REPLICATE_POLL_INTERVAL = 3
+_FLUX_SCHNELL = "black-forest-labs/flux-schnell"
+_REPLICATE_POLL_INTERVAL = 2
 _REPLICATE_MAX_WAIT = 120
 
 
@@ -57,8 +56,8 @@ class DALLe3Service:
                 return base64.b64decode(image_data)
             except openai.BadRequestError as e:
                 if "content_policy_violation" in str(e).lower() or "safety" in str(e).lower():
-                    raise ContentPolicyRejectionError(f"DALL-E 3 content policy: {e}") from e
-                raise ImageGenerationError(f"DALL-E 3 bad request: {e}") from e
+                    raise ContentPolicyRejectionError(f"DALL-E content policy: {e}") from e
+                raise ImageGenerationError(f"DALL-E bad request: {e}") from e
             except (ContentPolicyRejectionError, ImageGenerationError):
                 raise
             except Exception as e:
@@ -67,8 +66,8 @@ class DALLe3Service:
                 if attempt < _MAX_RETRIES - 1:
                     time.sleep(wait)
                 else:
-                    raise ImageProviderUnavailableError(f"DALL-E 3 failed after {_MAX_RETRIES} attempts: {e}") from e
-        raise ImageGenerationError("DALL-E 3: unreachable")
+                    raise ImageProviderUnavailableError(f"DALL-E failed after {_MAX_RETRIES} attempts: {e}") from e
+        raise ImageGenerationError("DALL-E: unreachable")
 
     def health_check(self) -> dict:
         try:
@@ -79,7 +78,7 @@ class DALLe3Service:
             return {"service": "dalle3", "ok": False, "error": str(e)}
 
 
-class StableDiffusionService:
+class FluxSchnellService:
     def generate(self, prompt: str) -> bytes:
         for attempt in range(_MAX_RETRIES):
             try:
@@ -89,37 +88,32 @@ class StableDiffusionService:
                 with httpx.Client(timeout=_TIMEOUT) as http:
                     r = http.get(image_url)
                     r.raise_for_status()
-                logger.info("stable_diffusion.generate ok prompt_len=%d attempt=%d", len(prompt), attempt + 1)
+                logger.info("flux_schnell.generate ok prompt_len=%d attempt=%d", len(prompt), attempt + 1)
                 return r.content
             except (ImageGenerationError, ContentPolicyRejectionError, ImageGenerationTimeoutError):
                 raise
             except Exception as e:
                 wait = 2 ** attempt * 3
-                logger.warning("stable_diffusion.generate attempt=%d/%d failed error=%s wait=%ds", attempt + 1, _MAX_RETRIES, e, wait)
+                logger.warning("flux_schnell.generate attempt=%d/%d failed error=%s wait=%ds", attempt + 1, _MAX_RETRIES, e, wait)
                 if attempt < _MAX_RETRIES - 1:
                     time.sleep(wait)
                 else:
-                    raise ImageProviderUnavailableError(f"Stable Diffusion failed after {_MAX_RETRIES} attempts: {e}") from e
-        raise ImageGenerationError("Stable Diffusion: unreachable")
+                    raise ImageProviderUnavailableError(f"Flux Schnell failed after {_MAX_RETRIES} attempts: {e}") from e
+        raise ImageGenerationError("Flux Schnell: unreachable")
 
     def _create_prediction(self, prompt: str) -> dict:
         with httpx.Client(timeout=30) as http:
             r = http.post(
-                "https://api.replicate.com/v1/predictions",
-                headers={"Authorization": f"Token {settings.REPLICATE_API_KEY}"},
+                "https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions",
+                headers={"Authorization": f"Bearer {settings.REPLICATE_API_KEY}"},
                 json={
-                    "version": _REPLICATE_SDXL.split(":")[1],
                     "input": {
                         "prompt": prompt,
-                        "negative_prompt": (
-                            "text, words, letters, watermark, signature, low quality, "
-                            "blurry, realistic photo, photography, 3D render"
-                        ),
-                        "width": 1024,
-                        "height": 1024,
-                        "num_inference_steps": 30,
-                        "guidance_scale": 7.5,
-                        "scheduler": "K_EULER",
+                        "go_fast": True,
+                        "num_outputs": 1,
+                        "aspect_ratio": "1:1",
+                        "output_format": "png",
+                        "output_quality": 90,
                     },
                 },
             )
@@ -133,7 +127,7 @@ class StableDiffusionService:
             with httpx.Client(timeout=30) as http:
                 r = http.get(
                     f"https://api.replicate.com/v1/predictions/{prediction_id}",
-                    headers={"Authorization": f"Token {settings.REPLICATE_API_KEY}"},
+                    headers={"Authorization": f"Bearer {settings.REPLICATE_API_KEY}"},
                 )
                 r.raise_for_status()
                 data = r.json()
@@ -143,33 +137,33 @@ class StableDiffusionService:
                 url = output[0] if isinstance(output, list) else output
                 return str(url)
             if status in ("failed", "canceled"):
-                raise ImageGenerationError(f"Replicate prediction {prediction_id} {status}: {data.get('error')}")
-        raise ImageGenerationTimeoutError(f"Replicate prediction {prediction_id} timed out after {_REPLICATE_MAX_WAIT}s")
+                raise ImageGenerationError(f"Flux prediction {prediction_id} {status}: {data.get('error')}")
+        raise ImageGenerationTimeoutError(f"Flux prediction {prediction_id} timed out after {_REPLICATE_MAX_WAIT}s")
 
     def health_check(self) -> dict:
         try:
             r = httpx.get(
-                "https://api.replicate.com/v1/models/stability-ai/sdxl",
-                headers={"Authorization": f"Token {settings.REPLICATE_API_KEY}"},
+                "https://api.replicate.com/v1/models/black-forest-labs/flux-schnell",
+                headers={"Authorization": f"Bearer {settings.REPLICATE_API_KEY}"},
                 timeout=10,
             )
-            return {"service": "stable_diffusion", "ok": r.status_code == 200}
+            return {"service": "flux_schnell", "ok": r.status_code == 200}
         except Exception as e:
-            return {"service": "stable_diffusion", "ok": False, "error": str(e)}
+            return {"service": "flux_schnell", "ok": False, "error": str(e)}
 
 
 class ImageGeneratorService:
     def __init__(self) -> None:
         self._dalle3 = DALLe3Service()
-        self._sd = StableDiffusionService()
+        self._flux = FluxSchnellService()
 
     def health_check(self) -> dict:
         dalle_hc = self._dalle3.health_check()
-        sd_hc = self._sd.health_check()
+        flux_hc = self._flux.health_check()
         return {
             "service": "image_generator",
-            "ok": dalle_hc["ok"] or sd_hc["ok"],
-            "providers": {"dalle3": dalle_hc, "stable_diffusion": sd_hc},
+            "ok": dalle_hc["ok"] or flux_hc["ok"],
+            "providers": {"dalle3": dalle_hc, "flux_schnell": flux_hc},
         }
 
 
@@ -179,9 +173,10 @@ def get_image_generator_service() -> ImageGeneratorService:
 
 
 def generate_image(prompt: str, api: str) -> tuple[bytes, str]:
+    """Generate image. Tries Flux Schnell first, falls back to DALL-E."""
     svc = get_image_generator_service()
-    providers = [("dalle3", svc._dalle3), ("stable_diffusion", svc._sd)]
-    if api != "dalle3":
+    providers = [("flux_schnell", svc._flux), ("dalle3", svc._dalle3)]
+    if api == "dalle3":
         providers = list(reversed(providers))
 
     last_error: Exception = RuntimeError("No providers")

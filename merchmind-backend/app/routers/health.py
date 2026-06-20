@@ -124,14 +124,14 @@ def test_image_gen(_: str = Depends(verify_api_key)) -> dict:
     except Exception as e:
         results["dalle3"] = {"ok": False, "error": str(e), "type": type(e).__name__}
 
-    # Test Stable Diffusion
+    # Test Flux Schnell
     try:
-        from app.services.design.image_generator import StableDiffusionService
-        sd = StableDiffusionService()
-        img_bytes = sd.generate(prompt)
-        results["stable_diffusion"] = {"ok": True, "bytes": len(img_bytes)}
+        from app.services.design.image_generator import FluxSchnellService
+        flux = FluxSchnellService()
+        img_bytes = flux.generate(prompt)
+        results["flux_schnell"] = {"ok": True, "bytes": len(img_bytes)}
     except Exception as e:
-        results["stable_diffusion"] = {"ok": False, "error": str(e), "type": type(e).__name__}
+        results["flux_schnell"] = {"ok": False, "error": str(e), "type": type(e).__name__}
 
     return {"ok": any(r["ok"] for r in results.values()), "results": results}
 

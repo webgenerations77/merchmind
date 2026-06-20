@@ -66,11 +66,9 @@ def classify_archetype(raw_signal: str, source: str, niche: str = "") -> str:
 def select_image_api(archetype: str) -> str | None:
     """
     Select which image generation API to use based on archetype.
-    Returns 'dalle3', 'stable_diffusion', or None (skip image gen).
+    Returns 'flux_schnell', 'dalle3', or None (skip image gen).
+    Flux Schnell is preferred (~$0.003/image vs ~$0.03 for DALL-E).
     """
     if archetype in ("text_only", "typographic"):
         return None
-    if archetype in ("illustration", "hybrid"):
-        return "stable_diffusion"
-    # text_icon
-    return "dalle3"
+    return "flux_schnell"
