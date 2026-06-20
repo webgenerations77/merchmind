@@ -202,13 +202,22 @@ function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
           {products.length > 0 && (
             <div className="p-3 bg-bg-secondary rounded-lg border border-border">
               <p className="text-xs text-text-tertiary mb-2">Products ({products.length})</p>
-              <div className="space-y-1.5">
-                {products.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between">
-                    <span className="text-sm text-text-primary">{formatProductType(p.product_type)}</span>
-                    <span className="text-sm font-medium text-accent">{formatCurrency(p.retail_price)}</span>
-                  </div>
-                ))}
+              <div className="space-y-2">
+                {products.map((p) => {
+                  const profit = p.retail_price - p.printify_base_cost;
+                  const margin = p.printify_base_cost > 0 ? ((profit / p.retail_price) * 100) : 100;
+                  return (
+                    <div key={p.id} className="flex items-center justify-between">
+                      <span className="text-sm text-text-primary">{formatProductType(p.product_type)}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-text-tertiary">COGS {formatCurrency(p.printify_base_cost)}</span>
+                        <span className="text-xs text-approve">+{formatCurrency(profit)}</span>
+                        <span className={`text-xs font-medium ${margin >= 40 ? 'text-approve' : 'text-confidence-medium'}`}>{margin.toFixed(0)}%</span>
+                        <span className="text-sm font-medium text-accent">{formatCurrency(p.retail_price)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

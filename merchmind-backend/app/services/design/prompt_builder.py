@@ -10,9 +10,10 @@ from app.utils.claude_client import claude
 logger = logging.getLogger(__name__)
 
 _STYLE_LOCK = (
-    "Professional merchandise artwork style. White or transparent background. "
-    "Centered composition with clean edges. High contrast, vibrant colors. "
-    "No text, no letters, no words, no watermarks. "
+    "Professional merchandise artwork style. Isolated subject on a plain solid white background. "
+    "Centered composition with clean edges and plenty of whitespace around the subject. "
+    "High contrast, vibrant colors. No text, no letters, no words, no watermarks. "
+    "The design element should be clearly separated from the background. "
     "Print-ready quality, sharp details, professional commercial design."
 )
 

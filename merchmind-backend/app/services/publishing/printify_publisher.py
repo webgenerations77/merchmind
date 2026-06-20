@@ -204,13 +204,21 @@ class PrintifyService:
                 f"/shops/{settings.PRINTIFY_SHOP_ID}/products/{printify_product_id}.json",
             )
             images = result.get("images", [])
-            mockup_urls: dict[str, str] = {}
-
+            front_url = ""
+            back_url = ""
             for img in images:
                 position = img.get("position", "front")
                 src = img.get("src", "")
-                if position in ("front", "back") and src and position not in mockup_urls:
-                    mockup_urls[position] = src
+                if position == "front" and src and not front_url:
+                    front_url = src
+                elif position == "back" and src and not back_url:
+                    back_url = src
+
+            mockup_urls: dict[str, str] = {}
+            if front_url:
+                mockup_urls["front"] = front_url
+            if back_url:
+                mockup_urls["back"] = back_url
 
             logger.info("printify.generate_mockups product_id=%s positions=%s", printify_product_id, list(mockup_urls))
             return mockup_urls

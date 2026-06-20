@@ -370,9 +370,18 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                 raw_url = storage.upload(raw_path, raw_bytes)
                 design.raw_image_url = raw_url
 
-                # Use raw image as processed (skip rembg to avoid OOM)
-                proc_path = storage.design_processed_path(design_id)
-                processed_url = storage.upload(proc_path, raw_bytes)
+                # Remove background for clean product mockups
+                try:
+                    from rembg import remove, new_session
+                    session = new_session("u2netp")
+                    clean_bytes = remove(raw_bytes, session=session)
+                    proc_path = storage.design_processed_path(design_id)
+                    processed_url = storage.upload(proc_path, clean_bytes)
+                    logger.info(f"design_task[{trend_id[:8]}] background removed")
+                except Exception as bg_err:
+                    logger.warning(f"design_task[{trend_id[:8]}] bg removal failed, using raw: {bg_err}")
+                    proc_path = storage.design_processed_path(design_id)
+                    processed_url = storage.upload(proc_path, raw_bytes)
                 design.processed_image_url = processed_url
                 db.commit()
                 logger.info(f"design_task[{trend_id[:8]}] images uploaded")
