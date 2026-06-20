@@ -36,11 +36,11 @@ _BLUEPRINT_MAP = {
 
 _PROVIDER_MAP = {
     "tshirt": 99,
-    "mug": 28,
+    "mug": 1,
     "hat": 99,
-    "phone_case": 55,
-    "sticker": 27,
-    "poster": 27,
+    "phone_case": 1,
+    "sticker": 99,
+    "poster": 99,
 }
 
 _FALLBACK_BASE_COSTS = {

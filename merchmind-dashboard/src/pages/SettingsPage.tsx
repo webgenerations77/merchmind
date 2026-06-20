@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getSettings, updateSettings, listClusters } from '../api/settings';
+import { getSettings, updateSettings, listClusters, updateCluster } from '../api/settings';
 import { getIntegrationHealth } from '../api/health';
 import type { AppSettings, NicheCluster, IntegrationHealth } from '../types/api';
 import { formatCurrency } from '../utils/formatters';
@@ -103,32 +103,14 @@ export default function SettingsPage() {
 
       <section className="bg-bg-secondary border border-border rounded-xl p-5">
         <h2 className="text-base font-semibold text-text-primary mb-4">Spinach Back Logo</h2>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-text-primary">Enable back logo on clothing</p>
-              <p className="text-xs text-text-tertiary">Adds Spinach the Cow logo to the back of tshirts and hats (+$2.50-3.00 COGS)</p>
-            </div>
-            <button
-              onClick={() => {
-                const next = !settings.back_logo_enabled;
-                setSettings({ ...settings, back_logo_enabled: next });
-                save({ back_logo_enabled: next });
-              }}
-              className={`relative w-11 h-6 rounded-full transition-colors ${settings.back_logo_enabled ? 'bg-accent' : 'bg-bg-tertiary border border-border'}`}
-            >
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${settings.back_logo_enabled ? 'translate-x-5' : ''}`} />
-            </button>
-          </div>
-          {settings.back_logo_enabled && settings.back_logo_url && (
-            <div className="flex items-center gap-3 p-3 bg-bg-tertiary rounded-lg">
-              <img src={settings.back_logo_url} alt="Back logo" className="w-12 h-12 rounded-lg object-contain" />
-              <div>
-                <p className="text-sm text-text-primary">Spinach the Cow</p>
-                <p className="text-xs text-text-tertiary">Applied to: {(settings.back_logo_products || ['tshirt', 'hat']).join(', ')}</p>
-              </div>
-            </div>
+        <div className="flex items-center gap-3 p-3 bg-bg-tertiary rounded-lg">
+          {settings.back_logo_url && (
+            <img src={settings.back_logo_url} alt="Back logo" className="w-12 h-12 rounded-lg object-contain" />
           )}
+          <div>
+            <p className="text-sm text-text-primary">Spinach the Cow — Always On</p>
+            <p className="text-xs text-text-tertiary">Applied to: {(settings.back_logo_products || ['tshirt', 'hat']).join(', ')} (+$2.50-3.00 COGS)</p>
+          </div>
         </div>
       </section>
 
@@ -147,9 +129,15 @@ export default function SettingsPage() {
                     <p className="text-xs text-text-tertiary">{cluster.keywords.slice(0, 5).join(', ')}</p>
                   </div>
                 </div>
-                <span className={`text-xs font-medium ${cluster.active ? 'text-approve' : 'text-text-tertiary'}`}>
-                  {cluster.active ? 'Active' : 'Inactive'}
-                </span>
+                <button
+                  onClick={async () => {
+                    const updated = await updateCluster(cluster.id, { active: !cluster.active });
+                    setClusters((prev) => prev.map((c) => c.id === updated.id ? updated : c));
+                  }}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${cluster.active ? 'bg-accent' : 'bg-bg-secondary border border-border'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${cluster.active ? 'translate-x-5' : ''}`} />
+                </button>
               </div>
             ))}
           </div>

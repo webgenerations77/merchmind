@@ -15,3 +15,8 @@ export async function listClusters(): Promise<NicheCluster[]> {
   const { data } = await apiClient.get<ApiResponse<NicheCluster[]>>('/niche-clusters');
   return data.data;
 }
+
+export async function updateCluster(id: string, updates: Partial<NicheCluster>): Promise<NicheCluster> {
+  const { data } = await apiClient.patch<ApiResponse<NicheCluster>>(`/niche-clusters/${id}`, updates);
+  return data.data;
+}
