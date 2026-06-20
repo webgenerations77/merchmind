@@ -296,11 +296,22 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
     """
     db = SessionLocal()
     design = None
+    def _log(msg):
+        logger.info(f"design_task[{trend_id[:8]}] {msg}")
+        try:
+            batch = db.query(Batch).filter(Batch.id == batch_id).first()
+            if batch:
+                _log_batch_error(batch, db, f"TRACE {trend_id[:8]}: {msg}")
+        except Exception:
+            pass
+
     try:
+        _log("started")
         trend = db.query(Trend).filter(Trend.id == trend_id).first()
         if not trend:
             raise ValueError(f"Trend {trend_id} not found")
 
+        _log(f"trend found: {trend.raw_signal[:40]}")
         quality_threshold = pipeline_settings.get("quality_threshold", 28)
         trend_boost_max = pipeline_settings.get("trend_boost_max", 0.20)
         base_markup = pipeline_settings.get("base_markup", {})
@@ -313,7 +324,9 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                 niche_name = cluster.name
 
         # 4a: Classify archetype
+        _log("classifying archetype...")
         archetype = classify_archetype(trend.raw_signal, trend.source, niche_name)
+        _log(f"archetype={archetype}")
 
         # 4b: Select image API
         image_api = select_image_api(archetype)
