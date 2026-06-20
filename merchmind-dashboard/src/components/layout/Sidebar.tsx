@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { logout, type User } from '../../firebase';
 
 const links = [
   { to: '/', label: 'Dashboard', icon: '~' },
@@ -9,7 +10,7 @@ const links = [
   { to: '/settings', label: 'Settings', icon: '*' },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ user }: { user: User }) {
   return (
     <aside className="w-56 min-h-screen bg-bg-secondary border-r border-border flex flex-col">
       <div className="p-5 border-b border-border">
@@ -35,6 +36,22 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
+      <div className="p-3 border-t border-border">
+        <div className="flex items-center gap-2 px-3 py-2">
+          {user.photoURL && (
+            <img src={user.photoURL} alt="" className="w-6 h-6 rounded-full" />
+          )}
+          <span className="text-xs text-text-secondary truncate flex-1">
+            {user.displayName || user.email}
+          </span>
+        </div>
+        <button
+          onClick={logout}
+          className="w-full px-3 py-1.5 rounded-lg text-xs text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary transition-colors text-left"
+        >
+          Sign out
+        </button>
+      </div>
     </aside>
   );
 }
