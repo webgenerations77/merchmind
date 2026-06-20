@@ -108,6 +108,19 @@ class PrintifyService:
         """Return base costs for all product types."""
         return {pt: self.get_base_cost(pt, print_provider_id) for pt in _BLUEPRINT_MAP}
 
+    def upload_image(self, image_url: str, file_name: str = "design.png") -> str:
+        """Upload an image to Printify via URL. Returns the Printify image ID."""
+        result = self._request(
+            "POST",
+            "/uploads/images.json",
+            json={"file_name": file_name, "url": image_url},
+        )
+        image_id = result.get("id", "")
+        if not image_id:
+            raise PrintifyError(f"Printify upload returned no ID: {result}")
+        logger.info("printify.upload_image id=%s file=%s", image_id, file_name)
+        return str(image_id)
+
     def create_product(
         self,
         product_type: str,
@@ -120,6 +133,8 @@ class PrintifyService:
         blueprint_id = _BLUEPRINT_MAP.get(product_type)
         if not blueprint_id:
             raise ValueError(f"Unknown product type for Printify: '{product_type}'")
+
+        printify_image_id = self.upload_image(image_url, f"{product_type}_design.png")
 
         variants_data = self._request(
             "GET",
@@ -142,7 +157,7 @@ class PrintifyService:
                     "placeholders": [
                         {
                             "position": "front",
-                            "images": [{"id": "", "x": 0.5, "y": 0.5, "scale": 1.0, "angle": 0}],
+                            "images": [{"id": printify_image_id, "x": 0.5, "y": 0.5, "scale": 1.0, "angle": 0}],
                         }
                     ],
                 }

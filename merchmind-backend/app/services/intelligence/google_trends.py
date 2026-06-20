@@ -1,40 +1,52 @@
 """
-Google Trends scraper — class-based wrapper around pytrends.
-Fetches US trending searches and rising queries for niche cluster keywords.
+Google Trends scraper — uses the public RSS feed for daily trending searches
+and the pytrends library for rising queries (with graceful fallback).
 """
 import logging
 import time
+import xml.etree.ElementTree as ET
 from functools import lru_cache
-from pytrends.request import TrendReq
+
+import httpx
 
 from app.utils.exceptions import GoogleTrendsError
 
 logger = logging.getLogger(__name__)
 
+_RSS_URL = "https://trends.google.com/trending/rss?geo=US"
 _PYTRENDS_BACKOFF = [5, 15, 30]
 
 
 class GoogleTrendsService:
     def __init__(self) -> None:
-        self._client: TrendReq | None = None
-
-    def _get_client(self) -> TrendReq:
-        if self._client is None:
-            self._client = TrendReq(hl="en-US", tz=360, timeout=(30, 30))
-        return self._client
+        self._pytrends_client = None
 
     def get_trending_searches(self) -> list[dict]:
-        """Fetch top trending searches for the US market."""
+        """Fetch top trending searches for the US market via RSS feed."""
         results = []
         try:
-            pt = self._get_client()
-            trending_df = pt.trending_searches(pn="united_states")
-            for term in trending_df[0].tolist():
+            with httpx.Client(timeout=30) as client:
+                r = client.get(_RSS_URL)
+                r.raise_for_status()
+
+            root = ET.fromstring(r.text)
+            ns = {"ht": "https://trends.google.com/trending/rss"}
+
+            for item in root.findall(".//item"):
+                title = item.findtext("title", "").strip()
+                if not title:
+                    continue
+                traffic = item.findtext("ht:approx_traffic", "", ns).replace("+", "").replace(",", "")
                 results.append({
-                    "raw_signal": term,
+                    "raw_signal": title,
                     "source": "google",
-                    "source_metadata": {"type": "trending_search", "market": "US"},
+                    "source_metadata": {
+                        "type": "trending_search",
+                        "market": "US",
+                        "approx_traffic": traffic,
+                    },
                 })
+
             logger.info("google_trends.trending_searches count=%d", len(results))
         except Exception as e:
             logger.error("google_trends.trending_searches failed error=%s", e)
@@ -42,10 +54,18 @@ class GoogleTrendsService:
         return results
 
     def get_rising_queries(self, keywords: list[str], cluster_name: str) -> list[dict]:
-        """Fetch rising queries for a niche cluster's keywords (max 5 per pytrends request)."""
+        """Fetch rising queries for a niche cluster's keywords. Uses pytrends with fallback."""
         results = []
+        try:
+            from pytrends.request import TrendReq
+            if self._pytrends_client is None:
+                self._pytrends_client = TrendReq(hl="en-US", tz=360, timeout=(30, 30))
+            pt = self._pytrends_client
+        except Exception as e:
+            logger.warning("google_trends.rising_queries pytrends unavailable: %s", e)
+            return results
+
         batches = [keywords[i:i + 5] for i in range(0, len(keywords), 5)]
-        pt = self._get_client()
 
         for batch in batches:
             for attempt, backoff in enumerate([0] + _PYTRENDS_BACKOFF):
@@ -79,49 +99,11 @@ class GoogleTrendsService:
         logger.info("google_trends.rising_queries cluster=%s count=%d", cluster_name, len(results))
         return results
 
-    def get_interest_over_time(self, keywords: list[str], timeframe: str = "today 3-m") -> dict:
-        """Return interest-over-time data for up to 5 keywords."""
-        try:
-            pt = self._get_client()
-            pt.build_payload(keywords[:5], timeframe=timeframe, geo="US")
-            df = pt.interest_over_time()
-            if df.empty:
-                return {}
-            result = {}
-            for kw in keywords[:5]:
-                if kw in df.columns:
-                    result[kw] = df[kw].tolist()
-            logger.info("google_trends.interest_over_time keywords=%s", keywords[:5])
-            return result
-        except Exception as e:
-            logger.error("google_trends.interest_over_time failed error=%s", e)
-            raise GoogleTrendsError(f"interest_over_time failed: {e}") from e
-
-    def calculate_trajectory(self, keyword: str) -> float:
-        """
-        Return a trajectory score in [-1.0, 1.0].
-        Positive = trending up, negative = trending down.
-        Uses 4-week vs prior average comparison.
-        """
-        try:
-            data = self.get_interest_over_time([keyword], timeframe="today 3-m")
-            series = data.get(keyword, [])
-            if len(series) < 8:
-                return 0.0
-            recent = sum(series[-4:]) / 4
-            baseline = sum(series[:-4]) / len(series[:-4])
-            if baseline == 0:
-                return 0.0
-            change = (recent - baseline) / baseline
-            return max(-1.0, min(1.0, change))
-        except GoogleTrendsError:
-            return 0.0
-
     def health_check(self) -> dict:
         try:
-            pt = self._get_client()
-            df = pt.trending_searches(pn="united_states")
-            ok = not df.empty
+            with httpx.Client(timeout=10) as client:
+                r = client.get(_RSS_URL)
+                ok = r.status_code == 200 and "<item>" in r.text
             return {"service": "google_trends", "ok": ok}
         except Exception as e:
             logger.warning("google_trends.health_check failed error=%s", e)
@@ -133,7 +115,6 @@ def get_google_trends_service() -> GoogleTrendsService:
     return GoogleTrendsService()
 
 
-# Module-level aliases for backwards compatibility with existing pipeline code
 _svc: GoogleTrendsService | None = None
 
 

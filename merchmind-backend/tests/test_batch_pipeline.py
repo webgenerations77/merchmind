@@ -33,7 +33,7 @@ class TestArchetypeClassifier:
         assert result == "text_icon"
 
     def test_select_image_api_for_illustration(self):
-        assert select_image_api("illustration") == "stable_diffusion"
+        assert select_image_api("illustration") == "flux_schnell"
 
     def test_select_image_api_for_text_only(self):
         assert select_image_api("text_only") is None
@@ -42,10 +42,10 @@ class TestArchetypeClassifier:
         assert select_image_api("typographic") is None
 
     def test_select_image_api_for_text_icon(self):
-        assert select_image_api("text_icon") == "dalle3"
+        assert select_image_api("text_icon") == "flux_schnell"
 
     def test_select_image_api_for_hybrid(self):
-        assert select_image_api("hybrid") == "stable_diffusion"
+        assert select_image_api("hybrid") == "flux_schnell"
 
 
 class TestProductBundleAssignment:
@@ -55,22 +55,22 @@ class TestProductBundleAssignment:
         assert "poster" in result
         assert "mug" not in result
 
-    def test_text_only_gets_all_types(self):
+    def test_text_only_gets_max_products(self):
         result = assign_product_bundle("text_only", {})
-        assert len(result) == 6
+        assert len(result) == 4
 
-    def test_typographic_gets_all_types(self):
+    def test_typographic_gets_max_products(self):
         result = assign_product_bundle("typographic", {})
-        assert len(result) == 6
+        assert len(result) == 4
 
     def test_text_icon_excludes_poster(self):
         result = assign_product_bundle("text_icon", {})
         assert "poster" not in result
         assert "tshirt" in result
 
-    def test_hybrid_high_quality_gets_all(self):
+    def test_hybrid_high_quality_gets_max(self):
         result = assign_product_bundle("hybrid", {"visual_appeal": 9})
-        assert len(result) == 6
+        assert len(result) == 4
 
     def test_hybrid_low_quality_gets_subset(self):
         result = assign_product_bundle("hybrid", {"visual_appeal": 5})
