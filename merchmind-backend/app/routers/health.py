@@ -99,7 +99,7 @@ def reset_data(db: Session = Depends(get_db), _: str = Depends(verify_api_key)) 
 def env_check(_: str = Depends(verify_api_key)) -> dict:
     """Check which env vars are set (masked values for debugging)."""
     import os
-    keys = ["SUPABASE_URL", "SUPABASE_KEY", "SUPABASE_BUCKET", "OPENAI_API_KEY", "REPLICATE_API_KEY", "ANTHROPIC_API_KEY"]
+    keys = ["SUPABASE_URL", "SUPABASE_KEY", "SUPABASE_BUCKET", "OPENAI_API_KEY", "REPLICATE_API_KEY", "ANTHROPIC_API_KEY", "SHOPIFY_STORE_URL", "SHOPIFY_ACCESS_TOKEN", "PRINTIFY_API_KEY", "PRINTIFY_SHOP_ID"]
     result = {}
     for k in keys:
         val = os.environ.get(k, "")

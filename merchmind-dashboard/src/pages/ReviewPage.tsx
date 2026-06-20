@@ -1,9 +1,90 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useReviewStore } from '../stores/reviewStore';
 import { getDesign } from '../api/designs';
-import type { DesignOut, DesignQueueItem } from '../types/api';
+import { listBatches, triggerBatch } from '../api/batches';
+import { listProducts } from '../api/products';
+import type { DesignOut, DesignQueueItem, BatchOut } from '../types/api';
 import ConfidenceBadge from '../components/shared/ConfidenceBadge';
 import StatusBadge from '../components/shared/StatusBadge';
+
+function BatchProgress({ batch, productCount }: { batch: BatchOut; productCount: number }) {
+  const startTime = new Date(batch.run_started_at).getTime();
+  const elapsed = Math.floor((Date.now() - startTime) / 1000);
+  const estimatedProducts = batch.queued_count * 4;
+  const progress = estimatedProducts > 0 ? Math.min(95, (productCount / estimatedProducts) * 100) : 0;
+
+  const steps = [
+    { label: 'Scraping trends', done: batch.total_ideas > 0 },
+    { label: `Scoring ${batch.total_ideas} ideas`, done: batch.queued_count > 0 },
+    { label: `Generating ${batch.queued_count} designs`, done: productCount > 0 },
+    { label: 'Creating products & marketing', done: batch.status === 'complete' },
+  ];
+
+  const currentStep = steps.findIndex((s) => !s.done);
+
+  return (
+    <div className="bg-bg-secondary border border-accent/30 rounded-xl p-5 mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-3 h-3 rounded-full bg-accent animate-pulse" />
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">Batch Running</h3>
+            <p className="text-xs text-text-secondary">
+              {elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`} elapsed
+              {productCount > 0 && ` · ${productCount} products created`}
+            </p>
+          </div>
+        </div>
+        <StatusBadge status={batch.status} />
+      </div>
+
+      <div className="w-full bg-bg-tertiary rounded-full h-2 mb-4">
+        <div
+          className="bg-accent rounded-full h-2 transition-all duration-1000"
+          style={{ width: `${Math.max(5, progress)}%` }}
+        />
+      </div>
+
+      <div className="grid grid-cols-4 gap-2">
+        {steps.map((step, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+              step.done ? 'bg-approve/20 text-approve' :
+              i === currentStep ? 'bg-accent/20 text-accent' :
+              'bg-bg-tertiary text-text-tertiary'
+            }`}>
+              {step.done ? '✓' : i + 1}
+            </span>
+            <span className={`text-xs ${step.done ? 'text-text-secondary' : i === currentStep ? 'text-accent' : 'text-text-tertiary'}`}>
+              {step.label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BatchComplete({ batch, onRefresh }: { batch: BatchOut; onRefresh: () => void }) {
+  return (
+    <div className="bg-bg-secondary border border-approve/30 rounded-xl p-5 mb-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-approve text-lg">✓</span>
+          <div>
+            <h3 className="text-sm font-semibold text-text-primary">Batch Complete</h3>
+            <p className="text-xs text-text-secondary">
+              {batch.queued_count} designs generated · {batch.total_ideas} trends scored
+            </p>
+          </div>
+        </div>
+        <button onClick={onRefresh} className="px-3 py-1.5 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/80 transition-colors">
+          Load Designs
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function DesignCard({ item, action, onClick }: { item: DesignQueueItem; action?: string; onClick: () => void }) {
   return (
@@ -62,6 +143,9 @@ function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
               <p className="text-xs text-text-tertiary mb-1">Image Prompt</p>
               <p className="text-sm text-text-secondary">{design.image_prompt}</p>
             </div>
+          )}
+          {design.image_api_used && (
+            <p className="text-xs text-text-tertiary mt-2">Generated via {design.image_api_used}</p>
           )}
         </div>
 
@@ -143,8 +227,54 @@ export default function ReviewPage() {
   const { queue, sessionActions, isLoading, error, fetchQueue, approveDesign, rejectDesign, delayDesign } = useReviewStore();
   const [selectedDesign, setSelectedDesign] = useState<DesignOut | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [runningBatch, setRunningBatch] = useState<BatchOut | null>(null);
+  const [recentBatch, setRecentBatch] = useState<BatchOut | null>(null);
+  const [productCount, setProductCount] = useState(0);
+  const [triggering, setTriggering] = useState(false);
 
-  useEffect(() => { fetchQueue(); }, [fetchQueue]);
+  const checkBatchStatus = useCallback(async () => {
+    try {
+      const batches = await listBatches();
+      const latest = batches[0];
+      if (latest?.status === 'running') {
+        setRunningBatch(latest);
+        setRecentBatch(null);
+        const products = await listProducts();
+        setProductCount(products.length);
+      } else if (latest?.status === 'complete') {
+        if (runningBatch) {
+          setRecentBatch(latest);
+          setRunningBatch(null);
+        }
+      }
+    } catch { /* ignore */ }
+  }, [runningBatch]);
+
+  useEffect(() => { fetchQueue(); checkBatchStatus(); }, [fetchQueue, checkBatchStatus]);
+
+  useEffect(() => {
+    if (!runningBatch) return;
+    const interval = setInterval(async () => {
+      await checkBatchStatus();
+      if (!runningBatch) fetchQueue();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [runningBatch, checkBatchStatus, fetchQueue]);
+
+  const handleTrigger = async () => {
+    if (!confirm('Run a new batch now?')) return;
+    setTriggering(true);
+    try {
+      await triggerBatch();
+      setTimeout(checkBatchStatus, 2000);
+    } catch { /* ignore */ }
+    setTriggering(false);
+  };
+
+  const handleRefresh = () => {
+    setRecentBatch(null);
+    fetchQueue();
+  };
 
   const pending = queue.filter((d) => !sessionActions[d.id]);
   const actioned = queue.filter((d) => sessionActions[d.id]);
@@ -191,17 +321,33 @@ export default function ReviewPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Review Queue</h1>
-          <p className="text-sm text-text-secondary mt-1">{pending.length} designs pending review</p>
+          <p className="text-sm text-text-secondary mt-1">
+            {pending.length} designs pending review
+          </p>
         </div>
-        <button onClick={fetchQueue} className="px-3 py-1.5 rounded-lg bg-bg-secondary border border-border text-sm text-text-secondary hover:text-text-primary transition-colors">
-          Refresh
-        </button>
+        <div className="flex gap-2">
+          <button onClick={fetchQueue} className="px-3 py-1.5 rounded-lg bg-bg-secondary border border-border text-sm text-text-secondary hover:text-text-primary transition-colors">
+            Refresh
+          </button>
+          {!runningBatch && (
+            <button
+              onClick={handleTrigger}
+              disabled={triggering}
+              className="px-3 py-1.5 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/80 transition-colors disabled:opacity-50"
+            >
+              {triggering ? 'Starting...' : 'Run Batch'}
+            </button>
+          )}
+        </div>
       </div>
 
-      {pending.length === 0 && actioned.length === 0 && (
+      {runningBatch && <BatchProgress batch={runningBatch} productCount={productCount} />}
+      {recentBatch && <BatchComplete batch={recentBatch} onRefresh={handleRefresh} />}
+
+      {pending.length === 0 && actioned.length === 0 && !runningBatch && !recentBatch && (
         <div className="text-center py-20 text-text-tertiary">
           <p className="text-lg">No designs to review</p>
-          <p className="text-sm mt-1">Trigger a new batch to generate designs</p>
+          <p className="text-sm mt-1">Click "Run Batch" to generate new designs</p>
         </div>
       )}
 
