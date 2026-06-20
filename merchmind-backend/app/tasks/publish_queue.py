@@ -66,9 +66,11 @@ def _publish_single_design(design: Design, db):
         printify_id = None
         try:
             image_url = design.processed_image_url or design.raw_image_url or ""
+            product_label = product.product_type.replace("_", " ").title()
+            base_name = design.concept_name or design.shopify_title or "Design"
             printify_id = create_product(
                 product_type=product.product_type,
-                title=design.shopify_title or design.concept_name,
+                title=f"{base_name} — {product_label}",
                 description=design.shopify_description or "",
                 image_url=image_url,
                 retail_price=float(product.retail_price),

@@ -521,10 +521,12 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
             from app.services.publishing.printify_publisher import create_product as printify_create, _get as _get_printify
             for product in db.query(Product).filter(Product.design_id == design.id).all():
                 try:
+                    product_label = product.product_type.replace("_", " ").title()
+                    base_name = design.concept_name or design.shopify_title or "Design"
                     printify_id = printify_create(
                         product_type=product.product_type,
-                        title=design.shopify_title or design.concept_name,
-                        description="",
+                        title=f"{base_name} — {product_label}",
+                        description=design.shopify_description or "",
                         image_url=image_url,
                         retail_price=float(product.retail_price),
                     )
