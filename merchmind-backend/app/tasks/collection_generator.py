@@ -131,17 +131,8 @@ def generate_collection_task(self, collection_id: str, count: int):
                         storage.upload(raw_path, raw_bytes)
                         design.raw_image_url = storage.upload(raw_path, raw_bytes)
 
-                        # Background removal for clean mockups
-                        try:
-                            from rembg import remove, new_session
-                            session = new_session("u2netp")
-                            clean_bytes = remove(raw_bytes, session=session)
-                            proc_path = storage.design_processed_path(design_id)
-                            processed_url = storage.upload(proc_path, clean_bytes)
-                        except Exception as bg_err:
-                            logger.warning("Collection bg removal failed design=%s: %s", design_id[:8], bg_err)
-                            proc_path = storage.design_processed_path(design_id)
-                            processed_url = storage.upload(proc_path, raw_bytes)
+                        proc_path = storage.design_processed_path(design_id)
+                        processed_url = storage.upload(proc_path, raw_bytes)
 
                         design.processed_image_url = processed_url
                         db.commit()
