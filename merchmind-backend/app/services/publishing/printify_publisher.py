@@ -200,10 +200,13 @@ class PrintifyService:
     def health_check(self) -> dict:
         try:
             start = time.monotonic()
-            result = self._request("GET", f"/shops/{settings.PRINTIFY_SHOP_ID}.json")
+            result = self._request("GET", "/shops.json")
             ms = round((time.monotonic() - start) * 1000)
-            ok = bool(result.get("id"))
-            return {"service": "printify", "ok": ok, "ms": ms}
+            shops = result if isinstance(result, list) else result.get("data", result)
+            shop_ids = [s.get("id") for s in shops] if isinstance(shops, list) else []
+            target_id = int(settings.PRINTIFY_SHOP_ID) if settings.PRINTIFY_SHOP_ID else 0
+            ok = target_id in shop_ids
+            return {"service": "printify", "ok": ok, "ms": ms, "shop_found": ok, "shops": len(shop_ids)}
         except PrintifyAuthError as e:
             return {"service": "printify", "ok": False, "error": "auth_failed", "detail": str(e)}
         except Exception as e:
