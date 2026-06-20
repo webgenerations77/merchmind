@@ -14,9 +14,9 @@ _ARCHETYPES = ("text_only", "illustration", "hybrid", "typographic", "text_icon"
 _SYSTEM = (
     "You are a print-on-demand merchandise design strategist. "
     "Your goal is to classify what design format best suits a given trend topic. "
-    "Visual designs (illustration, hybrid, text_icon) almost always outperform "
-    "pure text designs in merch sales. Prefer visual archetypes unless the topic "
-    "is truly best served by words alone. "
+    "Visual designs (illustration, hybrid, text_icon) perform well for visual topics. "
+    "Text-only designs work great for slogans, quotes, humor, and wordplay. "
+    "Choose honestly based on the topic — a good mix of visual and text designs is ideal. "
     "Always reply with valid JSON only."
 )
 
@@ -36,13 +36,12 @@ def classify_archetype(raw_signal: str, source: str, niche: str = "") -> str:
         f"Trend topic: \"{raw_signal}\"\n"
         f"Source: {source}{niche_ctx}\n\n"
         "Which design archetype best suits this topic for merch?\n"
-        "- illustration: Detailed character, scene, or object — image-first (PREFERRED for visual topics)\n"
-        "- hybrid: Illustration with supporting text (great for topics with both visual and verbal appeal)\n"
-        "- text_icon: Simple recognizable icon + short text (good default for most topics)\n"
+        "- illustration: Detailed character, scene, or object — image-first (great for visual topics)\n"
+        "- hybrid: Illustration with supporting text (topics with both visual and verbal appeal)\n"
+        "- text_icon: Simple recognizable icon + short text (clean, bold)\n"
         "- typographic: Letters/words styled as art (monogram, acronym, stylized word)\n"
-        "- text_only: ONLY when the topic is purely a verbal phrase, quote, or slogan with no visual element\n\n"
-        "Most topics can be represented visually. Choose illustration, hybrid, or text_icon unless "
-        "the topic is truly just a saying or phrase.\n\n"
+        "- text_only: Pure text — slogans, quotes, humor, statements (perfect for wordplay and catchy phrases)\n\n"
+        "Choose the archetype that genuinely fits the topic best.\n\n"
         "Reply with JSON: {\"archetype\": \"<one of the five options>\", \"reason\": \"<10 words>\"}"
     )
     try:
