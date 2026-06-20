@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MerchMind is an AI-powered print-on-demand merch pipeline. A weekly Celery batch scrapes trends (Reddit, Twitter, Google Trends), scores them with Claude/OpenAI, generates designs via DALL-E/Stable Diffusion, and queues products for Printify/Shopify publishing. A React Native mobile app lets the user review, approve/reject, and monitor everything.
+MerchMind is an AI-powered print-on-demand merch pipeline. A weekly Celery batch scrapes trends (Reddit, Google Trends, seasonal calendar), scores them with Claude, generates designs via Flux Schnell (Replicate) with DALL-E fallback, creates Printify products with mockup previews, and queues everything for Shopify publishing. A web dashboard lets the user review, approve/reject, trigger batches, and monitor the pipeline.
 
 ## Repository Layout
 
@@ -92,7 +92,7 @@ npm run preview        # Preview production build
 - The Supabase client and Firebase are initialized lazily (on first call, not at import). Maintain this pattern to avoid startup crashes when credentials are missing.
 - Config lives in `app/config.py` as a Pydantic `Settings` class reading from `.env`.
 
-**Batch pipeline** (`app/tasks/batch_pipeline.py`): The core 10-step orchestrator that runs weekly (Sunday 10pm UTC via Celery Beat). It scrapes trends → scores them with LLMs → generates images → post-processes → creates products with pricing → emits progress via Redis pub/sub. The mobile app streams progress with SSE.
+**Batch pipeline** (`app/tasks/batch_pipeline.py`): The core orchestrator that runs weekly (Sunday 10pm UTC via Celery Beat). Design generation runs **inline** (not as Celery subtasks) within the batch task. Steps: scrape trends → score with Claude → classify archetype → generate image (Flux Schnell/DALL-E) → upload to Supabase → create products with pricing → generate Printify mockups (tshirt, mug, phone_case) → generate marketing assets → emit progress via Redis pub/sub. Supports `max_designs` parameter for testing (`POST /batches/trigger?max_designs=2`).
 
 **Service namespaces under `app/services/`:**
 - `intelligence/` — trend scraping and scoring (Reddit, Twitter, Google Trends, seasonal calendar)
@@ -128,9 +128,9 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 
 **Important:** Pushing to `main` triggers a Railway redeploy which restarts the Celery worker, killing in-progress design generation tasks. Avoid pushing while batches are actively generating designs. Designs killed mid-generation get stuck at `status: "generating"` permanently.
 
-**Phase 1 (current):** AI pipeline only — trend scraping, scoring, design generation, text previews. No Printify/Shopify publishing. Printify base costs use hardcoded fallbacks (`_FALLBACK_BASE_COSTS` in `printify_publisher.py`).
+**Phase 1 (current):** AI pipeline + Printify mockups working. Printify connected (shop ID 27979306, "Wear it Forward", Shopify sales channel). Printify creates draft products and generates mockup previews during batch runs. Shopify direct API access not yet configured (needs `shpat_` access token from Dev Dashboard custom app). Printify handles Shopify sync via its own integration.
 
-**Phase 2 (future):** Add Printify product creation, Shopify listing, mockup generation, sales sync.
+**Phase 2 (future):** Direct Shopify API access for sales sync, order tracking, and product management. Deploy web dashboard to Vercel.
 
 ## Web Dashboard Architecture
 
@@ -149,7 +149,26 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 
 ## Design Pipeline Notes
 
-- **Archetype classifier** (`app/services/design/archetype_classifier.py`): Biased toward visual archetypes (`illustration`, `hybrid`, `text_icon`). Falls back to `text_icon` (not `text_only`) on error.
-- **Image generation:** `illustration`/`hybrid` → Stable Diffusion (Replicate). `text_icon` → DALL-E 3 (OpenAI). `text_only`/`typographic` → no image gen, text preview rendered via Pillow instead.
+- **Archetype classifier** (`app/services/design/archetype_classifier.py`): Balanced for a natural mix of visual and text designs. Falls back to `text_icon` (not `text_only`) on error. Archetypes: `illustration`, `hybrid`, `text_icon`, `typographic`, `text_only`.
+- **Image generation** (`app/services/design/image_generator.py`): Primary: Flux Schnell (Replicate, ~$0.003/image). Fallback: gpt-image-1 (OpenAI, ~$0.03/image with `quality="low"`). All visual archetypes route to `flux_schnell` by default. Uses **sync** clients (not async) for Celery compatibility. DB enum `image_api` includes: `dalle3`, `stable_diffusion`, `flux_schnell`.
 - **Text preview** (`app/services/design/text_preview.py`): Renders primary/secondary text with font pair label on a dark canvas using Pillow + DejaVu fonts. Uploaded to Supabase as the `processed_image_url`.
-- **COGS fallback:** When Printify API is unavailable, `get_base_cost()` returns industry-standard costs from `_FALLBACK_BASE_COSTS` (tshirt $8.50, mug $6.00, hat $10.00, phone_case $8.00, sticker $2.50, poster $12.00).
+- **Post-processing:** rembg background removal is **skipped** (caused OOM on Railway worker). Raw generated images are used directly as processed images.
+- **Printify mockups:** During batch generation, Printify draft products are created for tshirt, mug, and phone_case. Mockup images are fetched and stored in `product.mockup_urls`. Non-blocking — failures don't affect design completion.
+- **COGS fallback:** When Printify API is unavailable for cost lookups, `get_base_cost()` returns industry-standard costs from `_FALLBACK_BASE_COSTS` (tshirt $8.50, mug $6.00, hat $10.00, phone_case $8.00, sticker $2.50, poster $12.00).
+- **Product limit:** Max 4 product types per design (`assign_product_bundle` in `quality_scorer.py`).
+
+## Weekly Schedule (Celery Beat)
+
+- **Sunday 10pm UTC** — `run_weekly_batch`: scrape, score, generate designs + images + mockups
+- **Monday 9am UTC** — `publish_approved_products`: push approved designs to Printify → Shopify
+- **Monday 6am UTC** — `sync_shopify_sales`: fetch order data
+- **Monday 7am UTC** — `check_underperformers`: flag low-performing products
+- **Every 6 hours** — `health_monitor`: check service health
+
+## Temporary Diagnostic Endpoints (remove before production)
+
+- `POST /health/reset-data` — delete all pipeline data (keeps settings/clusters)
+- `POST /health/purge-queue` — clear stuck Celery tasks
+- `POST /health/test-image-gen` — test DALL-E + Flux Schnell image generation
+- `POST /health/run-migration` — apply DB enum changes
+- `GET /health/env-check` — show masked env var values

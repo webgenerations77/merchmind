@@ -242,24 +242,24 @@ export default function ReviewPage() {
         const products = await listProducts();
         setProductCount(products.length);
       } else if (latest?.status === 'complete') {
-        if (runningBatch) {
-          setRecentBatch(latest);
-          setRunningBatch(null);
-        }
+        setRunningBatch((prev) => {
+          if (prev) setRecentBatch(latest);
+          return null;
+        });
       }
     } catch { /* ignore */ }
-  }, [runningBatch]);
+  }, []);
 
-  useEffect(() => { fetchQueue(); checkBatchStatus(); }, [fetchQueue, checkBatchStatus]);
+  useEffect(() => {
+    fetchQueue();
+    checkBatchStatus();
+  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!runningBatch) return;
-    const interval = setInterval(async () => {
-      await checkBatchStatus();
-      if (!runningBatch) fetchQueue();
-    }, 5000);
+    const interval = setInterval(checkBatchStatus, 5000);
     return () => clearInterval(interval);
-  }, [runningBatch, checkBatchStatus, fetchQueue]);
+  }, [runningBatch, checkBatchStatus]);
 
   const handleTrigger = async () => {
     if (!confirm('Run a new batch now?')) return;
