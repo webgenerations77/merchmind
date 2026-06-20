@@ -110,6 +110,14 @@ def env_check(_: str = Depends(verify_api_key)) -> dict:
     return result
 
 
+@router.post("/health/purge-queue")
+def purge_queue(_: str = Depends(verify_api_key)) -> dict:
+    """Purge all pending Celery tasks from the Redis queue."""
+    from app.tasks.celery_app import celery_app
+    purged = celery_app.control.purge()
+    return {"ok": True, "purged": purged}
+
+
 @router.post("/health/test-image-gen")
 def test_image_gen(_: str = Depends(verify_api_key)) -> dict:
     """Test image generation with a simple prompt and return detailed error if it fails."""
