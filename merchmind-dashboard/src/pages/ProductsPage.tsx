@@ -7,6 +7,7 @@ import StatusBadge from '../components/shared/StatusBadge';
 import ConfidenceBadge from '../components/shared/ConfidenceBadge';
 import ClickableImage from '../components/shared/ClickableImage';
 import { formatCurrency, formatProductType, formatDate } from '../utils/formatters';
+import { calculateCostBreakdown } from '../utils/profitCalc';
 
 const filters = ['all', 'pending', 'live', 'published', 'failed', 'unpublished'] as const;
 
@@ -19,10 +20,7 @@ function ProductDetail({ product, onBack, onUpdate }: { product: ProductOut; onB
     getDesign(product.design_id).then(setDesign).catch(() => null).finally(() => setLoading(false));
   }, [product.design_id]);
 
-  const baseCost = product.printify_base_cost;
-  const retailPrice = product.retail_price;
-  const estimatedProfit = retailPrice - baseCost;
-  const marginPct = baseCost > 0 ? ((estimatedProfit / retailPrice) * 100) : 100;
+  const breakdown = calculateCostBreakdown(product.retail_price, product.printify_base_cost);
 
   return (
     <div>
@@ -117,52 +115,65 @@ function ProductDetail({ product, onBack, onUpdate }: { product: ProductOut; onB
 
         <div className="space-y-4">
           <div className="bg-bg-secondary border border-border rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-text-primary mb-4">Pricing Breakdown</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-sm text-text-secondary">Base Cost</span>
-                <span className="text-sm text-text-primary">{formatCurrency(baseCost)}</span>
-              </div>
+            <h3 className="text-sm font-semibold text-text-primary mb-4">Pricing</h3>
+            <div className="space-y-2">
               <div className="flex justify-between">
                 <span className="text-sm text-text-secondary">Markup ({product.base_markup}x)</span>
-                <span className="text-sm text-text-primary">{formatCurrency(baseCost * product.base_markup)}</span>
+                <span className="text-sm text-text-primary">{formatCurrency(product.printify_base_cost * product.base_markup)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm text-text-secondary">Trend Adjustment</span>
                 <span className="text-sm text-text-primary">+{formatCurrency(product.trend_adjustment)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-text-secondary">Floor Price</span>
+                <span className="text-sm text-text-tertiary">Floor Price</span>
                 <span className="text-sm text-text-tertiary">{formatCurrency(product.floor_price)}</span>
               </div>
-              <div className="border-t border-border pt-3 flex justify-between">
+              <div className="border-t border-border pt-2 flex justify-between">
                 <span className="text-sm font-semibold text-text-primary">Retail Price</span>
-                <span className="text-sm font-bold text-accent">{formatCurrency(retailPrice)}</span>
+                <span className="text-sm font-bold text-accent">{formatCurrency(breakdown.retailPrice)}</span>
               </div>
             </div>
           </div>
 
           <div className="bg-bg-secondary border border-border rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-text-primary mb-4">Estimated P&L (per unit)</h3>
-            <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-text-primary mb-4">P&L Per Unit</h3>
+            <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-sm text-text-secondary">Revenue</span>
-                <span className="text-sm text-approve">{formatCurrency(retailPrice)}</span>
+                <span className="text-sm text-approve">Revenue</span>
+                <span className="text-sm text-approve">{formatCurrency(breakdown.retailPrice)}</span>
+              </div>
+              <div className="border-t border-border pt-2 mt-1">
+                <p className="text-xs text-text-tertiary mb-2">COGS Breakdown</p>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-text-secondary">COGS</span>
-                <span className="text-sm text-confidence-low">-{formatCurrency(baseCost)}</span>
+                <span className="text-sm text-text-secondary pl-2">Printify (production + shipping)</span>
+                <span className="text-sm text-confidence-low">-{formatCurrency(breakdown.printifyCost)}</span>
               </div>
-              <div className="border-t border-border pt-3 flex justify-between">
-                <span className="text-sm font-semibold text-text-primary">Profit</span>
-                <span className={`text-sm font-bold ${estimatedProfit > 0 ? 'text-approve' : 'text-confidence-low'}`}>
-                  {formatCurrency(estimatedProfit)}
+              <div className="flex justify-between">
+                <span className="text-sm text-text-secondary pl-2">Credit card (2.9% + $0.30)</span>
+                <span className="text-sm text-confidence-low">-{formatCurrency(breakdown.paymentProcessingFee)}</span>
+              </div>
+              {breakdown.shopifyTxnFee > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-text-secondary pl-2">Shopify transaction fee</span>
+                  <span className="text-sm text-confidence-low">-{formatCurrency(breakdown.shopifyTxnFee)}</span>
+                </div>
+              )}
+              <div className="flex justify-between border-t border-border pt-2">
+                <span className="text-sm text-text-secondary font-medium">Total COGS</span>
+                <span className="text-sm text-confidence-low font-medium">-{formatCurrency(breakdown.totalCogs)}</span>
+              </div>
+              <div className="flex justify-between border-t border-border pt-2 mt-1">
+                <span className="text-sm font-bold text-text-primary">Net Profit</span>
+                <span className={`text-sm font-bold ${breakdown.netProfit > 0 ? 'text-approve' : 'text-confidence-low'}`}>
+                  {formatCurrency(breakdown.netProfit)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm text-text-secondary">Margin</span>
-                <span className={`text-sm font-semibold ${marginPct >= 40 ? 'text-approve' : marginPct >= 20 ? 'text-confidence-medium' : 'text-confidence-low'}`}>
-                  {marginPct.toFixed(1)}%
+                <span className="text-sm text-text-secondary">Net Margin</span>
+                <span className={`text-sm font-semibold ${breakdown.netMargin >= 30 ? 'text-approve' : breakdown.netMargin >= 15 ? 'text-confidence-medium' : 'text-confidence-low'}`}>
+                  {breakdown.netMargin.toFixed(1)}%
                 </span>
               </div>
               {product.margin_flag && (
@@ -347,13 +358,13 @@ export default function ProductsPage() {
                 </th>
               ))}
               <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">Status</th>
-              <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">Markup</th>
-              <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">Est. Profit</th>
+              <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">COGS</th>
+              <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">Net Profit</th>
             </tr>
           </thead>
           <tbody>
             {sorted.map((product) => {
-              const profit = product.retail_price - product.printify_base_cost;
+              const b = calculateCostBreakdown(product.retail_price, product.printify_base_cost);
               return (
                 <tr
                   key={product.id}
@@ -364,12 +375,14 @@ export default function ProductsPage() {
                   <td className="px-4 py-3 text-sm text-text-primary font-medium">{formatCurrency(product.retail_price)}</td>
                   <td className="px-4 py-3 text-sm text-text-secondary">{formatDate(product.created_at)}</td>
                   <td className="px-4 py-3"><StatusBadge status={product.publish_status} /></td>
-                  <td className="px-4 py-3 text-sm text-text-secondary">{product.base_markup}x</td>
+                  <td className="px-4 py-3 text-sm text-text-tertiary">{formatCurrency(b.totalCogs)}</td>
                   <td className="px-4 py-3 text-sm">
-                    <span className={profit > 0 ? 'text-approve' : 'text-confidence-low'}>
-                      {formatCurrency(profit)}
+                    <span className={b.netProfit > 0 ? 'text-approve' : 'text-confidence-low'}>
+                      {formatCurrency(b.netProfit)}
                     </span>
-                    {product.margin_flag && <span className="ml-1 text-xs text-confidence-low">!</span>}
+                    <span className={`ml-1 text-xs ${b.netMargin >= 30 ? 'text-approve' : 'text-confidence-medium'}`}>
+                      {b.netMargin.toFixed(0)}%
+                    </span>
                   </td>
                 </tr>
               );

@@ -8,6 +8,7 @@ import type { DesignOut, DesignQueueItem, BatchOut, ProductOut } from '../types/
 import ConfidenceBadge from '../components/shared/ConfidenceBadge';
 import StatusBadge from '../components/shared/StatusBadge';
 import { formatCurrency, formatProductType } from '../utils/formatters';
+import { calculateCostBreakdown } from '../utils/profitCalc';
 
 function BatchProgress({ batch, productCount }: { batch: BatchOut; productCount: number }) {
   const startTime = new Date(batch.run_started_at).getTime();
@@ -207,15 +208,14 @@ function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
               <p className="text-xs text-text-tertiary mb-2">Products ({products.length})</p>
               <div className="space-y-2">
                 {products.map((p) => {
-                  const profit = p.retail_price - p.printify_base_cost;
-                  const margin = p.printify_base_cost > 0 ? ((profit / p.retail_price) * 100) : 100;
+                  const b = calculateCostBreakdown(p.retail_price, p.printify_base_cost);
                   return (
                     <div key={p.id} className="flex items-center justify-between">
                       <span className="text-sm text-text-primary">{formatProductType(p.product_type)}</span>
                       <div className="flex items-center gap-3">
-                        <span className="text-xs text-text-tertiary">COGS {formatCurrency(p.printify_base_cost)}</span>
-                        <span className="text-xs text-approve">+{formatCurrency(profit)}</span>
-                        <span className={`text-xs font-medium ${margin >= 40 ? 'text-approve' : 'text-confidence-medium'}`}>{margin.toFixed(0)}%</span>
+                        <span className="text-xs text-text-tertiary">COGS {formatCurrency(b.totalCogs)}</span>
+                        <span className="text-xs text-approve">Net {formatCurrency(b.netProfit)}</span>
+                        <span className={`text-xs font-medium ${b.netMargin >= 30 ? 'text-approve' : 'text-confidence-medium'}`}>{b.netMargin.toFixed(0)}%</span>
                         <span className="text-sm font-medium text-accent">{formatCurrency(p.retail_price)}</span>
                       </div>
                     </div>

@@ -64,7 +64,7 @@ def _emit_progress(batch_id: str, step: int, total: int, message: str, data: dic
     acks_late=True,
     name="app.tasks.batch_pipeline.run_weekly_batch",
 )
-def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional[int] = None, max_trends: Optional[int] = None):
+def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional[int] = None, max_trends: Optional[int] = 30):
     """
     Main Sunday batch task. Creates or resumes a batch and runs all 8 pipeline steps.
     Optional max_designs/max_trends limit output for testing.
@@ -158,12 +158,31 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
         batch.total_ideas = len(raw_signals)
         db.commit()
 
-        # Step 3: Score all signals
+        # Step 3: Score all signals (batched — 10 per Claude call)
         _emit_progress(bid, 3, 8, f"Scoring {len(raw_signals)} signals")
         cluster_keyword_map = {c.name: (c.keywords, c.score_boost) for c in active_clusters}
         queued_trends = []
 
+        from app.services.intelligence.trend_scorer import score_trends_batch
+        batch_inputs = []
         for signal in raw_signals:
+            cluster_boost = 0
+            signal_lower = signal["raw_signal"].lower()
+            for name, (kws, boost) in cluster_keyword_map.items():
+                if any(kw.lower() in signal_lower for kw in kws):
+                    cluster_boost = boost
+                    break
+            batch_inputs.append({
+                "raw_signal": signal["raw_signal"],
+                "source": signal["source"],
+                "source_metadata": signal.get("source_metadata", {}),
+                "cluster_boost": cluster_boost,
+            })
+
+        scores = score_trends_batch(batch_inputs)
+        logger.info(f"Batch scored {len(scores)} signals in {len(range(0, len(batch_inputs), 10))} Claude calls")
+
+        for signal, score_result in zip(raw_signals, scores):
             try:
                 trend = Trend(
                     batch_id=batch.id,
@@ -171,52 +190,26 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                     raw_signal=signal["raw_signal"],
                     source_url=signal.get("source_url"),
                     source_metadata=signal.get("source_metadata", {}),
+                    trend_score=score_result["trend_score"],
+                    viability_score=score_result["viability_score"],
+                    final_score=score_result["final_score"],
+                    claude_reasoning=score_result["claude_reasoning"],
+                    risk_flag=score_result["risk_flag"],
+                    risk_reason=score_result.get("risk_reason"),
                 )
                 db.add(trend)
-                db.flush()
 
-                # Stage 1
-                s1 = score_trend_signal(
-                    signal["raw_signal"], signal["source"], signal.get("source_metadata", {})
-                )
-                trend.trend_score = s1["trend_score"]
-
-                # Cluster boost
-                cluster_boost = 0
-                matched_cluster_kws = []
-                signal_lower = signal["raw_signal"].lower()
-                for name, (kws, boost) in cluster_keyword_map.items():
-                    if any(kw.lower() in signal_lower for kw in kws):
-                        cluster_boost = boost
-                        matched_cluster_kws = kws
-                        break
-
-                # Stage 2
-                s2 = score_merch_viability(
-                    signal["raw_signal"], s1["trend_score"], matched_cluster_kws, cluster_boost
-                )
-                trend.viability_score = s2["viability_score"]
-                trend.final_score = s2["final_score"]
-                trend.claude_reasoning = s2["claude_reasoning"]
-
-                # Risk check
-                risk = check_risk(signal["raw_signal"], s2["final_score"], score_threshold)
-                trend.risk_flag = risk["risk_flag"]
-                trend.risk_reason = risk.get("risk_reason")
-
-                if risk["risk_flag"] == "hard":
+                if score_result["risk_flag"] == "hard":
                     trend.status = "rejected"
-                elif s2["final_score"] >= score_threshold:
+                elif score_result["final_score"] >= score_threshold:
                     trend.status = "queued"
                     queued_trends.append(trend)
                 else:
                     trend.status = "rejected"
 
-                trend.status = trend.status
                 db.commit()
-
             except Exception as e:
-                logger.error(f"Scoring failed for signal '{signal.get('raw_signal', '')}': {e}")
+                logger.error(f"Saving score failed for '{signal.get('raw_signal', '')}': {e}")
                 _log_batch_error(batch, db, f"Score error: {e}")
 
         # Limit queue to max_queue (or max_designs for testing), sorted by final_score descending
@@ -252,6 +245,9 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                     "trend_boost_max": trend_boost_max,
                     "base_markup": base_markup,
                     "floor_prices": floor_prices,
+                    "back_logo_enabled": back_logo_enabled,
+                    "back_logo_url": back_logo_url,
+                    "back_logo_products": back_logo_products,
                 })
                 approved_count += 1
             except Exception as e:
@@ -323,6 +319,9 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
         trend_boost_max = pipeline_settings.get("trend_boost_max", 0.20)
         base_markup = pipeline_settings.get("base_markup", {})
         floor_prices = pipeline_settings.get("floor_prices", {})
+        back_logo_enabled = pipeline_settings.get("back_logo_enabled", False)
+        back_logo_url = pipeline_settings.get("back_logo_url")
+        back_logo_products = pipeline_settings.get("back_logo_products", ["tshirt", "hat"])
 
         niche_name = ""
         if trend.niche_cluster_id:

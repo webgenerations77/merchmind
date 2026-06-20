@@ -137,9 +137,87 @@ def check_risk(raw_signal: str, score: int, threshold: int = 35) -> dict:
         return {"risk_flag": "soft", "risk_reason": f"Risk check error: {e}"}
 
 
+def score_trends_batch(signals: list[dict], batch_size: int = 10) -> list[dict]:
+    """
+    Score multiple trends in a single Claude call.
+    Each signal: {raw_signal, source, source_metadata, cluster_keywords?, cluster_boost?}
+    Returns list of {trend_score, viability_score, final_score, claude_reasoning, risk_flag, risk_reason}.
+    """
+    results = []
+    for i in range(0, len(signals), batch_size):
+        chunk = signals[i:i + batch_size]
+        chunk_results = _score_chunk(chunk)
+        results.extend(chunk_results)
+    return results
+
+
+def _score_chunk(signals: list[dict]) -> list[dict]:
+    """Score a chunk of up to 10 trends in one Claude call."""
+    trend_list = "\n".join(
+        f'{idx + 1}. "{s["raw_signal"]}" (source: {s.get("source", "unknown")})'
+        for idx, s in enumerate(signals)
+    )
+
+    prompt = (
+        f"Score these {len(signals)} trend topics for print-on-demand merchandise potential.\n\n"
+        f"{trend_list}\n\n"
+        "For EACH trend, evaluate:\n"
+        "- trend_score (0-100): velocity + cross-source presence + trajectory\n"
+        "- viability_score (0-100): emotional resonance + visual potential + niche depth + freshness\n"
+        "- risk_flag: 'none', 'soft' (borderline), or 'hard' (trademark/real person/tragedy)\n"
+        "- reasoning: one sentence explaining merch potential\n\n"
+        "Reply with a JSON array. Example:\n"
+        "[{\"trend_score\": 65, \"viability_score\": 72, \"risk_flag\": \"none\", \"risk_reason\": null, "
+        "\"reasoning\": \"Strong emotional hook with visual potential\"}]\n\n"
+        "Return exactly one object per trend, in the same order."
+    )
+    try:
+        text, _ = claude.haiku(
+            "batch_trend_score",
+            [{"role": "user", "content": prompt}],
+            system=_SYSTEM_SCORER,
+            max_tokens=200 * len(signals),
+        )
+        arr = json.loads(_extract_json_array(text))
+        results = []
+        for idx, s in enumerate(signals):
+            item = arr[idx] if idx < len(arr) else {}
+            trend_score = max(0, min(100, int(item.get("trend_score", 0))))
+            viability_score = max(0, min(100, int(item.get("viability_score", 0))))
+            cluster_boost = s.get("cluster_boost", 0)
+            final_score = min(100, int((trend_score * 0.4) + (viability_score * 0.6)) + cluster_boost)
+            risk_flag = item.get("risk_flag", "none")
+            if risk_flag not in ("none", "soft", "hard"):
+                risk_flag = "none"
+            results.append({
+                "trend_score": trend_score,
+                "viability_score": viability_score,
+                "final_score": final_score,
+                "claude_reasoning": str(item.get("reasoning", "")),
+                "risk_flag": risk_flag,
+                "risk_reason": item.get("risk_reason"),
+            })
+        return results
+    except Exception as e:
+        logger.error("Batch scoring failed for %d trends: %s", len(signals), e)
+        return [
+            {"trend_score": 0, "viability_score": 0, "final_score": 0,
+             "claude_reasoning": "Batch scoring failed", "risk_flag": "soft", "risk_reason": str(e)}
+            for _ in signals
+        ]
+
+
 def _extract_json(text: str) -> str:
     """Extract JSON object from Claude's response text."""
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if match:
         return match.group()
     raise ValueError(f"No JSON found in response: {text[:200]}")
+
+
+def _extract_json_array(text: str) -> str:
+    """Extract JSON array from Claude's response text."""
+    match = re.search(r"\[.*\]", text, re.DOTALL)
+    if match:
+        return match.group()
+    raise ValueError(f"No JSON array found in response: {text[:200]}")
