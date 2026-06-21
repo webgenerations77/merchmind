@@ -19,6 +19,7 @@ from app.services.design.prompt_builder import build_image_prompt, generate_text
 from app.services.design.image_generator import generate_image
 from app.services.design.quality_scorer import assign_product_bundle
 from app.services.design.font_selector import select_font_pair
+from app.services.design.text_compositor import composite_text_on_image, should_composite
 from app.services.design.shopify_copy_generator import generate_shopify_copy
 from app.services.pricing.pricing_engine import calculate_price
 from app.services.publishing.printify_publisher import get_base_cost, _DUAL_PRINT_SURCHARGE
@@ -148,6 +149,26 @@ def generate_collection_task(self, collection_id: str, count: int):
                 design.font_pair = font_result["font_pair"]
                 design.font_reasoning = font_result["reasoning"]
                 design.design_style = archetype
+                design.primary_text = text_content.get("primary_text")
+                design.secondary_text = text_content.get("secondary_text")
+                design.tagline = text_content.get("tagline")
+
+                if processed_url and should_composite(archetype):
+                    try:
+                        img_bytes = storage.download(storage.design_processed_path(design_id))
+                        composited = composite_text_on_image(
+                            img_bytes,
+                            primary_text=text_content.get("primary_text", concept_name),
+                            secondary_text=text_content.get("secondary_text"),
+                            archetype=archetype,
+                        )
+                        processed_url = storage.upload(
+                            storage.design_processed_path(design_id), composited, "image/png"
+                        )
+                        design.processed_image_url = processed_url
+                        db.commit()
+                    except Exception as comp_err:
+                        logger.warning("Text compositing failed for collection design %s: %s", design_id, comp_err)
 
                 light_variant_url = None
                 if not processed_url and archetype in ("text_only", "typographic"):

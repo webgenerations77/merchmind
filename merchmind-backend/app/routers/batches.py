@@ -14,6 +14,8 @@ import redis as redis_lib
 
 from app.database import get_db
 from app.models.batch import Batch
+from app.models.design import Design
+from app.models.product import Product
 from app.schemas.batch import BatchOut
 from app.routers.auth import verify_api_key
 from app.config import settings
@@ -56,6 +58,49 @@ def trigger_batch(max_designs: Optional[int] = None, max_trends: Optional[int] =
     from app.tasks.batch_pipeline import run_weekly_batch
     task = run_weekly_batch.delay(None, max_designs, max_trends)
     return _envelope({"task_id": task.id, "message": "Batch pipeline triggered", "max_designs": max_designs, "max_trends": max_trends})
+
+
+@router.post("/{batch_id}/cancel")
+def cancel_batch(
+    batch_id: UUID,
+    purge: bool = False,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key),
+):
+    """Cancel a stuck batch. With purge=true, also deletes its designs/products/trends."""
+    batch = db.query(Batch).filter(Batch.id == batch_id).first()
+    if not batch:
+        raise HTTPException(404, f"Batch {batch_id} not found")
+
+    batch.status = "failed"
+    batch.run_completed_at = datetime.utcnow()
+
+    stuck = db.query(Design).filter(
+        Design.batch_id == batch_id, Design.status == "generating"
+    ).all()
+    for d in stuck:
+        d.status = "rejected"
+        d.rejected_at = datetime.utcnow()
+
+    purged = {}
+    if purge:
+        designs = db.query(Design).filter(Design.batch_id == batch_id).all()
+        design_ids = [d.id for d in designs]
+        prod_count = db.query(Product).filter(Product.design_id.in_(design_ids)).delete(synchronize_session=False) if design_ids else 0
+        design_count = db.query(Design).filter(Design.batch_id == batch_id).delete(synchronize_session=False)
+        from app.models.trend import Trend
+        trend_count = db.query(Trend).filter(Trend.batch_id == batch_id).delete(synchronize_session=False)
+        purged = {"designs_deleted": design_count, "products_deleted": prod_count, "trends_deleted": trend_count}
+
+    try:
+        _redis.flushdb()
+        purged["redis_flushed"] = True
+    except Exception:
+        purged["redis_flushed"] = False
+
+    db.commit()
+    logger.info("Batch %s cancelled (purge=%s) %s", batch_id, purge, purged)
+    return _envelope({"batch_id": str(batch_id), "status": "failed", "stuck_designs_rejected": len(stuck), **purged})
 
 
 @router.get("/{batch_id}/progress")

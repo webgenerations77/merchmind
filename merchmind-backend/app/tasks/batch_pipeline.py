@@ -28,6 +28,7 @@ from app.services.design.prompt_builder import build_image_prompt, generate_text
 from app.services.design.image_generator import generate_image
 from app.services.design.post_processor import process_image, image_to_bytes
 from app.services.design.quality_scorer import score_design_quality, assign_product_bundle
+from app.services.design.text_compositor import composite_text_on_image, should_composite
 from app.services.design.font_selector import select_font_pair
 from app.services.design.shopify_copy_generator import generate_shopify_copy
 from app.services.design.text_preview import generate_text_preview
@@ -412,7 +413,32 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
         design.design_style = archetype
         db.commit()
 
-        # 4f-2: Generate text preview for text_only/typographic designs without images
+        design.primary_text = text_content.get("primary_text")
+        design.secondary_text = text_content.get("secondary_text")
+        design.tagline = text_content.get("tagline")
+        db.commit()
+
+        # 4f-2: Composite text onto image for hybrid/text_icon
+        if processed_url and should_composite(archetype):
+            try:
+                img_bytes = storage.download(storage.design_processed_path(design_id))
+                composited = composite_text_on_image(
+                    img_bytes,
+                    primary_text=text_content.get("primary_text", trend.raw_signal),
+                    secondary_text=text_content.get("secondary_text"),
+                    archetype=archetype,
+                    color_palette=color_palette,
+                )
+                processed_url = storage.upload(
+                    storage.design_processed_path(design_id), composited, "image/png"
+                )
+                design.processed_image_url = processed_url
+                db.commit()
+                logger.info(f"design_task[{trend_id[:8]}] text composited onto image")
+            except Exception as comp_err:
+                logger.warning(f"Text compositing failed for design {design_id}: {comp_err}")
+
+        # 4f-3: Generate text preview for text_only/typographic designs without images
         if not processed_url and archetype in ("text_only", "typographic"):
             try:
                 preview_bytes = generate_text_preview(

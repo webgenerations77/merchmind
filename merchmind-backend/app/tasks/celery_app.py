@@ -87,10 +87,10 @@ def cleanup_stuck_on_startup(sender, **kwargs):
 
 
 celery_app.conf.beat_schedule = {
-    "sunday-batch": {
-        "task": "app.tasks.batch_pipeline.run_weekly_batch",
-        "schedule": crontab(hour=22, minute=0, day_of_week=0),  # Sunday 10pm UTC
-    },
+    # "sunday-batch": {
+    #     "task": "app.tasks.batch_pipeline.run_weekly_batch",
+    #     "schedule": crontab(hour=22, minute=0, day_of_week=0),  # Sunday 10pm UTC
+    # },
     "monday-publish": {
         "task": "app.tasks.publish_queue.publish_approved_products",
         "schedule": crontab(hour=9, minute=0, day_of_week=1),   # Monday 9am UTC
