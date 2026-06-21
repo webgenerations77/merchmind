@@ -207,3 +207,5 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 10. **Shopify theme update from STC HQ** — TODO. Update `shopify-theme/` to match Spinach the Cow corporate site at `https://webgenerations77.github.io/stchq/`. Back up current theme first.
 
 11. **Hat and sticker mockups** — TODO. Removed Pillow fallback mockups for hat and sticker (looked fake). These need photorealistic rendering via Dynamic Mockups. Until then, products show the raw design image.
+
+12. **API balances on Usage page** — TODO. Add current API credit balances (Anthropic, Replicate, OpenAI, Printify) to the dashboard API Usage page so Drew can monitor spend.
