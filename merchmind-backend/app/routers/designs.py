@@ -98,7 +98,7 @@ def approve_design(
     selected_types = set(product_types.split(",")) if product_types else None
 
     published = []
-    skipped = []
+    removed = []
     failed = []
     if publish:
         from app.models.product import Product
@@ -107,7 +107,13 @@ def approve_design(
         products = db.query(Product).filter(Product.design_id == design_id).all()
         for product in products:
             if selected_types and product.product_type not in selected_types:
-                skipped.append(product.product_type)
+                if product.printify_product_id:
+                    try:
+                        svc.delete_product(product.printify_product_id)
+                    except Exception as e:
+                        logger.warning(f"Printify delete failed for deselected {product.product_type}: {e}")
+                db.delete(product)
+                removed.append(product.product_type)
                 continue
             if product.printify_product_id:
                 try:
@@ -121,12 +127,13 @@ def approve_design(
                     db.commit()
                     failed.append({"type": product.product_type, "error": str(e)})
                     logger.warning(f"Publish failed for {product.product_type}: {e}")
+        db.commit()
 
     return _envelope({
         "id": str(design_id),
         "status": "approved",
         "published": published,
-        "skipped": skipped,
+        "removed": removed,
         "failed": failed,
     })
 

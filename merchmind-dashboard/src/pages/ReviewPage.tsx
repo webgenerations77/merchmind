@@ -340,45 +340,70 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
             </button>
           </div>
 
-          {showPublishDialog && (
-            <div className="mt-4 p-4 bg-bg-tertiary rounded-xl border border-accent/30">
-              <p className="text-sm font-semibold text-text-primary mb-3">Select products to publish:</p>
-              <div className="space-y-2 mb-4">
-                {products.map((p) => (
-                  <label key={p.id} className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedPublishTypes.has(p.product_type)}
-                      onChange={(e) => {
-                        const next = new Set(selectedPublishTypes);
-                        if (e.target.checked) next.add(p.product_type);
-                        else next.delete(p.product_type);
-                        setSelectedPublishTypes(next);
-                      }}
-                      className="w-4 h-4 rounded accent-accent"
-                    />
-                    <span className="text-sm text-text-primary">{formatProductType(p.product_type)}</span>
-                    <span className="text-xs text-text-tertiary ml-auto">{formatCurrency(p.retail_price)}</span>
-                  </label>
-                ))}
+          {showPublishDialog && (() => {
+            const deselectedTypes = products.filter((p) => !selectedPublishTypes.has(p.product_type));
+            const noneSelected = selectedPublishTypes.size === 0;
+            return (
+              <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setShowPublishDialog(false)}>
+                <div className="bg-bg-secondary rounded-2xl border border-border w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+                  <h3 className="text-lg font-bold text-text-primary mb-1">Confirm Publish</h3>
+                  <p className="text-xs text-text-secondary mb-4">Select which product types to publish to Shopify.</p>
+
+                  <div className="space-y-2 mb-4">
+                    {products.map((p) => {
+                      const b = calculateCostBreakdown(p.retail_price, p.printify_base_cost);
+                      return (
+                        <label key={p.id} className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-bg-tertiary transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={selectedPublishTypes.has(p.product_type)}
+                            onChange={(e) => {
+                              const next = new Set(selectedPublishTypes);
+                              if (e.target.checked) next.add(p.product_type);
+                              else next.delete(p.product_type);
+                              setSelectedPublishTypes(next);
+                            }}
+                            className="w-4 h-4 rounded accent-accent shrink-0"
+                          />
+                          <span className="text-sm text-text-primary flex-1">{formatProductType(p.product_type)}</span>
+                          <span className="text-xs text-text-tertiary">{formatCurrency(p.retail_price)}</span>
+                          <span className={`text-xs font-medium ${b.netMargin >= 30 ? 'text-approve' : 'text-confidence-medium'}`}>{b.netMargin.toFixed(0)}%</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  {deselectedTypes.length > 0 && !noneSelected && (
+                    <p className="text-xs text-amber-400 mb-3">
+                      {deselectedTypes.map((p) => formatProductType(p.product_type)).join(', ')} will be permanently removed.
+                    </p>
+                  )}
+
+                  {noneSelected && (
+                    <p className="text-xs text-confidence-low mb-3">
+                      At least one product type must be selected.
+                    </p>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowPublishDialog(false)}
+                      className="flex-1 py-2.5 rounded-lg bg-bg-tertiary border border-border text-sm text-text-secondary hover:text-text-primary transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => { setShowPublishDialog(false); onApprove(Array.from(selectedPublishTypes)); }}
+                      disabled={noneSelected}
+                      className="flex-1 py-2.5 rounded-lg bg-approve text-white font-semibold text-sm hover:bg-approve/90 disabled:opacity-50 transition-colors"
+                    >
+                      Publish {selectedPublishTypes.size} Product{selectedPublishTypes.size !== 1 ? 's' : ''}
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowPublishDialog(false)}
-                  className="flex-1 py-2 rounded-lg bg-bg-secondary border border-border text-sm text-text-secondary hover:text-text-primary transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => onApprove(Array.from(selectedPublishTypes))}
-                  disabled={selectedPublishTypes.size === 0}
-                  className="flex-1 py-2 rounded-lg bg-approve text-white font-semibold text-sm hover:bg-approve/90 disabled:opacity-50 transition-colors"
-                >
-                  Publish {selectedPublishTypes.size} Product{selectedPublishTypes.size !== 1 ? 's' : ''}
-                </button>
-              </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </div>
