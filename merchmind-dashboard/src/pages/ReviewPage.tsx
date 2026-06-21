@@ -413,7 +413,7 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
 }
 
 export default function ReviewPage() {
-  const { queue, archivedQueue, sessionActions, isLoading, error, fetchQueue, fetchArchived, approveDesign, rejectDesign, archiveDesign, unarchiveDesign, revisitDesign, delayDesign } = useReviewStore();
+  const { queue, archivedQueue, sessionActions, publishErrors, isLoading, error, fetchQueue, fetchArchived, approveDesign, rejectDesign, archiveDesign, unarchiveDesign, revisitDesign, delayDesign } = useReviewStore();
   const [selectedDesign, setSelectedDesign] = useState<DesignOut | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [runningBatch, setRunningBatch] = useState<BatchOut | null>(null);
@@ -694,14 +694,38 @@ export default function ReviewPage() {
         <>
           <h2 className="text-lg font-semibold text-text-primary mb-3">Reviewed this session</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {actioned.map((item) => (
-              <DesignCard
-                key={item.id}
-                item={item}
-                action={sessionActions[item.id]}
-                onClick={() => openDetail(item.id)}
-              />
-            ))}
+            {actioned.map((item) => {
+              const pubErr = publishErrors[item.id];
+              return (
+                <div key={item.id}>
+                  <DesignCard
+                    item={item}
+                    action={sessionActions[item.id]}
+                    onClick={() => openDetail(item.id)}
+                  />
+                  {pubErr && pubErr.failed.length > 0 && (
+                    <div className="mt-1 p-2 rounded-lg bg-confidence-low/10 border border-confidence-low/30">
+                      <p className="text-xs font-semibold text-confidence-low">
+                        {pubErr.published.length > 0 ? 'Partial publish' : 'Publish failed'}
+                      </p>
+                      {pubErr.failed.map((f) => (
+                        <p key={f.type} className="text-xs text-text-secondary mt-0.5">
+                          {formatProductType(f.type)}: {f.error.slice(0, 80)}
+                        </p>
+                      ))}
+                      {pubErr.published.length === 0 && (
+                        <button
+                          onClick={() => openDetail(item.id)}
+                          className="mt-1 text-xs text-accent hover:underline"
+                        >
+                          Retry from detail view
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </>
       )}

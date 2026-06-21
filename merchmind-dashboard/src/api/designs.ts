@@ -11,12 +11,21 @@ export async function getDesign(id: string): Promise<DesignOut> {
   return data.data;
 }
 
-export async function approveDesign(id: string, productTypes?: string[]): Promise<void> {
+export interface ApproveResult {
+  id: string;
+  status: string;
+  published: string[];
+  removed: string[];
+  failed: { type: string; error: string }[];
+}
+
+export async function approveDesign(id: string, productTypes?: string[]): Promise<ApproveResult> {
   const params: Record<string, string> = {};
   if (productTypes && productTypes.length > 0) {
     params.product_types = productTypes.join(',');
   }
-  await apiClient.patch(`/designs/${id}/approve`, null, { params });
+  const { data } = await apiClient.patch<ApiResponse<ApproveResult>>(`/designs/${id}/approve`, null, { params });
+  return data.data;
 }
 
 export async function rejectDesign(id: string): Promise<void> {

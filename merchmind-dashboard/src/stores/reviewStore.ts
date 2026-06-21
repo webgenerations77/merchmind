@@ -8,15 +8,17 @@ import {
   unarchiveDesign as apiUnarchive,
   revisitDesign as apiRevisit,
   delayDesign as apiDelay,
+  type ApproveResult,
 } from '../api/designs';
 
-type ReviewAction = 'approved' | 'rejected' | 'archived' | 'revisited' | 'delayed';
+type ReviewAction = 'approved' | 'rejected' | 'archived' | 'revisited' | 'delayed' | 'publish_failed';
 
 interface ReviewState {
   queue: DesignQueueItem[];
   archivedQueue: DesignQueueItem[];
   currentIndex: number;
   sessionActions: Record<string, ReviewAction>;
+  publishErrors: Record<string, ApproveResult>;
   isLoading: boolean;
   error: string | null;
   fetchQueue: () => Promise<void>;
@@ -38,6 +40,7 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   archivedQueue: [],
   currentIndex: 0,
   sessionActions: {},
+  publishErrors: {},
   isLoading: false,
   error: null,
 
@@ -61,7 +64,15 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
   approveDesign: async (id: string, productTypes?: string[]) => {
     set((s) => ({ sessionActions: { ...s.sessionActions, [id]: 'approved' } }));
     try {
-      await apiApprove(id, productTypes);
+      const result = await apiApprove(id, productTypes);
+      if (result.failed.length > 0 && result.published.length === 0) {
+        set((s) => ({
+          sessionActions: { ...s.sessionActions, [id]: 'publish_failed' },
+          publishErrors: { ...s.publishErrors, [id]: result },
+        }));
+      } else if (result.failed.length > 0) {
+        set((s) => ({ publishErrors: { ...s.publishErrors, [id]: result } }));
+      }
     } catch {
       set((s) => { const { [id]: _, ...rest } = s.sessionActions; return { sessionActions: rest }; });
     }
@@ -120,5 +131,5 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
     if (currentIndex > 0) set({ currentIndex: currentIndex - 1 });
   },
   goToIndex: (index: number) => set({ currentIndex: index }),
-  reset: () => set({ queue: [], archivedQueue: [], currentIndex: 0, sessionActions: {}, error: null }),
+  reset: () => set({ queue: [], archivedQueue: [], currentIndex: 0, sessionActions: {}, publishErrors: {}, error: null }),
 }));

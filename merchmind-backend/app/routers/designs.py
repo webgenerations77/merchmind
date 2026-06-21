@@ -32,9 +32,9 @@ def get_review_queue(
     if filter == "archived":
         statuses = ["archived"]
     elif filter == "all":
-        statuses = ["ready", "approved", "delayed", "archived"]
+        statuses = ["ready", "delayed", "approved", "archived"]
     else:
-        statuses = ["ready", "approved", "delayed"]
+        statuses = ["ready", "delayed"]
 
     designs = (
         db.query(Design)
@@ -90,14 +90,23 @@ def approve_design(
     db: Session = Depends(get_db),
     _: str = Depends(verify_api_key),
 ):
-    """Approve a design. Optionally publish only selected product types (comma-separated)."""
+    """
+    Approve and publish a design.
+
+    State machine:
+      ready → approved      (all products published successfully)
+      ready → approved      (publish=false, approve without publishing)
+      ready → ready         (all products failed — stays in queue with error)
+      ready → approved      (partial success — approved but failed products flagged)
+
+    Products track their own publish_status: pending → live | failed.
+    Design status only moves to "approved" when at least one product publishes
+    (or publish=false). If every product fails, design stays "ready" so it
+    remains visible in the review queue for retry.
+    """
     design = db.query(Design).filter(Design.id == design_id, Design.is_deleted == False).first()
     if not design:
         raise HTTPException(404, f"Design {design_id} not found")
-    design.status = "approved"
-    design.approved_at = datetime.utcnow()
-    _log_feedback(db, design, "approved")
-    db.commit()
 
     selected_types = set(product_types.split(",")) if product_types else None
 
@@ -124,18 +133,25 @@ def approve_design(
                     svc.publish_product(product.printify_product_id)
                     product.publish_status = "live"
                     product.published_at = datetime.utcnow()
-                    db.commit()
                     published.append(product.product_type)
                 except Exception as e:
                     product.publish_status = "failed"
-                    db.commit()
                     failed.append({"type": product.product_type, "error": str(e)})
                     logger.warning(f"Publish failed for {product.product_type}: {e}")
-        db.commit()
 
+    if not publish or len(published) > 0 or len(failed) == 0:
+        design.status = "approved"
+        design.approved_at = datetime.utcnow()
+        _log_feedback(db, design, "approved")
+    else:
+        _log_feedback(db, design, "publish_failed")
+
+    db.commit()
+
+    final_status = design.status
     return _envelope({
         "id": str(design_id),
-        "status": "approved",
+        "status": final_status,
         "published": published,
         "removed": removed,
         "failed": failed,
