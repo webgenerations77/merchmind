@@ -38,7 +38,7 @@ def get_review_queue(
 
     designs = (
         db.query(Design)
-        .options(joinedload(Design.trend), joinedload(Design.collection))
+        .options(joinedload(Design.trend), joinedload(Design.collection), joinedload(Design.products))
         .filter(
             Design.is_deleted == False,
             Design.status.in_(statuses),
@@ -55,6 +55,10 @@ def get_review_queue(
         data = item.model_dump()
         if d.collection:
             data["collection_name"] = d.collection.name
+        primary_pt = d.primary_product_type or "tshirt"
+        primary_product = next((p for p in d.products if p.product_type == primary_pt and p.mockup_urls), None)
+        if primary_product and primary_product.mockup_urls.get("front"):
+            data["primary_mockup_url"] = primary_product.mockup_urls["front"]
         if d.collection_id:
             data["source"] = "collection"
         elif d.trend_id:

@@ -43,6 +43,7 @@ class Design(Base):
     shopify_description = Column(Text, nullable=True)
     shopify_tags = Column(ARRAY(Text), default=list)
     classification = Column(String(20), nullable=True, default="design_idea")
+    primary_product_type = Column(String(30), nullable=True, default="tshirt")
     is_deleted = Column(Boolean, default=False)
     status = Column(
         SAEnum(

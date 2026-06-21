@@ -16,6 +16,8 @@ export interface DesignQueueItem {
   collection_id: string | null;
   collection_name?: string;
   source?: 'batch' | 'collection' | 'drews_mind';
+  primary_product_type?: string;
+  primary_mockup_url?: string;
   revisit_count?: number;
   claude_reasoning: string | null;
 }
@@ -43,6 +45,7 @@ export interface DesignOut {
   shopify_description: string | null;
   shopify_tags: string[] | null;
   classification: string | null;
+  primary_product_type: string | null;
   status: string;
   delayed_to_week: string | null;
   approved_at: string | null;

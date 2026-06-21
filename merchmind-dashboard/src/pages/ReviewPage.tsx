@@ -119,8 +119,8 @@ function DesignCard({ item, action, onClick }: { item: DesignQueueItem; action?:
       onClick={onClick}
       className="bg-bg-secondary border border-border rounded-xl p-4 text-left hover:border-accent/50 transition-colors w-full"
     >
-      {item.processed_image_url ? (
-        <ClickableImage src={item.processed_image_url} alt={item.concept_name} className="w-full h-40 object-cover rounded-lg mb-3" />
+      {(item.primary_mockup_url || item.processed_image_url) ? (
+        <ClickableImage src={item.primary_mockup_url || item.processed_image_url!} alt={item.concept_name} className="w-full h-40 object-cover rounded-lg mb-3" />
       ) : (
         <div className="w-full h-40 bg-bg-tertiary rounded-lg mb-3 flex items-center justify-center text-text-tertiary text-sm">
           Text Only
@@ -179,8 +179,10 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
       setProducts(matched);
       setSelectedPublishTypes(new Set(matched.map((p) => p.product_type)));
       const withMockups = matched.filter((p) => p.mockup_urls && Object.keys(p.mockup_urls).length > 0);
-      const clothing = withMockups.find((p) => clothingOrder.indexOf(p.product_type) <= 1);
-      const defaultMockup = clothing || withMockups[0];
+      const primary = design.primary_product_type
+        ? withMockups.find((p) => p.product_type === design.primary_product_type)
+        : null;
+      const defaultMockup = primary || withMockups[0];
       if (defaultMockup) setSelectedProduct(defaultMockup.id);
     }).catch(() => null);
   }, [design.id]);

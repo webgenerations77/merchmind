@@ -80,6 +80,17 @@ def score_design_quality(
         }
 
 
+def select_primary_product_type(archetype: str) -> str:
+    _PRIMARY_MAP = {
+        "illustration": "tshirt",
+        "hybrid": "tshirt",
+        "text_icon": "tshirt",
+        "text_only": "mug",
+        "typographic": "poster",
+    }
+    return _PRIMARY_MAP.get(archetype, "tshirt")
+
+
 def assign_product_bundle(archetype: str, quality_breakdown: dict, max_products: int = 6) -> list[str]:
     """
     Assign product types based on archetype and quality.

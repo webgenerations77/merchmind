@@ -27,7 +27,7 @@ from app.services.design.archetype_classifier import classify_archetype, select_
 from app.services.design.prompt_builder import build_image_prompt, generate_text_content
 from app.services.design.image_generator import generate_image
 from app.services.design.post_processor import process_image, image_to_bytes
-from app.services.design.quality_scorer import score_design_quality, assign_product_bundle
+from app.services.design.quality_scorer import score_design_quality, assign_product_bundle, select_primary_product_type
 from app.services.design.text_compositor import composite_text_on_image, should_composite
 from app.services.design.font_selector import select_font_pair
 from app.services.design.shopify_copy_generator import generate_shopify_copy
@@ -507,8 +507,10 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                 db.commit()
                 break
 
-        # 4h: Assign product bundle
+        # 4h: Assign product bundle + primary product type
         product_types = assign_product_bundle(design.archetype, design.quality_breakdown or {})
+        design.primary_product_type = select_primary_product_type(design.archetype)
+        design.classification = "collection" if len(product_types) >= 3 else "design_idea"
 
         # 4i: Generate Shopify copy
         copy = generate_shopify_copy(

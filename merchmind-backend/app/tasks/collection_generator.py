@@ -17,7 +17,7 @@ from app.models.settings import AppSettings
 from app.services.design.archetype_classifier import classify_archetype, select_image_api
 from app.services.design.prompt_builder import build_image_prompt, generate_text_content
 from app.services.design.image_generator import generate_image
-from app.services.design.quality_scorer import assign_product_bundle
+from app.services.design.quality_scorer import assign_product_bundle, select_primary_product_type
 from app.services.design.font_selector import select_font_pair
 from app.services.design.text_compositor import composite_text_on_image, should_composite
 from app.services.design.shopify_copy_generator import generate_shopify_copy
@@ -198,6 +198,8 @@ def generate_collection_task(self, collection_id: str, count: int):
                 design.quality_breakdown = {"concept_clarity": 8, "visual_appeal": 8, "merch_suitability": 8, "originality": 8}
 
                 product_types = assign_product_bundle(archetype, design.quality_breakdown)
+                design.primary_product_type = select_primary_product_type(archetype)
+                design.classification = "collection" if len(product_types) >= 3 else "design_idea"
                 copy = generate_shopify_copy(concept_name, collection.name, archetype, product_types, "")
                 design.shopify_title = copy["shopify_title"]
                 design.shopify_description = copy["shopify_description"]

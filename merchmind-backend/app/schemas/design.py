@@ -29,6 +29,7 @@ class DesignOut(BaseModel):
     shopify_description: Optional[str]
     shopify_tags: Optional[list]
     classification: Optional[str] = "design_idea"
+    primary_product_type: Optional[str] = "tshirt"
     status: str
     delayed_to_week: Optional[date]
     approved_at: Optional[datetime]
@@ -51,6 +52,7 @@ class DesignQueueItem(BaseModel):
     classification: Optional[str] = "design_idea"
     status: str
     collection_id: Optional[UUID] = None
+    primary_product_type: Optional[str] = "tshirt"
     revisit_count: Optional[int] = 0
     claude_reasoning: Optional[str] = None
 
