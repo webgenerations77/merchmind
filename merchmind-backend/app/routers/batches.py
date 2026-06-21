@@ -84,18 +84,25 @@ def cancel_batch(
 
     purged = {}
     if purge:
+        from app.models.marketing_asset import MarketingAsset
+        from app.models.feedback_log import FeedbackLog
+        from app.models.alert import Alert
+        from app.models.trend import Trend
+
         designs = db.query(Design).filter(Design.batch_id == batch_id).all()
         design_ids = [d.id for d in designs]
         if design_ids:
-            from app.models.marketing_asset import MarketingAsset
-            from app.models.feedback_log import FeedbackLog
-            from app.models.alert import Alert
             db.query(MarketingAsset).filter(MarketingAsset.design_id.in_(design_ids)).delete(synchronize_session=False)
             db.query(FeedbackLog).filter(FeedbackLog.design_id.in_(design_ids)).delete(synchronize_session=False)
-            db.query(Alert).filter(Alert.batch_id == batch_id).delete(synchronize_session=False)
-        prod_count = db.query(Product).filter(Product.design_id.in_(design_ids)).delete(synchronize_session=False) if design_ids else 0
+            db.query(Alert).filter(Alert.design_id.in_(design_ids)).delete(synchronize_session=False)
+            db.query(Product).filter(Product.design_id.in_(design_ids)).delete(synchronize_session=False)
+            # Clear self-referencing parent_design_id before deleting
+            db.query(Design).filter(Design.parent_design_id.in_(design_ids)).update(
+                {Design.parent_design_id: None}, synchronize_session=False
+            )
+        db.query(Alert).filter(Alert.batch_id == batch_id).delete(synchronize_session=False)
+        prod_count = len(design_ids)
         design_count = db.query(Design).filter(Design.batch_id == batch_id).delete(synchronize_session=False)
-        from app.models.trend import Trend
         trend_count = db.query(Trend).filter(Trend.batch_id == batch_id).delete(synchronize_session=False)
         purged = {"designs_deleted": design_count, "products_deleted": prod_count, "trends_deleted": trend_count}
 
