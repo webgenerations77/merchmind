@@ -10,6 +10,8 @@ from app.utils.claude_client import claude
 logger = logging.getLogger(__name__)
 
 _ARCHETYPES = ("text_only", "illustration", "hybrid", "typographic", "text_icon")
+_VISUAL_ARCHETYPES = {"illustration", "hybrid", "text_icon"}
+_TEXT_ARCHETYPES = {"text_only", "typographic"}
 
 _SYSTEM = (
     "You are a print-on-demand merchandise design strategist. "
@@ -21,7 +23,7 @@ _SYSTEM = (
 )
 
 
-def classify_archetype(raw_signal: str, source: str, niche: str = "") -> str:
+def classify_archetype(raw_signal: str, source: str, niche: str = "", bias: str | None = None) -> str:
     """
     Classify the best design archetype for a trend signal.
 
@@ -32,9 +34,20 @@ def classify_archetype(raw_signal: str, source: str, niche: str = "") -> str:
     - hybrid: Illustration + text overlay.
     """
     niche_ctx = f"\nNiche category: {niche}" if niche else ""
+    bias_ctx = ""
+    if bias == "visual":
+        bias_ctx = (
+            "\nIMPORTANT: We need more visual designs in this batch. "
+            "Strongly prefer illustration, hybrid, or text_icon unless the topic is purely verbal/wordplay."
+        )
+    elif bias == "text":
+        bias_ctx = (
+            "\nIMPORTANT: We need more text designs in this batch. "
+            "Strongly prefer text_only or typographic unless the topic is highly visual."
+        )
     prompt = (
         f"Trend topic: \"{raw_signal}\"\n"
-        f"Source: {source}{niche_ctx}\n\n"
+        f"Source: {source}{niche_ctx}{bias_ctx}\n\n"
         "Which design archetype best suits this topic for merch?\n"
         "- illustration: Detailed character, scene, or object — image-first (great for visual topics)\n"
         "- hybrid: Illustration with supporting text (topics with both visual and verbal appeal)\n"

@@ -243,7 +243,8 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                     f"Designing {i + 1}/{len(queued_trends)}: {trend.raw_signal[:40]}",
                     {"current": i + 1, "total": len(queued_trends)},
                 )
-                logger.info(f"Running design generation inline for trend {trend.id}")
+                archetype_bias = "visual" if i % 2 == 0 else "text"
+                logger.info(f"Running design generation inline for trend {trend.id} (bias={archetype_bias})")
                 _generate_design_for_trend(str(trend.id), str(batch.id), {
                     "quality_threshold": quality_threshold,
                     "trend_boost_max": trend_boost_max,
@@ -252,6 +253,7 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                     "back_logo_enabled": True,
                     "back_logo_url": back_logo_url,
                     "back_logo_products": back_logo_products,
+                    "archetype_bias": archetype_bias,
                 })
                 approved_count += 1
             except Exception as e:
@@ -333,9 +335,10 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
             if cluster:
                 niche_name = cluster.name
 
-        # 4a: Classify archetype
-        archetype = classify_archetype(trend.raw_signal, trend.source, niche_name)
-        logger.info(f"design_task[{trend_id[:8]}] archetype={archetype}")
+        # 4a: Classify archetype (bias alternates for balanced distribution)
+        archetype_bias = pipeline_settings.get("archetype_bias")
+        archetype = classify_archetype(trend.raw_signal, trend.source, niche_name, bias=archetype_bias)
+        logger.info(f"design_task[{trend_id[:8]}] archetype={archetype} bias={archetype_bias}")
 
         # 4b: Select image API
         image_api = select_image_api(archetype)
