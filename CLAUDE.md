@@ -161,7 +161,7 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 
 ## Weekly Schedule (Celery Beat)
 
-- **Sunday 10pm UTC** — `run_weekly_batch`: scrape, score, generate designs + images + mockups
+- **Sunday 10pm UTC** — `run_weekly_batch`: **PAUSED** (commented out in `celery_app.py`). Re-enable when ready to go live.
 - **Monday 9am UTC** — `publish_approved_products`: push approved designs to Printify → Shopify
 - **Monday 6am UTC** — `sync_shopify_sales`: fetch order data
 - **Monday 7am UTC** — `check_underperformers`: flag low-performing products
@@ -202,10 +202,16 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 
 8. **Text compositor** — DONE. `text_compositor.py` composites slogans onto hybrid/text_icon design images with gradient band + outlined text. Migration 008 persists `primary_text`, `secondary_text`, `tagline` on designs. 3-way archetype rotation ensures balanced mix: image-only (illustration), text (text_only/typographic), image+text (hybrid/text_icon). Batch cancel endpoint at `POST /batches/{id}/cancel?purge=true`.
 
-9. **Dynamic Mockups integration** — IN PROGRESS. Service built (`dynamic_mockups.py`), wired into all 3 generators. Needs: sign up at dynamicmockups.com, set `DYNAMIC_MOCKUPS_API_KEY` env var on Railway, populate `_TEMPLATE_MAP` with template UUIDs per product type. Placeit has no API — was replaced with Dynamic Mockups.
+9. **Quality scorer fix** — DONE. Quality scorer was degrading all image designs to text_only (vision API errors → score 0 → regen crash → force text_only). Fixed: image designs kept even if quality is low; scorer fallback auto-passes instead of failing. Production batch confirmed: 9 illustration + 8 hybrid + 8 text_only out of 25 designs.
 
-10. **Shopify theme update from STC HQ** — TODO. Update `shopify-theme/` to match Spinach the Cow corporate site at `https://webgenerations77.github.io/stchq/`. Back up current theme first.
+10. **Dynamic Mockups integration** — IN PROGRESS. Service built (`dynamic_mockups.py`), wired into all 3 generators. Mockup chain: Printify → Dynamic Mockups → Pillow fallback. Needs: sign up at dynamicmockups.com, set `DYNAMIC_MOCKUPS_API_KEY` env var on Railway, populate `_TEMPLATE_MAP` with template UUIDs per product type. Placeit has no API — was replaced with Dynamic Mockups.
 
-11. **Hat and sticker mockups** — TODO. Removed Pillow fallback mockups for hat and sticker (looked fake). These need photorealistic rendering via Dynamic Mockups. Until then, products show the raw design image.
+11. **Shopify theme update from STC HQ** — TODO. Update `shopify-theme/` to match Spinach the Cow corporate site at `https://webgenerations77.github.io/stchq/`. Back up current theme first.
 
-12. **API balances on Usage page** — TODO. Add current API credit balances (Anthropic, Replicate, OpenAI, Printify) to the dashboard API Usage page so Drew can monitor spend.
+12. **Hat and sticker mockups** — TODO. Removed Pillow fallback mockups for hat and sticker (looked fake). These need photorealistic rendering via Dynamic Mockups. Until then, products show the raw design image.
+
+13. **API balances on Usage page** — TODO. Add current API credit balances (Anthropic, Replicate, OpenAI, Printify) to the dashboard API Usage page so Drew can monitor spend.
+
+14. **Vercel redeploy dashboard** — TODO. `thecindycooley@gmail.com` added as authorized user in code but needs `vercel --prod` from `merchmind-dashboard/` to go live. Also still needs `VITE_FIREBASE_API_KEY` env var.
+
+15. **Re-enable Sunday batch** — TODO. Uncomment `sunday-batch` in `celery_app.py` beat_schedule when ready to go live. Currently paused to avoid unreviewed runs.
