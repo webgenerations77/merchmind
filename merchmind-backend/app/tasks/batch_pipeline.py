@@ -380,11 +380,13 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                 raw_url = storage.upload(raw_path, raw_bytes)
                 design.raw_image_url = raw_url
 
+                from app.services.design.bg_remover import remove_white_background
+                clean_bytes = remove_white_background(raw_bytes)
                 proc_path = storage.design_processed_path(design_id)
-                processed_url = storage.upload(proc_path, raw_bytes)
+                processed_url = storage.upload(proc_path, clean_bytes)
                 design.processed_image_url = processed_url
                 db.commit()
-                logger.info(f"design_task[{trend_id[:8]}] images uploaded")
+                logger.info(f"design_task[{trend_id[:8]}] images uploaded (bg removed)")
 
             except Exception as img_err:
                 error_msg = f"Image generation failed: {type(img_err).__name__}: {img_err}"
@@ -542,6 +544,24 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                     logger.info(f"design_task[{trend_id[:8]}] Printify mockup for {product.product_type}")
                 except Exception as mock_err:
                     logger.warning(f"design_task[{trend_id[:8]}] Printify mockup failed for {product.product_type}: {mock_err}")
+
+        # Step 6c: Generate Pillow mockups for products missing Printify mockups
+        if image_url:
+            from app.services.design.mockup_generator import generate_mockup
+            for product in db.query(Product).filter(Product.design_id == design.id).all():
+                if not product.mockup_urls or not product.mockup_urls.get("front"):
+                    try:
+                        import httpx
+                        img_resp = httpx.get(image_url, timeout=15)
+                        mockup_bytes = generate_mockup(product.product_type, img_resp.content)
+                        if mockup_bytes:
+                            mockup_path = storage.mockup_path(design_id, product.product_type, "front")
+                            mockup_url = storage.upload(mockup_path, mockup_bytes)
+                            product.mockup_urls = {"front": mockup_url}
+                            db.commit()
+                            logger.info(f"design_task[{trend_id[:8]}] Pillow mockup for {product.product_type}")
+                    except Exception as e:
+                        logger.warning(f"design_task[{trend_id[:8]}] Pillow mockup failed for {product.product_type}: {e}")
 
         # Step 7: Generate marketing assets
         _generate_marketing_assets(design, trend, niche_name, product_types, db)

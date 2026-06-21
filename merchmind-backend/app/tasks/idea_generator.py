@@ -74,8 +74,10 @@ def generate_idea_design(self, idea_id: str):
                 storage.upload(raw_path, raw_bytes)
                 design.raw_image_url = storage.upload(raw_path, raw_bytes)
 
+                from app.services.design.bg_remover import remove_white_background
+                clean_bytes = remove_white_background(raw_bytes)
                 proc_path = storage.design_processed_path(design_id)
-                processed_url = storage.upload(proc_path, raw_bytes)
+                processed_url = storage.upload(proc_path, clean_bytes)
 
                 design.processed_image_url = processed_url
                 db.commit()
@@ -167,6 +169,23 @@ def generate_idea_design(self, idea_id: str):
                     db.commit()
                 except Exception as e:
                     logger.warning("Printify failed for idea %s pt=%s: %s", idea_id, product.product_type, e)
+
+        # Generate Pillow mockups for products missing Printify mockups
+        if image_url:
+            from app.services.design.mockup_generator import generate_mockup
+            import httpx as _httpx
+            for product in db.query(Product).filter(Product.design_id == design.id).all():
+                if not product.mockup_urls or not product.mockup_urls.get("front"):
+                    try:
+                        img_resp = _httpx.get(image_url, timeout=15)
+                        mockup_bytes = generate_mockup(product.product_type, img_resp.content)
+                        if mockup_bytes:
+                            mockup_path = storage.mockup_path(design_id, product.product_type, "front")
+                            mockup_url = storage.upload(mockup_path, mockup_bytes)
+                            product.mockup_urls = {"front": mockup_url}
+                            db.commit()
+                    except Exception as e:
+                        logger.warning("Pillow mockup failed for idea %s pt=%s: %s", idea_id[:8], product.product_type, e)
 
         design.status = "ready"
         idea.design_id = design.id
