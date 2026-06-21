@@ -46,8 +46,11 @@ class Settings(BaseSettings):
     KLAVIYO_API_KEY: str = ""
     KLAVIYO_LIST_ID: str = ""
 
-    # Placeit
+    # Placeit (legacy, unused)
     PLACEIT_API_KEY: str = ""
+
+    # Dynamic Mockups
+    DYNAMIC_MOCKUPS_API_KEY: str = ""
 
     # Expo Push
     EXPO_ACCESS_TOKEN: str = ""

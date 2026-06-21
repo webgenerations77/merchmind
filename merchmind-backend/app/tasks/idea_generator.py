@@ -191,7 +191,19 @@ def generate_idea_design(self, idea_id: str):
                 except Exception as e:
                     logger.warning("Printify failed for idea %s pt=%s: %s", idea_id, product.product_type, e)
 
-        # Generate Pillow mockups for products missing Printify mockups
+        # Dynamic Mockups for products missing Printify mockups
+        if image_url:
+            from app.services.design.dynamic_mockups import get_dynamic_mockups_service
+            dm = get_dynamic_mockups_service()
+            if dm.is_available():
+                for product in db.query(Product).filter(Product.design_id == design.id).all():
+                    if not product.mockup_urls or not product.mockup_urls.get("front"):
+                        url = dm.render_mockup(product.product_type, image_url, design_id)
+                        if url:
+                            product.mockup_urls = {"front": url}
+                            db.commit()
+
+        # Pillow fallback for anything still missing
         if image_url:
             from app.services.design.mockup_generator import generate_mockup
             import httpx as _httpx

@@ -575,7 +575,20 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                 except Exception as mock_err:
                     logger.warning(f"design_task[{trend_id[:8]}] Printify mockup failed for {product.product_type}: {mock_err}")
 
-        # Step 6c: Generate Pillow mockups for products missing Printify mockups
+        # Step 6c: Dynamic Mockups for products missing Printify mockups
+        if image_url:
+            from app.services.design.dynamic_mockups import get_dynamic_mockups_service
+            dm = get_dynamic_mockups_service()
+            if dm.is_available():
+                for product in db.query(Product).filter(Product.design_id == design.id).all():
+                    if not product.mockup_urls or not product.mockup_urls.get("front"):
+                        url = dm.render_mockup(product.product_type, image_url, design_id)
+                        if url:
+                            product.mockup_urls = {"front": url}
+                            db.commit()
+                            logger.info(f"design_task[{trend_id[:8]}] Dynamic Mockups for {product.product_type}")
+
+        # Step 6d: Pillow mockups as final fallback
         if image_url:
             from app.services.design.mockup_generator import generate_mockup
             for product in db.query(Product).filter(Product.design_id == design.id).all():

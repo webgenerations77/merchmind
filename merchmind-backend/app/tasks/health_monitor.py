@@ -152,5 +152,5 @@ def _check_image_generator() -> dict:
 
 
 def _check_placeit() -> dict:
-    from app.services.design.placeit_service import get_placeit_service
-    return get_placeit_service().health_check()
+    from app.services.design.dynamic_mockups import get_dynamic_mockups_service
+    return get_dynamic_mockups_service().health_check()

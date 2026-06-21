@@ -167,14 +167,11 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 - **Monday 7am UTC** — `check_underperformers`: flag low-performing products
 - **Every 6 hours** — `health_monitor`: check service health
 
-## Temporary Diagnostic Endpoints (remove before production)
+## Batch Management Endpoints
 
-- `POST /health/reset-data` — delete all pipeline data (keeps settings/clusters)
-- `POST /health/purge-queue` — clear stuck Celery tasks
-- `POST /health/test-image-gen` — test DALL-E + Flux Schnell image generation
-- `POST /health/test-printify-mockup` — test full Printify product + mockup flow
-- `POST /health/run-migration` — apply DB enum changes
-- `GET /health/env-check` — show masked env var values
+- `POST /batches/trigger?max_designs=N` — manually trigger batch pipeline
+- `POST /batches/{id}/cancel?purge=true` — cancel stuck batch, optionally purge its designs/products/trends
+- `GET /batches/{id}/progress` — SSE stream of batch progress events
 
 ## Authentication
 
@@ -202,3 +199,9 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 6. **Shopify store design** — DONE. Custom Dawn theme in `shopify-theme/`. Playful brand with Spinach the Cow: teal/coral palette, rounded cards, bounce animation, hero banner section, featured collections grid, announcement bar, "New Drop" badges. See `shopify-theme/SETUP.md` for installation guide.
 
 7. **Remove diagnostic endpoints** — DONE. Removed `/health/reset-data`, `/health/purge-queue`, `/health/test-image-gen`, `/health/test-printify-mockup`, `/health/run-migration`, `/health/env-check`. Kept `/health` (liveness) and `/health/integrations` (deep check).
+
+8. **Text compositor** — DONE. `text_compositor.py` composites slogans onto hybrid/text_icon design images with gradient band + outlined text. Migration 008 persists `primary_text`, `secondary_text`, `tagline` on designs. 3-way archetype rotation ensures balanced mix: image-only (illustration), text (text_only/typographic), image+text (hybrid/text_icon). Batch cancel endpoint at `POST /batches/{id}/cancel?purge=true`.
+
+9. **Placeit mockup integration** — TODO. Placeit account created. Integrate Smartmockups API for photorealistic product mockups (lifestyle t-shirt shots, mugs on desks, etc.). Priority order: Printify → Placeit → Pillow fallback.
+
+10. **Shopify theme update from STC HQ** — TODO. Update `shopify-theme/` to match Spinach the Cow corporate site at `https://webgenerations77.github.io/stchq/`. Back up current theme first.
