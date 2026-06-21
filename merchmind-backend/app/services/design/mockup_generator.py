@@ -11,6 +11,18 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 _TEMPLATES = {
+    "tshirt": {
+        "size": (800, 1000),
+        "bg_color": (30, 30, 30),
+        "design_area": (200, 200, 600, 600),
+        "label": "T-Shirt",
+    },
+    "mug": {
+        "size": (800, 600),
+        "bg_color": (245, 245, 245),
+        "design_area": (175, 100, 625, 450),
+        "label": "Mug",
+    },
     "poster": {
         "size": (800, 1000),
         "bg_color": (245, 242, 237),
@@ -77,7 +89,20 @@ def generate_mockup(product_type: str, design_bytes: bytes) -> bytes | None:
 
         canvas.paste(design_resized, (area[0], area[1]), design_resized)
 
-        if product_type == "poster":
+        if product_type == "tshirt":
+            collar_color = (50, 50, 50)
+            draw.arc([300, 15, 500, 120], start=200, end=340, fill=collar_color, width=3)
+            draw.line([(200, 200), (100, 300), (100, 400), (200, 350)], fill=collar_color, width=2)
+            draw.line([(600, 200), (700, 300), (700, 400), (600, 350)], fill=collar_color, width=2)
+            draw.rounded_rectangle([150, 180, 650, 900], radius=20, outline=collar_color, width=2)
+
+        elif product_type == "mug":
+            mug_color = (200, 200, 200)
+            draw.rounded_rectangle([120, 60, 680, 500], radius=30, outline=mug_color, width=3)
+            draw.arc([650, 150, 770, 400], start=270, end=90, fill=mug_color, width=3)
+            draw.line([(120, 500), (680, 500)], fill=mug_color, width=3)
+
+        elif product_type == "poster":
             fc = template["frame_color"]
             fw = template["frame_width"]
             draw.rectangle([area[0] - fw, area[1] - fw, area[2] + fw, area[3] + fw], outline=fc, width=fw)
