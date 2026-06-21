@@ -35,15 +35,22 @@ def classify_archetype(raw_signal: str, source: str, niche: str = "", bias: str 
     """
     niche_ctx = f"\nNiche category: {niche}" if niche else ""
     bias_ctx = ""
-    if bias == "visual":
+    if bias == "image_only":
         bias_ctx = (
-            "\nIMPORTANT: We need more visual designs in this batch. "
-            "Strongly prefer illustration, hybrid, or text_icon unless the topic is purely verbal/wordplay."
+            "\nIMPORTANT: This design slot is reserved for a pure visual design. "
+            "You MUST choose 'illustration'. The design will be image-only with no text overlay."
+        )
+    elif bias == "image_text":
+        bias_ctx = (
+            "\nIMPORTANT: This design slot is reserved for an image-with-text design. "
+            "You MUST choose either 'hybrid' or 'text_icon'. "
+            "These designs combine a visual element with a text slogan overlay."
         )
     elif bias == "text":
         bias_ctx = (
-            "\nIMPORTANT: We need more text designs in this batch. "
-            "Strongly prefer text_only or typographic unless the topic is highly visual."
+            "\nIMPORTANT: This design slot is reserved for a text-based design. "
+            "You MUST choose either 'text_only' or 'typographic'. "
+            "These designs use text/slogans as the primary visual element."
         )
     prompt = (
         f"Trend topic: \"{raw_signal}\"\n"

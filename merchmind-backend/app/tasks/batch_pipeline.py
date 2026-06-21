@@ -243,7 +243,8 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                     f"Designing {i + 1}/{len(queued_trends)}: {trend.raw_signal[:40]}",
                     {"current": i + 1, "total": len(queued_trends)},
                 )
-                archetype_bias = "visual" if i % 2 == 0 else "text"
+                _BIAS_ROTATION = ("image_only", "text", "image_text")
+                archetype_bias = _BIAS_ROTATION[i % 3]
                 logger.info(f"Running design generation inline for trend {trend.id} (bias={archetype_bias})")
                 _generate_design_for_trend(str(trend.id), str(batch.id), {
                     "quality_threshold": quality_threshold,
