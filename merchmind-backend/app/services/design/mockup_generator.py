@@ -38,20 +38,6 @@ _TEMPLATES = {
         "corner_radius": 40,
         "label": "Phone Case",
     },
-    "sticker": {
-        "size": (600, 600),
-        "bg_color": (255, 255, 255),
-        "design_area": (75, 75, 450, 450),
-        "label": "Sticker",
-        "border_color": (200, 200, 200),
-        "border_dash": True,
-    },
-    "hat": {
-        "size": (800, 600),
-        "bg_color": (40, 40, 40),
-        "design_area": (225, 100, 350, 250),
-        "label": "Hat",
-    },
 }
 
 _FONT_PATHS = [
@@ -114,18 +100,6 @@ def generate_mockup(product_type: str, design_bytes: bytes) -> bytes | None:
             draw.rounded_rectangle([50, 60, 450, 840], radius=40, outline=outline_color, width=3)
             draw.rounded_rectangle([60, 70, 440, 830], radius=36, outline=(50, 50, 50), width=1)
             draw.ellipse([215, 850, 285, 870], outline=outline_color, width=2)
-
-        elif product_type == "sticker":
-            bc = template.get("border_color", (200, 200, 200))
-            draw.rounded_rectangle([50, 50, 550, 550], radius=20, outline=bc, width=2)
-            label_font = _load_font(14)
-            draw.text((250, 565), "Sticker · Die Cut", fill=(150, 150, 150), font=label_font, anchor="mt")
-
-        elif product_type == "hat":
-            draw.arc([100, 50, 700, 500], start=200, end=340, fill=(60, 60, 60), width=3)
-            draw.rounded_rectangle([150, 350, 650, 550], radius=10, outline=(60, 60, 60), width=2)
-            label_font = _load_font(14)
-            draw.text((400, 560), "Embroidered Hat", fill=(150, 150, 150), font=label_font, anchor="mt")
 
         label_font = _load_font(16)
         label = template.get("label", product_type)

@@ -202,6 +202,8 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 
 8. **Text compositor** — DONE. `text_compositor.py` composites slogans onto hybrid/text_icon design images with gradient band + outlined text. Migration 008 persists `primary_text`, `secondary_text`, `tagline` on designs. 3-way archetype rotation ensures balanced mix: image-only (illustration), text (text_only/typographic), image+text (hybrid/text_icon). Batch cancel endpoint at `POST /batches/{id}/cancel?purge=true`.
 
-9. **Placeit mockup integration** — TODO. Placeit account created. Integrate Smartmockups API for photorealistic product mockups (lifestyle t-shirt shots, mugs on desks, etc.). Priority order: Printify → Placeit → Pillow fallback.
+9. **Dynamic Mockups integration** — IN PROGRESS. Service built (`dynamic_mockups.py`), wired into all 3 generators. Needs: sign up at dynamicmockups.com, set `DYNAMIC_MOCKUPS_API_KEY` env var on Railway, populate `_TEMPLATE_MAP` with template UUIDs per product type. Placeit has no API — was replaced with Dynamic Mockups.
 
 10. **Shopify theme update from STC HQ** — TODO. Update `shopify-theme/` to match Spinach the Cow corporate site at `https://webgenerations77.github.io/stchq/`. Back up current theme first.
+
+11. **Hat and sticker mockups** — TODO. Removed Pillow fallback mockups for hat and sticker (looked fake). These need photorealistic rendering via Dynamic Mockups. Until then, products show the raw design image.
