@@ -28,10 +28,13 @@ class DesignOut(BaseModel):
     shopify_title: Optional[str]
     shopify_description: Optional[str]
     shopify_tags: Optional[list]
+    classification: Optional[str] = "design_idea"
     status: str
     delayed_to_week: Optional[date]
     approved_at: Optional[datetime]
     rejected_at: Optional[datetime]
+    archived_at: Optional[datetime] = None
+    revisit_count: Optional[int] = 0
     created_at: datetime
 
 
@@ -45,9 +48,11 @@ class DesignQueueItem(BaseModel):
     processed_image_url: Optional[str]
     quality_score: int
     shopify_title: Optional[str]
+    classification: Optional[str] = "design_idea"
     status: str
     collection_id: Optional[UUID] = None
-    claude_reasoning: Optional[str] = None  # From joined trend
+    revisit_count: Optional[int] = 0
+    claude_reasoning: Optional[str] = None
 
 
 class DelayRequest(BaseModel):

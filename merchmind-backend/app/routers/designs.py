@@ -23,14 +23,25 @@ def _envelope(data=None, error: str = None) -> dict:
 
 
 @router.get("/queue")
-def get_review_queue(db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
-    """Return all non-deleted, non-rejected designs across all batches."""
+def get_review_queue(
+    filter: str = "active",
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key),
+):
+    """Return designs for review. filter=active (default), filter=archived, filter=all."""
+    if filter == "archived":
+        statuses = ["archived"]
+    elif filter == "all":
+        statuses = ["ready", "approved", "delayed", "archived"]
+    else:
+        statuses = ["ready", "approved", "delayed"]
+
     designs = (
         db.query(Design)
         .options(joinedload(Design.trend), joinedload(Design.collection))
         .filter(
             Design.is_deleted == False,
-            Design.status.in_(["ready", "approved", "delayed"]),
+            Design.status.in_(statuses),
         )
         .order_by(Design.created_at.desc())
         .all()
@@ -122,15 +133,16 @@ def approve_design(
 
 @router.patch("/{design_id}/reject")
 def reject_design(design_id: UUID, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """Permanently delete a design — removes Supabase assets, Printify drafts, and DB records."""
     design = db.query(Design).filter(Design.id == design_id, Design.is_deleted == False).first()
     if not design:
         raise HTTPException(404, f"Design {design_id} not found")
-    design.status = "rejected"
-    design.rejected_at = datetime.utcnow()
-    design.is_deleted = True
-    _log_feedback(db, design, "rejected")
 
-    deleted_products = []
+    _log_feedback(db, design, "rejected")
+    did = str(design.id)
+
+    # Delete Printify drafts
+    deleted_printify = []
     from app.models.product import Product
     from app.services.publishing.printify_publisher import _get as _get_printify
     svc = _get_printify()
@@ -139,13 +151,86 @@ def reject_design(design_id: UUID, db: Session = Depends(get_db), _: str = Depen
         if product.printify_product_id:
             try:
                 svc.delete_product(product.printify_product_id)
-                deleted_products.append(product.product_type)
+                deleted_printify.append(product.product_type)
             except Exception as e:
                 logger.warning(f"Printify delete failed for {product.product_type}: {e}")
-        product.publish_status = "unpublished"
 
+    # Delete Supabase storage assets
+    from app.utils.storage import storage
+    deleted_assets = []
+    for path in [
+        storage.design_raw_path(did),
+        storage.design_processed_path(did),
+        storage.design_light_variant_path(did),
+    ]:
+        try:
+            storage.delete(path)
+            deleted_assets.append(path)
+        except Exception:
+            pass
+    for pt in ["tshirt", "mug", "hat", "phone_case", "sticker", "poster"]:
+        for variant in ["front", "back", "lifestyle"]:
+            try:
+                storage.delete(storage.mockup_path(did, pt, variant))
+                deleted_assets.append(f"mockups/{pt}/{variant}")
+            except Exception:
+                pass
+
+    # Delete DB records (cascade: marketing_assets, feedback_logs, alerts, products, then design)
+    from app.models.marketing_asset import MarketingAsset
+    from app.models.alert import Alert
+    db.query(MarketingAsset).filter(MarketingAsset.design_id == design_id).delete(synchronize_session=False)
+    db.query(FeedbackLog).filter(FeedbackLog.design_id == design_id).delete(synchronize_session=False)
+    db.query(Alert).filter(Alert.design_id == design_id).delete(synchronize_session=False)
+    db.query(Product).filter(Product.design_id == design_id).delete(synchronize_session=False)
+    db.query(Design).filter(Design.parent_design_id == design_id).update(
+        {Design.parent_design_id: None}, synchronize_session=False
+    )
+    db.delete(design)
     db.commit()
-    return _envelope({"id": str(design_id), "status": "rejected", "printify_deleted": deleted_products})
+
+    logger.info("Design %s permanently deleted: %d printify, %d assets", did, len(deleted_printify), len(deleted_assets))
+    return _envelope({"id": did, "status": "deleted", "printify_deleted": deleted_printify, "assets_deleted": len(deleted_assets)})
+
+
+@router.patch("/{design_id}/archive")
+def archive_design(design_id: UUID, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """Archive a design — removes from active queue, recoverable."""
+    design = db.query(Design).filter(Design.id == design_id, Design.is_deleted == False).first()
+    if not design:
+        raise HTTPException(404, f"Design {design_id} not found")
+    design.status = "archived"
+    design.archived_at = datetime.utcnow()
+    _log_feedback(db, design, "archived")
+    db.commit()
+    return _envelope({"id": str(design_id), "status": "archived"})
+
+
+@router.patch("/{design_id}/unarchive")
+def unarchive_design(design_id: UUID, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """Restore an archived design to the review queue."""
+    design = db.query(Design).filter(Design.id == design_id, Design.status == "archived").first()
+    if not design:
+        raise HTTPException(404, f"Archived design {design_id} not found")
+    design.status = "ready"
+    design.archived_at = None
+    _log_feedback(db, design, "unarchived")
+    db.commit()
+    return _envelope({"id": str(design_id), "status": "ready"})
+
+
+@router.patch("/{design_id}/revisit")
+def revisit_design(design_id: UUID, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """Move a design to the bottom of the review queue with a revisit badge."""
+    design = db.query(Design).filter(Design.id == design_id, Design.is_deleted == False).first()
+    if not design:
+        raise HTTPException(404, f"Design {design_id} not found")
+    design.revisit_count = (design.revisit_count or 0) + 1
+    design.created_at = datetime.utcnow()
+    design.status = "ready"
+    _log_feedback(db, design, "revisited")
+    db.commit()
+    return _envelope({"id": str(design_id), "status": "ready", "revisit_count": design.revisit_count})
 
 
 @router.patch("/{design_id}/delay")

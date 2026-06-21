@@ -130,7 +130,21 @@ function DesignCard({ item, action, onClick }: { item: DesignQueueItem; action?:
         <h3 className="text-sm font-semibold text-text-primary truncate">{item.concept_name}</h3>
         <ConfidenceBadge score={item.quality_score} />
       </div>
-      <p className="text-xs text-text-tertiary mb-2">{item.archetype.replace(/_/g, ' ')}</p>
+      <div className="flex items-center gap-2 mb-2">
+        <p className="text-xs text-text-tertiary">{item.archetype.replace(/_/g, ' ')}</p>
+        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${
+          item.classification === 'collection'
+            ? 'bg-purple-500/20 text-purple-400'
+            : 'bg-accent/20 text-accent'
+        }`}>
+          {item.classification === 'collection' ? 'Collection' : 'Design Idea'}
+        </span>
+        {(item.revisit_count ?? 0) > 0 && (
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase bg-blue-500/20 text-blue-400">
+            Revisit {item.revisit_count! > 1 ? `x${item.revisit_count}` : ''}
+          </span>
+        )}
+      </div>
       {item.shopify_title && (
         <p className="text-xs text-text-secondary truncate">{item.shopify_title}</p>
       )}
@@ -143,11 +157,13 @@ function DesignCard({ item, action, onClick }: { item: DesignQueueItem; action?:
   );
 }
 
-function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
+function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisit, onDelay }: {
   design: DesignOut;
   onBack: () => void;
   onApprove: (productTypes?: string[]) => void;
   onReject: () => void;
+  onArchive: () => void;
+  onRevisit: () => void;
   onDelay: () => void;
 }) {
   const [products, setProducts] = useState<ProductOut[]>([]);
@@ -231,6 +247,13 @@ function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
             <div className="flex items-center gap-2 mt-2">
               <ConfidenceBadge score={design.quality_score} />
               <StatusBadge status={design.archetype} />
+              <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase ${
+                design.classification === 'collection'
+                  ? 'bg-purple-500/20 text-purple-400'
+                  : 'bg-accent/20 text-accent'
+              }`}>
+                {design.classification === 'collection' ? 'Collection' : 'Design Idea'}
+              </span>
               {design.version > 1 && <span className="text-xs text-text-tertiary">v{design.version}</span>}
             </div>
           </div>
@@ -296,11 +319,20 @@ function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
             </div>
           )}
 
-          <div className="flex gap-3 pt-4 border-t border-border">
-            <button onClick={onReject} className="flex-1 py-2.5 rounded-lg bg-reject/20 text-reject font-semibold text-sm hover:bg-reject/30 transition-colors">
+          <div className="flex gap-2 pt-4 border-t border-border">
+            <button
+              onClick={() => { if (confirm('Permanently delete this design and all assets? This cannot be undone.')) onReject(); }}
+              className="py-2.5 px-3 rounded-lg bg-reject/20 text-reject font-semibold text-sm hover:bg-reject/30 transition-colors"
+            >
               Reject
             </button>
-            <button onClick={onDelay} className="flex-1 py-2.5 rounded-lg bg-delay/20 text-delay font-semibold text-sm hover:bg-delay/30 transition-colors">
+            <button onClick={onArchive} className="py-2.5 px-3 rounded-lg bg-amber-500/20 text-amber-400 font-semibold text-sm hover:bg-amber-500/30 transition-colors">
+              Archive
+            </button>
+            <button onClick={onRevisit} className="py-2.5 px-3 rounded-lg bg-blue-500/20 text-blue-400 font-semibold text-sm hover:bg-blue-500/30 transition-colors">
+              Revisit
+            </button>
+            <button onClick={onDelay} className="py-2.5 px-3 rounded-lg bg-delay/20 text-delay font-semibold text-sm hover:bg-delay/30 transition-colors">
               Delay
             </button>
             <button onClick={() => setShowPublishDialog(true)} className="flex-1 py-2.5 rounded-lg bg-approve/20 text-approve font-semibold text-sm hover:bg-approve/30 transition-colors">
@@ -354,7 +386,7 @@ function DesignDetail({ design, onBack, onApprove, onReject, onDelay }: {
 }
 
 export default function ReviewPage() {
-  const { queue, sessionActions, isLoading, error, fetchQueue, approveDesign, rejectDesign, delayDesign } = useReviewStore();
+  const { queue, archivedQueue, sessionActions, isLoading, error, fetchQueue, fetchArchived, approveDesign, rejectDesign, archiveDesign, unarchiveDesign, revisitDesign, delayDesign } = useReviewStore();
   const [selectedDesign, setSelectedDesign] = useState<DesignOut | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [runningBatch, setRunningBatch] = useState<BatchOut | null>(null);
@@ -389,6 +421,7 @@ export default function ReviewPage() {
 
   useEffect(() => {
     fetchQueue();
+    fetchArchived();
     checkBatchStatus();
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -416,7 +449,7 @@ export default function ReviewPage() {
     fetchQueue();
   };
 
-  const [reviewTab, setReviewTab] = useState<'batch' | 'collections' | 'drews_mind'>('batch');
+  const [reviewTab, setReviewTab] = useState<'batch' | 'collections' | 'drews_mind' | 'archived'>('batch');
 
   const pending = queue.filter((d) => !sessionActions[d.id]);
   const actioned = queue.filter((d) => sessionActions[d.id]);
@@ -437,6 +470,7 @@ export default function ReviewPage() {
     batch: batchDesigns.length,
     collections: collectionDesigns.length,
     drews_mind: drewsDesigns.length,
+    archived: archivedQueue.length,
   };
 
   const openDetail = async (id: string) => {
@@ -448,11 +482,16 @@ export default function ReviewPage() {
     setLoadingDetail(false);
   };
 
-  const handleAction = async (action: 'approve' | 'reject' | 'delay', id: string, productTypes?: string[]) => {
+  const handleAction = async (action: 'approve' | 'reject' | 'archive' | 'revisit' | 'delay', id: string, productTypes?: string[]) => {
     if (action === 'approve') {
       await approveDesign(id, productTypes);
     } else if (action === 'reject') {
       await rejectDesign(id);
+    } else if (action === 'archive') {
+      await archiveDesign(id);
+      fetchArchived();
+    } else if (action === 'revisit') {
+      await revisitDesign(id);
     } else {
       const nextWeek = new Date();
       nextWeek.setDate(nextWeek.getDate() + 7);
@@ -471,6 +510,8 @@ export default function ReviewPage() {
         onBack={() => setSelectedDesign(null)}
         onApprove={(productTypes) => handleAction('approve', selectedDesign.id, productTypes)}
         onReject={() => handleAction('reject', selectedDesign.id)}
+        onArchive={() => handleAction('archive', selectedDesign.id)}
+        onRevisit={() => handleAction('revisit', selectedDesign.id)}
         onDelay={() => handleAction('delay', selectedDesign.id)}
       />
     );
@@ -531,7 +572,7 @@ export default function ReviewPage() {
       {recentBatch && <BatchComplete batch={recentBatch} onRefresh={handleRefresh} />}
 
       <div className="flex gap-1 mb-6 bg-bg-secondary rounded-lg p-1 border border-border">
-        {([['batch', 'Design Ideas'], ['collections', 'Collections'], ['drews_mind', "Drew's Mind"]] as const).map(([key, label]) => (
+        {([['batch', 'Design Ideas'], ['collections', 'Collections'], ['drews_mind', "Drew's Mind"], ['archived', 'Archived']] as const).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setReviewTab(key)}
@@ -595,6 +636,29 @@ export default function ReviewPage() {
           <div className="text-center py-16 text-text-tertiary">
             <p className="text-lg">No Drew's Mind designs to review</p>
             <p className="text-sm mt-1">Create ideas from the Drew's Mind page</p>
+          </div>
+        )
+      )}
+
+      {reviewTab === 'archived' && (
+        archivedQueue.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            {archivedQueue.map((item) => (
+              <div key={item.id} className="relative">
+                <DesignCard item={item} onClick={() => openDetail(item.id)} />
+                <button
+                  onClick={async (e) => { e.stopPropagation(); await unarchiveDesign(item.id); }}
+                  className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-approve/20 text-approve text-xs font-semibold hover:bg-approve/30 transition-colors"
+                >
+                  Unarchive
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16 text-text-tertiary">
+            <p className="text-lg">No archived designs</p>
+            <p className="text-sm mt-1">Archived designs will appear here</p>
           </div>
         )
       )}

@@ -42,10 +42,11 @@ class Design(Base):
     shopify_title = Column(Text, nullable=True)
     shopify_description = Column(Text, nullable=True)
     shopify_tags = Column(ARRAY(Text), default=list)
+    classification = Column(String(20), nullable=True, default="design_idea")
     is_deleted = Column(Boolean, default=False)
     status = Column(
         SAEnum(
-            "generating", "ready", "approved", "rejected", "delayed",
+            "generating", "ready", "approved", "rejected", "delayed", "archived",
             name="design_status",
         ),
         nullable=False,
@@ -54,6 +55,8 @@ class Design(Base):
     delayed_to_week = Column(Date, nullable=True)
     approved_at = Column(DateTime(timezone=True), nullable=True)
     rejected_at = Column(DateTime(timezone=True), nullable=True)
+    archived_at = Column(DateTime(timezone=True), nullable=True)
+    revisit_count = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
     trend = relationship("Trend", back_populates="designs")

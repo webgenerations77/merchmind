@@ -11,10 +11,12 @@ export interface DesignQueueItem {
   processed_image_url: string | null;
   quality_score: number;
   shopify_title: string | null;
+  classification: string | null;
   status: string;
   collection_id: string | null;
   collection_name?: string;
   source?: 'batch' | 'collection' | 'drews_mind';
+  revisit_count?: number;
   claude_reasoning: string | null;
 }
 
@@ -40,10 +42,13 @@ export interface DesignOut {
   shopify_title: string | null;
   shopify_description: string | null;
   shopify_tags: string[] | null;
+  classification: string | null;
   status: string;
   delayed_to_week: string | null;
   approved_at: string | null;
   rejected_at: string | null;
+  archived_at: string | null;
+  revisit_count: number;
   created_at: string;
 }
 
