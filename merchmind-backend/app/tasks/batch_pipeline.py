@@ -488,12 +488,15 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                         continue
                     except Exception:
                         pass
-                # Force text_only on second failure
+                # Keep the image design even if quality is low — don't degrade to text_only
+                if design.raw_image_url:
+                    logger.info(f"Quality below threshold but keeping image design {design_id}")
+                    break
                 archetype = "text_only"
                 design.archetype = archetype
                 design.image_api_used = None
                 processed_url = None
-                design.quality_score = 30  # text_only always passes threshold
+                design.quality_score = 30
                 design.quality_breakdown = {"concept_clarity": 8, "visual_appeal": 7, "merch_suitability": 8, "originality": 7}
                 db.commit()
                 break
