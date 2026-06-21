@@ -175,7 +175,7 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 
 ## Authentication
 
-- **Dashboard:** Firebase Auth with Google Sign-in. Project: `merchmind-cb1f9`. Only two emails authorized: `webgenerations77@gmail.com` and `spinachthecow@gmail.com`. Config in `src/firebase.ts`. API key via `VITE_FIREBASE_API_KEY` env var.
+- **Dashboard:** Firebase Auth with Google Sign-in. Project: `merchmind-cb1f9`. Authorized emails: `webgenerations77@gmail.com`, `spinachthecow@gmail.com`, and `thecindycooley@gmail.com`. Config in `src/firebase.ts`. API key via `VITE_FIREBASE_API_KEY` env var.
 - **API:** `X-API-Key` header (unchanged).
 
 ## Drew's Mind (Custom Ideas)

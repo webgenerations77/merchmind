@@ -15,6 +15,7 @@ const provider = new GoogleAuthProvider();
 const ALLOWED_EMAILS = [
   'webgenerations77@gmail.com',
   'spinachthecow@gmail.com',
+  'thecindycooley@gmail.com',
 ];
 
 export function isAllowedUser(user: User | null): boolean {
