@@ -21,17 +21,21 @@ function BatchProgress({ batch, productCount, designCount }: { batch: BatchOut; 
     return () => clearInterval(timer);
   }, [batch.run_started_at]);
 
-  const totalDesigns = batch.queued_count || 1;
+  const totalDesigns = batch.queued_count || 0;
   const designsDone = designCount;
-  const progressPct = batch.queued_count > 0
+  const progressPct = totalDesigns > 0
     ? Math.min(95, ((designsDone / totalDesigns) * 80) + (batch.total_ideas > 0 ? 10 : 0) + (batch.queued_count > 0 ? 10 : 0))
     : batch.total_ideas > 0 ? 15 : 5;
 
+  const scraped = batch.total_ideas > 0;
+  const scored = scraped && batch.queued_count > 0;
+  const generated = scored && totalDesigns > 0 && designsDone >= totalDesigns;
+  const productsCreated = generated && productCount > 0;
   const steps = [
-    { label: 'Scraping trends', detail: batch.total_ideas > 0 ? `${batch.total_ideas} found` : '', done: batch.total_ideas > 0 },
-    { label: 'Scoring & filtering', detail: batch.queued_count > 0 ? `${batch.queued_count} qualified` : '', done: batch.queued_count > 0 },
-    { label: 'Generating designs', detail: batch.queued_count > 0 ? `${designsDone}/${totalDesigns}` : '', done: designsDone >= totalDesigns && totalDesigns > 0 },
-    { label: 'Creating products', detail: productCount > 0 ? `${productCount} created` : '', done: productCount > 0 && designsDone >= totalDesigns },
+    { label: 'Scraping trends', detail: scraped ? `${batch.total_ideas} found` : '', done: scraped },
+    { label: 'Scoring & filtering', detail: scored ? `${batch.queued_count} qualified` : '', done: scored },
+    { label: 'Generating designs', detail: scored ? `${designsDone}/${totalDesigns}` : '', done: generated },
+    { label: 'Creating products', detail: productsCreated ? `${productCount} created` : '', done: productsCreated },
     { label: 'Marketing copy', detail: '', done: batch.status === 'complete' },
   ];
 
@@ -646,12 +650,12 @@ export default function ReviewPage() {
       if (latest?.status === 'running') {
         setRunningBatch(latest);
         setRecentBatch(null);
-        const products = await listProducts();
-        const batchStart = new Date(latest.run_started_at).getTime();
-        const batchProducts = products.filter((p) => new Date(p.created_at).getTime() >= batchStart);
-        setProductCount(batchProducts.length);
         const latestQueue = await getReviewQueue();
-        setBatchDesignCount(latestQueue.filter((d) => d.source === 'batch').length);
+        const batchDesigns = latestQueue.filter((d) => d.batch_id === latest.id);
+        setBatchDesignCount(batchDesigns.length);
+        const batchDesignIds = new Set(batchDesigns.map((d) => d.id));
+        const products = await listProducts();
+        setProductCount(products.filter((p) => batchDesignIds.has(p.design_id)).length);
       } else if (latest?.status === 'complete') {
         setRunningBatch((prev) => {
           if (prev) setRecentBatch(latest);
