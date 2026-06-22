@@ -635,6 +635,18 @@ def preview_product_prompts(
     return _envelope(results)
 
 
+@router.post("/fix-classifications")
+def fix_classifications(db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """One-off: fix designs misclassified as 'collection' that have no collection_id."""
+    updated = db.query(Design).filter(
+        Design.classification == "collection",
+        Design.collection_id == None,
+        Design.is_deleted == False,
+    ).update({Design.classification: "design_idea"}, synchronize_session=False)
+    db.commit()
+    return _envelope({"fixed": updated})
+
+
 @router.post("/{design_id}/rerender-preview")
 def rerender_preview(
     design_id: UUID,
