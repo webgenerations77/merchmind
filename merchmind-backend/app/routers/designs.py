@@ -240,9 +240,13 @@ def reject_design(design_id: UUID, db: Session = Depends(get_db), _: str = Depen
             except Exception:
                 pass
 
-    # Delete DB records (cascade: marketing_assets, feedback_logs, alerts, products, then design)
+    # Delete DB records (cascade: batch_items, marketing_assets, feedback_logs, alerts, products, then design)
     from app.models.marketing_asset import MarketingAsset
     from app.models.alert import Alert
+    from app.models.batch_item import BatchItem
+    db.query(BatchItem).filter(BatchItem.design_id == design_id).update(
+        {BatchItem.design_id: None}, synchronize_session=False
+    )
     db.query(MarketingAsset).filter(MarketingAsset.design_id == design_id).delete(synchronize_session=False)
     db.query(FeedbackLog).filter(FeedbackLog.design_id == design_id).delete(synchronize_session=False)
     db.query(Alert).filter(Alert.design_id == design_id).delete(synchronize_session=False)
