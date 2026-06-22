@@ -24,3 +24,29 @@ class BatchOut(BaseModel):
 class BatchListOut(BaseModel):
     batches: list[BatchOut]
     total: int
+
+
+class BatchItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    batch_id: UUID
+    trend_id: Optional[UUID]
+    design_id: Optional[UUID]
+    concept_name: str
+    status: str
+    failed_step: Optional[str]
+    error_summary: Optional[str]
+    error_detail: Optional[str]
+    product_types: list[str]
+    started_at: datetime
+    completed_at: Optional[datetime]
+    created_at: datetime
+    processed_image_url: Optional[str] = None
+
+
+class BatchDetailOut(BaseModel):
+    batch: BatchOut
+    items: list[BatchItemOut]
+    success_count: int
+    failed_count: int

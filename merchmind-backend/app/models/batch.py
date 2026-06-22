@@ -29,3 +29,4 @@ class Batch(Base):
     trends = relationship("Trend", back_populates="batch")
     designs = relationship("Design", back_populates="batch")
     alerts = relationship("Alert", back_populates="batch")
+    items = relationship("BatchItem", back_populates="batch", order_by="BatchItem.created_at")

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { listCollections, createCollection, deleteCollection, generateCollectionDesigns, getCollection } from '../api/collections';
 import type { CollectionOut } from '../types/api';
+import { toTitleCase } from '../utils/formatters';
 
 const ARCHETYPE_OPTIONS = ['', 'illustration', 'hybrid', 'text_icon', 'typographic', 'text_only'];
 
@@ -207,7 +208,7 @@ export default function CollectionsPage() {
                           </div>
                         )}
                         <div className="p-2">
-                          <p className="text-xs text-text-primary truncate">{d.concept_name}</p>
+                          <p className="text-xs text-text-primary truncate">{toTitleCase(d.concept_name)}</p>
                           <p className="text-xs text-text-tertiary">{d.archetype} · Q{d.quality_score}</p>
                         </div>
                       </div>

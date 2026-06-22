@@ -1,8 +1,10 @@
 import apiClient from './client';
 import type { ApiResponse, ProductOut } from '../types/api';
 
-export async function listProducts(status?: string): Promise<ProductOut[]> {
-  const params = status ? { status } : {};
+export async function listProducts(status?: string, includeRetired?: boolean): Promise<ProductOut[]> {
+  const params: Record<string, string> = {};
+  if (status) params.status = status;
+  if (includeRetired) params.include_retired = 'true';
   const { data } = await apiClient.get<ApiResponse<ProductOut[]>>('/products', { params });
   return data.data;
 }

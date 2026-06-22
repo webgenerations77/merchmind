@@ -37,4 +37,8 @@ class AppSettings(Base):
     back_logo_url = Column(Text, nullable=True)
     back_logo_products = Column(JSONB, default=lambda: ["tshirt", "hat"])
     active_clusters = Column(ARRAY(UUID(as_uuid=True)), default=list)
+    marketing_generation_enabled = Column(Boolean, default=False, nullable=False)
+    social_links = Column(JSONB, default=lambda: {
+        "instagram_url": "", "tiktok_url": "", "pinterest_url": "", "facebook_url": "",
+    })
     updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

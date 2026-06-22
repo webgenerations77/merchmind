@@ -146,6 +146,7 @@ class PrintifyService:
         retail_price: float,
         print_provider_id: int | None = None,
         back_logo_url: str | None = None,
+        archetype: str | None = None,
     ) -> str:
         blueprint_id = _BLUEPRINT_MAP.get(product_type)
         if not blueprint_id:
@@ -161,10 +162,16 @@ class PrintifyService:
             for v in all_variants[:20]
         ]
 
+        # Printify placement: x/y are normalized 0.0–1.0 within the print area.
+        # y=0.5 = vertical center; y=0.35 = upper chest for text designs on tshirts.
+        front_y = 0.5
+        if product_type == "tshirt" and archetype in ("text_only", "typographic", "text_icon"):
+            front_y = 0.35
+
         placeholders = [
             {
                 "position": "front",
-                "images": [{"id": printify_image_id, "x": 0.5, "y": 0.5, "scale": 1.0, "angle": 0}],
+                "images": [{"id": printify_image_id, "x": 0.5, "y": front_y, "scale": 1.0, "angle": 0}],
             }
         ]
 
@@ -216,6 +223,14 @@ class PrintifyService:
             },
         )
         logger.info("printify.publish_product product_id=%s", printify_product_id)
+
+    def unpublish_product(self, printify_product_id: str) -> None:
+        """Unpublish a product from the connected Shopify store. Keeps the product in Printify."""
+        self._request(
+            "POST",
+            f"/shops/{settings.PRINTIFY_SHOP_ID}/products/{printify_product_id}/unpublish.json",
+        )
+        logger.info("printify.unpublish_product product_id=%s", printify_product_id)
 
     def delete_product(self, printify_product_id: str) -> None:
         try:
@@ -317,8 +332,9 @@ def create_product(
     retail_price: float,
     print_provider_id: int | None = None,
     back_logo_url: str | None = None,
+    archetype: str | None = None,
 ) -> str:
-    return _get().create_product(product_type, title, description, image_url, retail_price, print_provider_id, back_logo_url)
+    return _get().create_product(product_type, title, description, image_url, retail_price, print_provider_id, back_logo_url, archetype)
 
 
 def delete_product(printify_product_id: str) -> None:

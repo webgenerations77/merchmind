@@ -11,7 +11,7 @@ from app.database import get_db
 from app.models.design import Design
 from app.models.trend import Trend
 from app.models.feedback_log import FeedbackLog
-from app.schemas.design import DesignOut, DesignQueueItem, DelayRequest, RegenerateRequest
+from app.schemas.design import DesignOut, DesignQueueItem, DelayRequest, RegenerateRequest, ChatMessageIn, SuggestRegenerateRequest
 from app.routers.auth import verify_api_key
 
 router = APIRouter(prefix="/designs", tags=["designs"])
@@ -55,16 +55,46 @@ def get_review_queue(
         data = item.model_dump()
         if d.collection:
             data["collection_name"] = d.collection.name
-        primary_pt = d.primary_product_type or "tshirt"
+        primary_pt = d.primary_product_type
+        if not primary_pt:
+            primary_pt = d.products[0].product_type if d.products else "tshirt"
+            logger.warning("Design %s missing primary_product_type, defaulting to %s", d.id, primary_pt)
         primary_product = next((p for p in d.products if p.product_type == primary_pt and p.mockup_urls), None)
         if primary_product and primary_product.mockup_urls.get("front"):
             data["primary_mockup_url"] = primary_product.mockup_urls["front"]
+        data["product_count"] = len(d.products)
         if d.collection_id:
             data["source"] = "collection"
         elif d.trend_id:
             data["source"] = "batch"
         else:
             data["source"] = "drews_mind"
+        result.append(data)
+    return _envelope(result)
+
+
+@router.get("/featured")
+def get_featured_designs(db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """Return all featured designs (any status except deleted), newest-featured first."""
+    designs = (
+        db.query(Design)
+        .options(joinedload(Design.trend), joinedload(Design.products))
+        .filter(Design.is_featured == True, Design.is_deleted == False)
+        .order_by(Design.featured_at.desc().nullslast(), Design.created_at.desc())
+        .all()
+    )
+    result = []
+    for d in designs:
+        item = DesignQueueItem.model_validate(d)
+        if d.trend:
+            item.claude_reasoning = d.trend.claude_reasoning
+        data = item.model_dump()
+        primary_pt = d.primary_product_type or "tshirt"
+        primary_product = next((p for p in d.products if p.product_type == primary_pt and p.mockup_urls), None)
+        if primary_product and primary_product.mockup_urls.get("front"):
+            data["primary_mockup_url"] = primary_product.mockup_urls["front"]
+        data["product_count"] = len(d.products)
+        data["featured_at"] = d.featured_at.isoformat() if d.featured_at else None
         result.append(data)
     return _envelope(result)
 
@@ -79,7 +109,16 @@ def get_design(design_id: UUID, db: Session = Depends(get_db), _: str = Depends(
     )
     if not design:
         raise HTTPException(404, f"Design {design_id} not found")
-    return _envelope(DesignOut.model_validate(design).model_dump())
+    data = DesignOut.model_validate(design).model_dump()
+    if design.trend:
+        data["trend_source"] = design.trend.source
+        data["trend_signal"] = design.trend.raw_signal
+        data["trend_source_metadata"] = design.trend.source_metadata or {}
+        data["trend_score"] = design.trend.trend_score
+        data["viability_score"] = design.trend.viability_score
+        data["final_score"] = design.trend.final_score
+        data["claude_reasoning"] = design.trend.claude_reasoning
+    return _envelope(data)
 
 
 @router.patch("/{design_id}/approve")
@@ -93,20 +132,18 @@ def approve_design(
     """
     Approve and publish a design.
 
-    State machine:
-      ready → approved      (all products published successfully)
-      ready → approved      (publish=false, approve without publishing)
-      ready → ready         (all products failed — stays in queue with error)
-      ready → approved      (partial success — approved but failed products flagged)
+    Design state machine (approve path):
+      ready/delayed → approved   (at least one product published, or publish=false)
+      ready/delayed → ready      (ALL products failed — stays in queue for retry)
+      approved      → 409        (already approved — rejected to prevent double-publish)
 
-    Products track their own publish_status: pending → live | failed.
-    Design status only moves to "approved" when at least one product publishes
-    (or publish=false). If every product fails, design stays "ready" so it
-    remains visible in the review queue for retry.
+    Product publish_status transitions: pending → live | failed.
     """
     design = db.query(Design).filter(Design.id == design_id, Design.is_deleted == False).first()
     if not design:
         raise HTTPException(404, f"Design {design_id} not found")
+    if design.status == "approved":
+        raise HTTPException(409, f"Design {design_id} is already approved")
 
     selected_types = set(product_types.split(",")) if product_types else None
 
@@ -260,6 +297,18 @@ def revisit_design(design_id: UUID, db: Session = Depends(get_db), _: str = Depe
     return _envelope({"id": str(design_id), "status": "ready", "revisit_count": design.revisit_count})
 
 
+@router.patch("/{design_id}/feature")
+def toggle_featured(design_id: UUID, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """Toggle the is_featured flag on a design."""
+    design = db.query(Design).filter(Design.id == design_id, Design.is_deleted == False).first()
+    if not design:
+        raise HTTPException(404, f"Design {design_id} not found")
+    design.is_featured = not design.is_featured
+    design.featured_at = datetime.utcnow() if design.is_featured else None
+    db.commit()
+    return _envelope({"id": str(design_id), "is_featured": design.is_featured, "featured_at": design.featured_at.isoformat() if design.featured_at else None})
+
+
 @router.patch("/{design_id}/delay")
 def delay_design(
     design_id: UUID,
@@ -275,6 +324,45 @@ def delay_design(
     _log_feedback(db, design, "delayed")
     db.commit()
     return _envelope({"id": str(design_id), "status": "delayed", "delayed_to_week": str(body.delayed_to_week)})
+
+
+@router.post("/{design_id}/retire")
+def retire_design(design_id: UUID, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """Retire all products for a design — unpublish from Printify/Shopify, mark as retired."""
+    design = db.query(Design).filter(Design.id == design_id, Design.is_deleted == False).first()
+    if not design:
+        raise HTTPException(404, f"Design {design_id} not found")
+
+    from app.models.product import Product
+    from app.services.publishing.printify_publisher import _get as _get_printify
+    svc = _get_printify()
+    products = db.query(Product).filter(Product.design_id == design_id).all()
+
+    retired = []
+    failed = []
+    for product in products:
+        if product.publish_status == "retired":
+            continue
+        if product.printify_product_id:
+            try:
+                svc.unpublish_product(product.printify_product_id)
+            except Exception as e:
+                logger.warning("Printify unpublish failed for %s: %s", product.product_type, e)
+                failed.append({"type": product.product_type, "error": str(e)})
+                continue
+        product.publish_status = "retired"
+        product.unpublished_at = datetime.utcnow()
+        retired.append(product.product_type)
+
+    _log_feedback(db, design, "retired")
+    db.commit()
+
+    logger.info("Design %s retired: %d products, %d failed", design_id, len(retired), len(failed))
+    return _envelope({
+        "id": str(design_id),
+        "retired": retired,
+        "failed": failed,
+    })
 
 
 @router.post("/{design_id}/regenerate")
@@ -310,6 +398,199 @@ def regenerate_design(
     return _envelope({"task_id": task.id, "message": "Regeneration queued"})
 
 
+@router.post("/{design_id}/chat")
+def chat_with_concept(
+    design_id: UUID,
+    body: ChatMessageIn,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key),
+):
+    """Send a message to Claude about this concept. Persists conversation on the design."""
+    design = (
+        db.query(Design)
+        .options(joinedload(Design.trend), joinedload(Design.products))
+        .filter(Design.id == design_id, Design.is_deleted == False)
+        .first()
+    )
+    if not design:
+        raise HTTPException(404, f"Design {design_id} not found")
+
+    history = list(design.conversation_history or [])
+
+    if not history:
+        system_context = _build_chat_context(design)
+        opening = _generate_opening_message(design)
+        history.append({"role": "assistant", "content": opening})
+
+    history.append({"role": "user", "content": body.message})
+
+    from app.utils.claude_client import claude
+    api_messages = [{"role": m["role"], "content": m["content"]} for m in history]
+    system_prompt = _build_chat_context(design)
+
+    text, _ = claude.sonnet(
+        "suggest_chat",
+        api_messages,
+        system=system_prompt,
+        max_tokens=1024,
+    )
+
+    history.append({"role": "assistant", "content": text})
+    design.conversation_history = history
+    db.commit()
+
+    return _envelope({"reply": text, "conversation": history})
+
+
+@router.post("/{design_id}/suggest-regenerate")
+def suggest_regenerate(
+    design_id: UUID,
+    body: SuggestRegenerateRequest,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key),
+):
+    """Synthesize conversation into a directive and regenerate the design."""
+    design = (
+        db.query(Design)
+        .options(joinedload(Design.trend), joinedload(Design.products))
+        .filter(Design.id == design_id, Design.is_deleted == False)
+        .first()
+    )
+    if not design:
+        raise HTTPException(404, f"Design {design_id} not found")
+
+    from app.utils.claude_client import claude
+
+    synth_messages = [{"role": m["role"], "content": m["content"]} for m in body.conversation]
+    synth_messages.append({
+        "role": "user",
+        "content": (
+            "Based on our conversation, write a concise design directive that captures "
+            "all the changes I requested. This will be fed directly to the image generation "
+            "pipeline. Include: desired concept changes, style/mood adjustments, text changes, "
+            "and any archetype preference. Reply with ONLY the directive, no preamble."
+        ),
+    })
+
+    directive, _ = claude.sonnet(
+        "suggest_synthesize",
+        synth_messages,
+        system=_build_chat_context(design),
+        max_tokens=512,
+    )
+
+    design.conversation_history = body.conversation
+    new_version = (design.version or 1) + 1
+    design.version = new_version
+    _log_feedback(db, design, "suggest_regenerated", edited_prompt=directive)
+    db.commit()
+
+    from app.tasks.batch_pipeline import _generate_design_for_trend
+    from app.models.settings import AppSettings
+    settings_row = db.query(AppSettings).first()
+
+    task = _generate_design_for_trend.delay(
+        str(design.trend_id),
+        str(design.batch_id),
+        {
+            "quality_threshold": settings_row.quality_threshold if settings_row else 28,
+            "trend_boost_max": float(settings_row.trend_boost_max) if settings_row else 0.20,
+            "base_markup": settings_row.base_markup if settings_row else {},
+            "floor_prices": settings_row.floor_prices if settings_row else {},
+            "custom_prompt": directive,
+        },
+    )
+
+    return _envelope({
+        "task_id": task.id,
+        "directive": directive,
+        "version": new_version,
+    })
+
+
+@router.delete("/{design_id}/chat")
+def clear_chat(design_id: UUID, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """Clear the conversation history for a design."""
+    design = db.query(Design).filter(Design.id == design_id, Design.is_deleted == False).first()
+    if not design:
+        raise HTTPException(404, f"Design {design_id} not found")
+    design.conversation_history = None
+    db.commit()
+    return _envelope({"id": str(design_id), "cleared": True})
+
+
+def _build_chat_context(design: Design) -> str:
+    """Build the system prompt with full concept context for the chat."""
+    parts = [
+        "You are a creative director at a print-on-demand merch company called Wear it Forward.",
+        "You're discussing a design concept with Drew, the founder, who wants to iterate on it before approving.",
+        "Be conversational, concise, and creative. Suggest specific improvements when asked.",
+        "You have full context on this concept:",
+        "",
+        f"Concept: {design.concept_name}",
+        f"Archetype: {design.archetype}",
+        f"Quality Score: {design.quality_score}/40",
+    ]
+    if design.quality_breakdown:
+        scores = ", ".join(f"{k}: {v}/10" for k, v in design.quality_breakdown.items())
+        parts.append(f"Quality Breakdown: {scores}")
+    if design.primary_text:
+        parts.append(f"Primary Text: \"{design.primary_text}\"")
+    if design.secondary_text:
+        parts.append(f"Secondary Text: \"{design.secondary_text}\"")
+    if design.tagline:
+        parts.append(f"Tagline: \"{design.tagline}\"")
+    if design.image_prompt:
+        parts.append(f"Image Prompt Used: {design.image_prompt}")
+    if design.shopify_title:
+        parts.append(f"Shopify Title: {design.shopify_title}")
+    if design.font_pair:
+        parts.append(f"Font Pair: {design.font_pair}")
+    products = design.products
+    if products:
+        types = [p.product_type for p in products]
+        parts.append(f"Product Types: {', '.join(types)}")
+    if design.primary_product_type:
+        parts.append(f"Primary Product Type: {design.primary_product_type}")
+    if design.primary_product_type_reasoning:
+        parts.append(f"Primary Product Reasoning: {design.primary_product_type_reasoning}")
+    if design.trend:
+        parts.append(f"Trend Source: {design.trend.source}")
+        parts.append(f"Trend Signal: \"{design.trend.raw_signal}\"")
+        if design.trend.claude_reasoning:
+            parts.append(f"Trend Reasoning: {design.trend.claude_reasoning}")
+    return "\n".join(parts)
+
+
+def _generate_opening_message(design: Design) -> str:
+    """Generate Claude's opening message for the chat drawer."""
+    source_desc = ""
+    if design.trend:
+        source_map = {"google": "Google Trends", "reddit": "Reddit", "twitter": "Twitter/X", "seasonal": "the seasonal calendar"}
+        source_desc = f" based on a signal from {source_map.get(design.trend.source, design.trend.source)}"
+        if design.trend.raw_signal:
+            source_desc += f" (\"{design.trend.raw_signal[:80]}\")"
+
+    archetype_map = {
+        "illustration": "a visual illustration",
+        "hybrid": "a hybrid image-and-text design",
+        "text_icon": "a text-with-icon design",
+        "typographic": "a typography-focused design",
+        "text_only": "a text-only design",
+    }
+    style_desc = archetype_map.get(design.archetype, f"a {design.archetype} design")
+
+    parts = [f"I created \"{design.concept_name}\"{source_desc}."]
+    parts.append(f"It's {style_desc} that scored {design.quality_score}/40 on quality.")
+
+    if design.primary_text:
+        parts.append(f"The main text reads: \"{design.primary_text}\".")
+
+    parts.append("What would you like to change or explore?")
+
+    return " ".join(parts)
+
+
 @router.get("/{design_id}/versions")
 def get_design_versions(design_id: UUID, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
     design = db.query(Design).filter(Design.id == design_id).first()
@@ -324,6 +605,22 @@ def get_design_versions(design_id: UUID, db: Session = Depends(get_db), _: str =
 def get_preferences(db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
     from app.services.design.preference_learner import get_preference_summary
     return _envelope(get_preference_summary(db))
+
+
+@router.post("/preview-prompts")
+def preview_product_prompts(
+    concept: str,
+    archetype: str = "illustration",
+    niche: str = "",
+    _: str = Depends(verify_api_key),
+):
+    """
+    Generate and return format-specific prompts for ALL product types.
+    Use this to review how prompts differ per product before running a batch.
+    """
+    from app.services.design.prompt_builder import preview_all_product_prompts
+    results = preview_all_product_prompts(concept, archetype, niche, concept)
+    return _envelope(results)
 
 
 def _log_feedback(db, design: Design, action: str, edited_prompt: str = None):

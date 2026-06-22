@@ -30,7 +30,7 @@ class Product(Base):
     mockup_urls = Column(JSONB, default=dict)
     publish_status = Column(
         SAEnum(
-            "pending", "printify_only", "live", "failed", "unpublished",
+            "pending", "printify_only", "live", "failed", "unpublished", "retired",
             name="publish_status",
         ),
         nullable=False,

@@ -8,6 +8,7 @@ import {
   unarchiveDesign as apiUnarchive,
   revisitDesign as apiRevisit,
   delayDesign as apiDelay,
+  toggleFeatured as apiToggleFeatured,
   type ApproveResult,
 } from '../api/designs';
 
@@ -29,6 +30,7 @@ interface ReviewState {
   unarchiveDesign: (id: string) => Promise<void>;
   revisitDesign: (id: string) => Promise<void>;
   delayDesign: (id: string, week: string) => Promise<void>;
+  toggleFeatured: (id: string) => Promise<void>;
   goToNext: () => void;
   goToPrevious: () => void;
   goToIndex: (index: number) => void;
@@ -119,6 +121,17 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
       await apiDelay(id, week);
     } catch {
       set((s) => { const { [id]: _, ...rest } = s.sessionActions; return { sessionActions: rest }; });
+    }
+  },
+
+  toggleFeatured: async (id: string) => {
+    const toggle = (items: DesignQueueItem[]) =>
+      items.map((d) => d.id === id ? { ...d, is_featured: !d.is_featured } : d);
+    set((s) => ({ queue: toggle(s.queue), archivedQueue: toggle(s.archivedQueue) }));
+    try {
+      await apiToggleFeatured(id);
+    } catch {
+      set((s) => ({ queue: toggle(s.queue), archivedQueue: toggle(s.archivedQueue) }));
     }
   },
 

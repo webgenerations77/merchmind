@@ -34,3 +34,23 @@ export function formatProductType(type: string): string {
 export function formatStatus(status: string): string {
   return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+const SMALL_WORDS = new Set([
+  'a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor',
+  'of', 'in', 'on', 'at', 'to', 'by', 'is', 'it', 'vs',
+]);
+
+export function toTitleCase(text: string): string {
+  if (!text) return text;
+  return text
+    .split(' ')
+    .map((word, i) => {
+      if (!word) return word;
+      if (word.length > 1 && word === word.toUpperCase()) return word;
+      if (word !== word.toLowerCase() && word[0] === word[0].toLowerCase()) return word;
+      const lower = word.toLowerCase();
+      if (i > 0 && SMALL_WORDS.has(lower)) return lower;
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(' ');
+}

@@ -24,6 +24,8 @@ class SettingsOut(BaseModel):
     back_logo_products: Optional[list]
     shopify_store_url: Optional[str]
     active_clusters: Optional[list]
+    marketing_generation_enabled: bool
+    social_links: Optional[dict]
     updated_at: datetime
 
 
@@ -41,3 +43,5 @@ class SettingsUpdate(BaseModel):
     back_logo_products: Optional[list] = None
     shopify_store_url: Optional[str] = None
     active_clusters: Optional[list] = None
+    marketing_generation_enabled: Optional[bool] = None
+    social_links: Optional[dict] = None

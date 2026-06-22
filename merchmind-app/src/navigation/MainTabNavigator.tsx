@@ -129,14 +129,6 @@ export function MainTabNavigator() {
       }}
     >
       <Tab.Screen
-        name="HomeTab"
-        component={HomeStackNavigator}
-        options={{
-          tabBarLabel: 'Home',
-          tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} />,
-        }}
-      />
-      <Tab.Screen
         name="ReviewTab"
         component={ReviewStackNavigator}
         options={{
@@ -148,6 +140,14 @@ export function MainTabNavigator() {
             </View>
           ),
           tabBarBadge: pendingCount > 0 ? pendingCount : undefined,
+        }}
+      />
+      <Tab.Screen
+        name="HomeTab"
+        component={HomeStackNavigator}
+        options={{
+          tabBarLabel: 'Home',
+          tabBarIcon: ({ focused }) => <TabIcon emoji="🏠" focused={focused} />,
         }}
       />
       <Tab.Screen

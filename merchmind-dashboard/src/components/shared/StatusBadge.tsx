@@ -10,6 +10,8 @@ const colorMap: Record<string, string> = {
   published: 'bg-approve/20 text-approve',
   live: 'bg-approve/20 text-approve',
   failed: 'bg-confidence-low/20 text-confidence-low',
+  retired: 'bg-text-tertiary/20 text-text-tertiary',
+  unpublished: 'bg-text-tertiary/20 text-text-tertiary',
   complete: 'bg-approve/20 text-approve',
   running: 'bg-regen/20 text-regen',
 };

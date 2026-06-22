@@ -33,9 +33,10 @@ def publish_approved_products(self):
         approved_designs = (
             db.query(Design)
             .filter(Design.status == "approved", Design.is_deleted == False)
-            .order_by(Design.approved_at.asc())
+            .order_by(Design.is_featured.desc(), Design.approved_at.asc())
             .all()
         )
+        # TODO: increase ad spend allocation for featured items
         logger.info(f"Publishing {len(approved_designs)} approved designs")
 
         for design in approved_designs:
@@ -141,7 +142,8 @@ def _publish_single_design(design: Design, db):
 
 
 def _schedule_marketing(design: Design, db):
-    """Mark approved marketing assets as scheduled."""
+    """Mark approved marketing assets as scheduled. Featured designs get priority scheduling."""
+    # TODO: increase ad spend allocation for featured items
     assets = (
         db.query(MarketingAsset)
         .filter(

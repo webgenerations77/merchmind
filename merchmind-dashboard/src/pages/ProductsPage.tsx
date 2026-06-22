@@ -1,26 +1,60 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { listProducts, updateProduct, unpublishProduct, retryPublish } from '../api/products';
-import { getDesign } from '../api/designs';
+import { getDesign, retireDesign } from '../api/designs';
 import type { ProductOut, DesignOut } from '../types/api';
 import StatusBadge from '../components/shared/StatusBadge';
 import ConfidenceBadge from '../components/shared/ConfidenceBadge';
-import ClickableImage from '../components/shared/ClickableImage';
-import { formatCurrency, formatProductType, formatDate } from '../utils/formatters';
+import MockupTabs from '../components/shared/MockupTabs';
+import { formatCurrency, formatProductType, formatDate, toTitleCase } from '../utils/formatters';
 import { calculateCostBreakdown } from '../utils/profitCalc';
 
 const filters = ['all', 'pending', 'live', 'published', 'failed', 'unpublished'] as const;
 
-function ProductDetail({ product, onBack, onUpdate }: { product: ProductOut; onBack: () => void; onUpdate: (p: ProductOut) => void }) {
+function ProductDetail({ product, allProducts, onBack, onUpdate }: {
+  product: ProductOut;
+  allProducts: ProductOut[];
+  onBack: () => void;
+  onUpdate: (products: ProductOut[]) => void;
+}) {
   const [design, setDesign] = useState<DesignOut | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [retireError, setRetireError] = useState<string | null>(null);
+
+  const designProducts = allProducts.filter((p) => p.design_id === product.design_id);
 
   useEffect(() => {
     getDesign(product.design_id).then(setDesign).catch(() => null).finally(() => setLoading(false));
   }, [product.design_id]);
 
-  const breakdown = calculateCostBreakdown(product.retail_price, product.printify_base_cost);
+  const hasLiveProducts = designProducts.some((p) => p.publish_status === 'live' || p.publish_status === 'printify_only');
+  const allRetired = designProducts.every((p) => p.publish_status === 'retired');
+
+  const handleRetire = async () => {
+    if (!confirm('Retire all products for this design? They will be unpublished from Shopify but records are preserved.')) return;
+    setActionLoading(true);
+    setRetireError(null);
+    try {
+      const result = await retireDesign(product.design_id);
+      if (result.failed.length > 0) {
+        setRetireError(`Failed to retire: ${result.failed.map((f) => `${formatProductType(f.type)} (${f.error.slice(0, 60)})`).join(', ')}`);
+      }
+      const retiredTypes = new Set(result.retired);
+      const updated = allProducts.map((p) => {
+        if (p.design_id === product.design_id && retiredTypes.has(p.product_type)) {
+          return { ...p, publish_status: 'retired', unpublished_at: new Date().toISOString() };
+        }
+        return p;
+      });
+      onUpdate(updated);
+    } catch {
+      setRetireError('Failed to retire products. Please try again.');
+    }
+    setActionLoading(false);
+  };
+
+  if (loading) return <div className="flex items-center justify-center h-64 text-text-secondary">Loading design...</div>;
 
   return (
     <div>
@@ -28,168 +62,109 @@ function ProductDetail({ product, onBack, onUpdate }: { product: ProductOut; onB
         &larr; Back to products
       </button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
-          <div className="bg-bg-secondary border border-border rounded-xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-xl font-bold text-text-primary">{formatProductType(product.product_type)}</h2>
-                {design && <p className="text-sm text-text-secondary mt-0.5">{design.concept_name}</p>}
-              </div>
-              <StatusBadge status={product.publish_status} />
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <MockupTabs
+          products={designProducts}
+          designImageUrl={design?.processed_image_url ?? null}
+          designName={design?.concept_name ?? product.product_type}
+          defaultProductType={product.product_type}
+          imageApiUsed={design?.image_api_used}
+        />
 
-            {loading ? (
-              <div className="h-48 flex items-center justify-center text-text-tertiary">Loading design...</div>
-            ) : design ? (
-              <div className="flex gap-4">
-                {product.mockup_urls && Object.keys(product.mockup_urls).length > 0 ? (
-                  <div className="flex gap-2 shrink-0">
-                    {['front', 'back'].filter((pos) => (product.mockup_urls as Record<string, string>)[pos]).map((pos) => (
-                      <ClickableImage key={pos} src={(product.mockup_urls as Record<string, string>)[pos]} alt={`${pos} mockup`} className="w-48 h-48 object-cover rounded-lg" />
-                    ))}
-                  </div>
-                ) : design.processed_image_url ? (
-                  <ClickableImage src={design.processed_image_url} alt={design.concept_name} className="w-48 h-48 object-cover rounded-lg shrink-0" />
-                ) : (
-                  <div className="w-48 h-48 bg-bg-tertiary rounded-lg flex items-center justify-center text-text-tertiary text-sm shrink-0">
-                    Text Only
-                  </div>
-                )}
-                <div className="space-y-2 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <ConfidenceBadge score={design.quality_score} />
-                    <StatusBadge status={design.archetype} />
-                    {design.version > 1 && <span className="text-xs text-text-tertiary">v{design.version}</span>}
-                  </div>
-                  {design.shopify_title && (
-                    <p className="text-sm text-text-primary font-medium">{design.shopify_title}</p>
-                  )}
-                  {design.font_pair && (
-                    <p className="text-xs text-text-tertiary">Font: {design.font_pair}</p>
-                  )}
-                  {design.shopify_tags && design.shopify_tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {design.shopify_tags.slice(0, 10).map((tag) => (
-                        <span key={tag} className="px-1.5 py-0.5 bg-bg-tertiary rounded text-xs text-text-tertiary">{tag}</span>
-                      ))}
-                      {design.shopify_tags.length > 10 && (
-                        <span className="text-xs text-text-tertiary">+{design.shopify_tags.length - 10} more</span>
-                      )}
-                    </div>
-                  )}
-                </div>
+        <div className="space-y-4">
+          <div>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold text-text-primary">
+                {design ? toTitleCase(design.concept_name) : formatProductType(product.product_type)}
+              </h2>
+              {allRetired && (
+                <span className="px-2.5 py-1 rounded-lg text-xs font-semibold uppercase bg-text-tertiary/20 text-text-tertiary">Retired</span>
+              )}
+            </div>
+            {design && (
+              <div className="flex items-center gap-2 mt-2">
+                <ConfidenceBadge score={design.quality_score} />
+                <StatusBadge status={design.archetype} />
+                <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase ${
+                  design.classification === 'collection'
+                    ? 'bg-purple-500/20 text-purple-400'
+                    : 'bg-accent/20 text-accent'
+                }`}>
+                  {design.classification === 'collection' ? 'Collection' : 'Design Idea'}
+                </span>
+                {design.version > 1 && <span className="text-xs text-text-tertiary">v{design.version}</span>}
               </div>
-            ) : (
-              <p className="text-sm text-text-tertiary">Design not found</p>
             )}
           </div>
 
-          {design?.shopify_description && (
-            <div className="bg-bg-secondary border border-border rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-text-primary mb-2">Listing Description</h3>
-              <p className="text-sm text-text-secondary whitespace-pre-line max-h-64 overflow-y-auto">{design.shopify_description}</p>
+          <div className="p-3 bg-bg-secondary rounded-lg border border-border">
+            <p className="text-xs text-text-tertiary mb-2">Products ({designProducts.length})</p>
+            <div className="space-y-2">
+              {designProducts.map((p) => {
+                const b = calculateCostBreakdown(p.retail_price, p.printify_base_cost);
+                return (
+                  <div key={p.id} className={`flex items-center justify-between ${p.publish_status === 'retired' ? 'opacity-50' : ''}`}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-text-primary">{formatProductType(p.product_type)}</span>
+                      <StatusBadge status={p.publish_status} />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-text-tertiary">COGS {formatCurrency(b.totalCogs)}</span>
+                      <span className="text-xs text-approve">Net {formatCurrency(b.netProfit)}</span>
+                      <span className={`text-xs font-medium ${b.netMargin >= 30 ? 'text-approve' : 'text-confidence-medium'}`}>{b.netMargin.toFixed(0)}%</span>
+                      <span className="text-sm font-medium text-accent">{formatCurrency(p.retail_price)}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          )}
+          </div>
 
           {design?.quality_breakdown && (
-            <div className="bg-bg-secondary border border-border rounded-xl p-5">
-              <h3 className="text-sm font-semibold text-text-primary mb-3">Quality Breakdown</h3>
-              <div className="space-y-2">
+            <div className="p-3 bg-bg-secondary rounded-lg border border-border">
+              <p className="text-xs text-text-tertiary mb-2">Quality Breakdown</p>
+              <div className="grid grid-cols-2 gap-2">
                 {Object.entries(design.quality_breakdown).map(([key, val]) => (
-                  <div key={key} className="flex items-center gap-3">
-                    <span className="text-xs text-text-secondary capitalize w-32">{key.replace(/_/g, ' ')}</span>
-                    <div className="flex-1 bg-bg-tertiary rounded-full h-2">
-                      <div
-                        className="bg-accent rounded-full h-2 transition-all"
-                        style={{ width: `${(val / 10) * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-semibold text-text-primary w-8 text-right">{val}/10</span>
+                  <div key={key} className="flex justify-between">
+                    <span className="text-xs text-text-secondary capitalize">{key.replace(/_/g, ' ')}</span>
+                    <span className="text-xs font-semibold text-text-primary">{val}/10</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
-        </div>
 
-        <div className="space-y-4">
-          <div className="bg-bg-secondary border border-border rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-text-primary mb-4">Pricing</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-text-secondary">Markup ({product.base_markup}x)</span>
-                <span className="text-sm text-text-primary">{formatCurrency(product.printify_base_cost * product.base_markup)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-text-secondary">Trend Adjustment</span>
-                <span className="text-sm text-text-primary">+{formatCurrency(product.trend_adjustment)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-text-tertiary">Floor Price</span>
-                <span className="text-sm text-text-tertiary">{formatCurrency(product.floor_price)}</span>
-              </div>
-              <div className="border-t border-border pt-2 flex justify-between">
-                <span className="text-sm font-semibold text-text-primary">Retail Price</span>
-                <span className="text-sm font-bold text-accent">{formatCurrency(breakdown.retailPrice)}</span>
+          {design?.shopify_title && (
+            <div className="p-3 bg-bg-secondary rounded-lg border border-border">
+              <p className="text-xs text-text-tertiary mb-1">Shopify Title</p>
+              <p className="text-sm text-text-primary">{design.shopify_title}</p>
+            </div>
+          )}
+
+          {design?.shopify_description && (
+            <div className="p-3 bg-bg-secondary rounded-lg border border-border">
+              <p className="text-xs text-text-tertiary mb-1">Shopify Description</p>
+              <p className="text-sm text-text-secondary whitespace-pre-line max-h-48 overflow-y-auto">{design.shopify_description}</p>
+            </div>
+          )}
+
+          {design?.shopify_tags && design.shopify_tags.length > 0 && (
+            <div className="p-3 bg-bg-secondary rounded-lg border border-border">
+              <p className="text-xs text-text-tertiary mb-2">Tags</p>
+              <div className="flex flex-wrap gap-1">
+                {design.shopify_tags.map((tag) => (
+                  <span key={tag} className="px-2 py-0.5 bg-bg-tertiary rounded text-xs text-text-secondary">{tag}</span>
+                ))}
               </div>
             </div>
-          </div>
-
-          <div className="bg-bg-secondary border border-border rounded-xl p-5">
-            <h3 className="text-sm font-semibold text-text-primary mb-4">P&L Per Unit</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-approve">Revenue</span>
-                <span className="text-sm text-approve">{formatCurrency(breakdown.retailPrice)}</span>
-              </div>
-              <div className="border-t border-border pt-2 mt-1">
-                <p className="text-xs text-text-tertiary mb-2">COGS Breakdown</p>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-text-secondary pl-2">Printify (production + shipping)</span>
-                <span className="text-sm text-confidence-low">-{formatCurrency(breakdown.printifyCost)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-text-secondary pl-2">Credit card (2.9% + $0.30)</span>
-                <span className="text-sm text-confidence-low">-{formatCurrency(breakdown.paymentProcessingFee)}</span>
-              </div>
-              {breakdown.shopifyTxnFee > 0 && (
-                <div className="flex justify-between">
-                  <span className="text-sm text-text-secondary pl-2">Shopify transaction fee</span>
-                  <span className="text-sm text-confidence-low">-{formatCurrency(breakdown.shopifyTxnFee)}</span>
-                </div>
-              )}
-              <div className="flex justify-between border-t border-border pt-2">
-                <span className="text-sm text-text-secondary font-medium">Total COGS</span>
-                <span className="text-sm text-confidence-low font-medium">-{formatCurrency(breakdown.totalCogs)}</span>
-              </div>
-              <div className="flex justify-between border-t border-border pt-2 mt-1">
-                <span className="text-sm font-bold text-text-primary">Net Profit</span>
-                <span className={`text-sm font-bold ${breakdown.netProfit > 0 ? 'text-approve' : 'text-confidence-low'}`}>
-                  {formatCurrency(breakdown.netProfit)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-text-secondary">Net Margin</span>
-                <span className={`text-sm font-semibold ${breakdown.netMargin >= 30 ? 'text-approve' : breakdown.netMargin >= 15 ? 'text-confidence-medium' : 'text-confidence-low'}`}>
-                  {breakdown.netMargin.toFixed(1)}%
-                </span>
-              </div>
-              {product.margin_flag && (
-                <div className="mt-2 p-2 bg-confidence-low/10 rounded-lg">
-                  <p className="text-xs text-confidence-low font-medium">Low margin warning</p>
-                </div>
-              )}
-            </div>
-          </div>
+          )}
 
           <div className="bg-bg-secondary border border-border rounded-xl p-5">
             <h3 className="text-sm font-semibold text-text-primary mb-3">Details</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-text-secondary">Product ID</span>
-                <span className="text-text-tertiary font-mono text-xs">{product.id.slice(0, 8)}</span>
+                <span className="text-text-secondary">Design ID</span>
+                <span className="text-text-tertiary font-mono text-xs">{product.design_id.slice(0, 8)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-text-secondary">Created</span>
@@ -201,24 +176,35 @@ function ProductDetail({ product, onBack, onUpdate }: { product: ProductOut; onB
                   <span className="text-text-primary">{formatDate(product.published_at)}</span>
                 </div>
               )}
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Printify ID</span>
-                <span className="text-text-tertiary text-xs">{product.printify_product_id || 'Not published'}</span>
-              </div>
+              {product.unpublished_at && (
+                <div className="flex justify-between">
+                  <span className="text-text-secondary">Retired</span>
+                  <span className="text-text-primary">{formatDate(product.unpublished_at)}</span>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="bg-bg-secondary border border-border rounded-xl p-5">
             <h3 className="text-sm font-semibold text-text-primary mb-3">Actions</h3>
             <div className="space-y-2">
-              {product.publish_status === 'pending' && (
+              {hasLiveProducts && !allRetired && (
+                <button
+                  disabled={actionLoading}
+                  onClick={handleRetire}
+                  className="w-full py-2.5 rounded-lg bg-text-tertiary/15 text-text-secondary font-semibold text-sm hover:bg-text-tertiary/25 transition-colors disabled:opacity-50"
+                >
+                  {actionLoading ? 'Retiring...' : 'Retire Product'}
+                </button>
+              )}
+              {!hasLiveProducts && !allRetired && designProducts.some((p) => p.publish_status === 'pending') && (
                 <button
                   disabled={actionLoading}
                   onClick={async () => {
                     setActionLoading(true);
                     try {
                       const updated = await updateProduct(product.id, { publish_status: 'unpublished' });
-                      onUpdate(updated);
+                      onUpdate(allProducts.map((x) => x.id === updated.id ? updated : x));
                     } catch { /* ignore */ }
                     setActionLoading(false);
                   }}
@@ -227,53 +213,34 @@ function ProductDetail({ product, onBack, onUpdate }: { product: ProductOut; onB
                   Cancel (set to Unpublished)
                 </button>
               )}
-              {product.publish_status === 'live' && (
+              {designProducts.some((p) => p.publish_status === 'failed') && (
                 <button
                   disabled={actionLoading}
                   onClick={async () => {
                     setActionLoading(true);
                     try {
-                      await unpublishProduct(product.id);
-                      onUpdate({ ...product, publish_status: 'unpublished' });
-                    } catch { /* ignore */ }
-                    setActionLoading(false);
-                  }}
-                  className="w-full py-2 rounded-lg bg-confidence-low/15 text-confidence-low text-sm font-medium hover:bg-confidence-low/25 transition-colors disabled:opacity-50"
-                >
-                  Unpublish from Shopify
-                </button>
-              )}
-              {product.publish_status === 'failed' && (
-                <button
-                  disabled={actionLoading}
-                  onClick={async () => {
-                    setActionLoading(true);
-                    try {
-                      await retryPublish(product.id);
-                      onUpdate({ ...product, publish_status: 'pending' });
+                      const failedProduct = designProducts.find((p) => p.publish_status === 'failed')!;
+                      await retryPublish(failedProduct.id);
+                      onUpdate(allProducts.map((x) => x.id === failedProduct.id ? { ...x, publish_status: 'pending' } : x));
                     } catch { /* ignore */ }
                     setActionLoading(false);
                   }}
                   className="w-full py-2 rounded-lg bg-accent/15 text-accent text-sm font-medium hover:bg-accent/25 transition-colors disabled:opacity-50"
                 >
-                  Retry Publish
+                  Retry Failed Publish
                 </button>
               )}
-              {product.publish_status === 'unpublished' && (
-                <button
-                  disabled={actionLoading}
-                  onClick={async () => {
-                    setActionLoading(true);
-                    try {
-                      const updated = await updateProduct(product.id, { publish_status: 'pending' });
-                      onUpdate(updated);
-                    } catch { /* ignore */ }
-                    setActionLoading(false);
-                  }}
-                  className="w-full py-2 rounded-lg bg-approve/15 text-approve text-sm font-medium hover:bg-approve/25 transition-colors disabled:opacity-50"
-                >
-                  Re-queue for Publishing
-                </button>
+
+              {retireError && (
+                <div className="p-2 rounded-lg bg-confidence-low/10 border border-confidence-low/30">
+                  <p className="text-xs text-confidence-low">{retireError}</p>
+                </div>
+              )}
+
+              {allRetired && (
+                <div className="p-3 rounded-lg bg-text-tertiary/10 border border-border">
+                  <p className="text-xs text-text-tertiary text-center">All products have been retired</p>
+                </div>
               )}
             </div>
           </div>
@@ -287,12 +254,14 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<ProductOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [showRetired, setShowRetired] = useState(false);
   const [sortKey, setSortKey] = useState<'created_at' | 'retail_price' | 'product_type'>('created_at');
   const [selected, setSelected] = useState<ProductOut | null>(null);
   const location = useLocation();
 
-  useEffect(() => {
-    listProducts().then((p) => {
+  const loadProducts = () => {
+    setLoading(true);
+    listProducts(undefined, showRetired).then((p) => {
       setProducts(p);
       const navState = location.state as { selectedId?: string } | null;
       if (navState?.selectedId) {
@@ -300,13 +269,23 @@ export default function ProductsPage() {
         if (match) setSelected(match);
       }
     }).finally(() => setLoading(false));
-  }, [location.state]);
+  };
+
+  useEffect(() => {
+    loadProducts();
+  }, [showRetired, location.state]);
 
   if (selected) {
-    return <ProductDetail product={selected} onBack={() => setSelected(null)} onUpdate={(p) => {
-      setSelected(p);
-      setProducts((prev) => prev.map((x) => x.id === p.id ? p : x));
-    }} />;
+    return <ProductDetail
+      product={selected}
+      allProducts={products}
+      onBack={() => { setSelected(null); loadProducts(); }}
+      onUpdate={(updated) => {
+        setProducts(updated);
+        const refreshed = updated.find((p) => p.id === selected.id);
+        if (refreshed) setSelected(refreshed);
+      }}
+    />;
   }
 
   const filtered = filter === 'all' ? products : products.filter((p) => p.publish_status === filter);
@@ -322,7 +301,18 @@ export default function ProductsPage() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-text-primary">Products</h1>
-        <p className="text-sm text-text-secondary">{products.length} total</p>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showRetired}
+              onChange={(e) => setShowRetired(e.target.checked)}
+              className="w-4 h-4 rounded accent-accent"
+            />
+            <span className="text-sm text-text-secondary">Show Retired</span>
+          </label>
+          <p className="text-sm text-text-secondary">{products.length} total</p>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -338,6 +328,16 @@ export default function ProductsPage() {
             {f !== 'all' && ` (${products.filter((p) => p.publish_status === f).length})`}
           </button>
         ))}
+        {showRetired && (
+          <button
+            onClick={() => setFilter('retired')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              filter === 'retired' ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary hover:text-text-primary border border-border'
+            }`}
+          >
+            Retired ({products.filter((p) => p.publish_status === 'retired').length})
+          </button>
+        )}
       </div>
 
       <div className="bg-bg-secondary border border-border rounded-xl overflow-hidden">
@@ -365,11 +365,12 @@ export default function ProductsPage() {
           <tbody>
             {sorted.map((product) => {
               const b = calculateCostBreakdown(product.retail_price, product.printify_base_cost);
+              const isRetired = product.publish_status === 'retired';
               return (
                 <tr
                   key={product.id}
                   onClick={() => setSelected(product)}
-                  className="border-b border-border last:border-b-0 hover:bg-bg-tertiary/50 cursor-pointer"
+                  className={`border-b border-border last:border-b-0 hover:bg-bg-tertiary/50 cursor-pointer ${isRetired ? 'opacity-40' : ''}`}
                 >
                   <td className="px-4 py-3 text-sm text-text-primary">{formatProductType(product.product_type)}</td>
                   <td className="px-4 py-3 text-sm text-text-primary font-medium">{formatCurrency(product.retail_price)}</td>

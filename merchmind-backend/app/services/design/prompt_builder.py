@@ -1,6 +1,7 @@
 """
 Builds style-locked image generation prompts using Claude Sonnet.
 All prompts enforce flat design, white background, no text, screen-print safe.
+Product-type-specific format templates ensure compositional suitability per product.
 """
 import json
 import logging
@@ -17,6 +18,78 @@ _STYLE_LOCK = (
     "Print-ready quality at 300 DPI, sharp details, professional commercial design. "
     "No gradients bleeding into background, no subtle textures on background, pure white background only."
 )
+
+_PRODUCT_BACKGROUND_CONTEXT = {
+    "tshirt": {"bg": "dark", "text_color": "white or light colors", "reason": "printed on dark fabric"},
+    "hat": {"bg": "dark", "text_color": "white or light colors", "reason": "embroidered/printed on dark fabric"},
+    "mug": {"bg": "light", "text_color": "dark (near-black or deep saturated color)", "reason": "printed on white ceramic"},
+    "phone_case": {"bg": "light", "text_color": "dark (near-black or deep saturated color)", "reason": "printed on light case surface"},
+    "sticker": {"bg": "transparent", "text_color": "dark with outline/shadow for contrast", "reason": "die-cut on various surfaces"},
+    "poster": {"bg": "light", "text_color": "dark (near-black or deep rich color)", "reason": "printed on white paper stock"},
+}
+
+_PRODUCT_FORMAT_TEMPLATES = {
+    "tshirt": {
+        "aspect_ratio": "1:1",
+        "composition": (
+            "Centered chest-print composition with generous whitespace on all sides. "
+            "Design occupies roughly 60-70% of the canvas vertically. "
+            "Strong focal point designed for screen printing on fabric. "
+            "Bold, readable from arm's length."
+        ),
+        "prompt_keywords": "t-shirt print design, chest graphic, screen-print ready",
+    },
+    "mug": {
+        "aspect_ratio": "1:1",
+        "composition": (
+            "Wraparound-friendly composition — design works when viewed on a curved surface. "
+            "Horizontally balanced so it reads well from any angle. "
+            "No critical elements at extreme left/right edges. "
+            "Bold colors that pop against white ceramic."
+        ),
+        "prompt_keywords": "mug print design, wraparound graphic, ceramic-ready artwork",
+    },
+    "poster": {
+        "aspect_ratio": "3:4",
+        "composition": (
+            "Full bleed wall art composition — uses the entire canvas edge to edge. "
+            "Designed as a standalone art print for display at 18x24 or 24x36 inches. "
+            "Typographic hierarchy if text is involved. Rich detail that rewards close viewing. "
+            "Think gallery art print, not merch graphic."
+        ),
+        "prompt_keywords": "art print, wall art, poster design, full bleed illustration, gallery piece",
+    },
+    "phone_case": {
+        "aspect_ratio": "9:16",
+        "composition": (
+            "Vertical rectangular format designed for a phone case. "
+            "Central focal point with breathing room at edges for case curvature. "
+            "Bold and intentional at small scale — avoid intricate fine details. "
+            "Design accounts for camera cutout area at top."
+        ),
+        "prompt_keywords": "phone case design, vertical format, bold centered graphic, mobile accessory art",
+    },
+    "hat": {
+        "aspect_ratio": "1:1",
+        "composition": (
+            "Compact emblem or badge-style composition for embroidery/patch area. "
+            "Simple, recognizable at small scale (roughly 3x2 inches). "
+            "Minimal detail, strong silhouette, 2-4 colors maximum. "
+            "Think cap patch or embroidered logo — clean and iconic."
+        ),
+        "prompt_keywords": "hat patch design, embroidered emblem, cap badge, small-scale graphic",
+    },
+    "sticker": {
+        "aspect_ratio": "1:1",
+        "composition": (
+            "Die-cut sticker composition with a clear, clean outline. "
+            "Self-contained shape that works as a standalone element. "
+            "Vibrant colors, strong contrast, no background dependency. "
+            "Designed to look great at 3-4 inch size on laptops, water bottles, etc."
+        ),
+        "prompt_keywords": "die-cut sticker design, vinyl sticker art, laptop sticker, self-contained graphic",
+    },
+}
 
 _ARCHETYPE_TEMPLATES = {
     "illustration": (
@@ -49,16 +122,28 @@ _ARCHETYPE_TEMPLATES = {
 _SYSTEM = (
     "You are an expert merchandise graphic designer who creates bestselling "
     "print-on-demand designs. Write vivid, specific image generation prompts "
-    "that produce professional, eye-catching artwork people want to wear. "
+    "that produce professional, eye-catching artwork people want to wear or display. "
     "Focus on bold visual impact, emotional resonance, and commercial appeal. "
     "Never include text or words in image prompts — the design should be purely visual. "
     "Always specify: the exact subject, art style (flat design, vector, graphic art), "
-    "color palette (name 3-5 specific colors), composition (centered, symmetrical), "
+    "color palette (name 3-5 specific colors), composition, "
     "and rendering quality (sharp, clean edges, print-ready). "
+    "IMPORTANT: Tailor composition and format to the specific product type. "
+    "A poster should be full-bleed wall art; a phone case needs vertical format with central focus; "
+    "a hat needs a compact emblem; a sticker needs a die-cut shape. "
     "Avoid: photorealism, 3D renders, complex scenes, busy backgrounds, gradients. "
-    "Best merch designs are bold, simple, and iconic — like a logo or badge. "
     "Reply with only the prompt text, no extra commentary."
 )
+
+
+def get_product_format(product_type: str) -> dict:
+    """Return format template for a product type. Defaults to tshirt format."""
+    return _PRODUCT_FORMAT_TEMPLATES.get(product_type, _PRODUCT_FORMAT_TEMPLATES["tshirt"])
+
+
+def get_product_background(product_type: str) -> dict:
+    """Return background context (bg type, text color guidance) for a product type."""
+    return _PRODUCT_BACKGROUND_CONTEXT.get(product_type, _PRODUCT_BACKGROUND_CONTEXT["tshirt"])
 
 
 def build_image_prompt(
@@ -66,10 +151,12 @@ def build_image_prompt(
     archetype: str,
     niche: str = "",
     concept_name: str = "",
+    product_type: str = "tshirt",
 ) -> str | None:
     """
-    Build a style-locked image generation prompt for the given archetype.
+    Build a style-locked image generation prompt for the given archetype and product type.
     Returns None for text_only (no image generation needed).
+    The product_type determines compositional guidance (format, aspect ratio, keywords).
     """
     if archetype == "text_only":
         return None
@@ -78,14 +165,30 @@ def build_image_prompt(
     if template is None:
         return None
 
+    fmt = get_product_format(product_type)
+    bg_ctx = get_product_background(product_type)
+
+    text_color_instruction = ""
+    if archetype in ("hybrid", "text_icon", "typographic"):
+        text_color_instruction = (
+            f"\nTEXT COLOR REQUIREMENT:\n"
+            f"- This product has a {bg_ctx['bg']} background ({bg_ctx['reason']})\n"
+            f"- Any text or lettering elements must use {bg_ctx['text_color']}\n"
+            f"- Do NOT use white text on light backgrounds or dark text on dark backgrounds\n"
+        )
+
     context = (
         f"Trend topic: \"{raw_signal}\"\n"
         f"Concept name: \"{concept_name or raw_signal}\"\n"
         f"Niche category: {niche or 'general'}\n"
-        f"Design archetype: {archetype}\n\n"
-        f"Write an image generation prompt for a bestselling merchandise design.\n"
-        f"Think about what would look amazing on a t-shirt or hoodie — bold, eye-catching, "
-        f"something people would proudly wear.\n"
+        f"Design archetype: {archetype}\n"
+        f"Target product: {product_type}\n\n"
+        f"PRODUCT FORMAT REQUIREMENTS:\n"
+        f"- Composition: {fmt['composition']}\n"
+        f"- Style keywords: {fmt['prompt_keywords']}\n"
+        f"{text_color_instruction}\n"
+        f"Write an image generation prompt for this specific product format.\n"
+        f"The design must be PURPOSE-BUILT for {product_type} — not a generic graphic repurposed.\n"
         f"Be specific about the subject, visual style, color palette, and composition.\n"
         f"Must include these constraints: \"{_STYLE_LOCK}\"\n"
         f"Max 120 words."
@@ -100,38 +203,133 @@ def build_image_prompt(
         prompt = text.strip()
         if "white background" not in prompt.lower():
             prompt += f". {_STYLE_LOCK}"
+        logger.info(
+            "prompt_builder: product_type=%s archetype=%s prompt_preview='%s'",
+            product_type, archetype, prompt[:120],
+        )
         return prompt
     except Exception as e:
         logger.error(f"Prompt builder failed for '{raw_signal}': {e}")
-        # Fallback to template
         subject = concept_name or raw_signal
         return template.format(subject=subject, style_lock=_STYLE_LOCK)
 
 
+def preview_all_product_prompts(
+    raw_signal: str,
+    archetype: str,
+    niche: str = "",
+    concept_name: str = "",
+) -> dict:
+    """
+    Generate prompts for ALL product types for a given concept.
+    Returns {product_type: {prompt, aspect_ratio, composition, keywords, background}}.
+    Used for reviewing format-specific prompts before a batch run.
+    """
+    all_types = ["tshirt", "mug", "poster", "phone_case", "hat", "sticker"]
+    results = {}
+    for pt in all_types:
+        fmt = get_product_format(pt)
+        bg = get_product_background(pt)
+        prompt = build_image_prompt(raw_signal, archetype, niche, concept_name, product_type=pt)
+        results[pt] = {
+            "prompt": prompt,
+            "aspect_ratio": fmt["aspect_ratio"],
+            "composition": fmt["composition"],
+            "keywords": fmt["prompt_keywords"],
+            "background": bg["bg"],
+            "text_color": bg["text_color"],
+        }
+    return results
+
+
 def generate_text_content(raw_signal: str, archetype: str, niche: str = "") -> dict:
     """
-    Generate text content (slogans, phrases) for archetypes that include text.
-    Returns {primary_text, secondary_text, tagline}.
+    Generate text content for archetypes that include text.
+    Produces 3 candidates, scores each against merch-readiness criteria,
+    and selects the highest-scoring one.
+    Returns {primary_text, secondary_text, tagline, text_concept_scoring}.
     """
     prompt = (
         f"Trend topic: \"{raw_signal}\"\n"
         f"Niche: {niche or 'general'}\n"
         f"Design archetype: {archetype}\n\n"
-        "Generate compelling text for a print-on-demand design:\n"
-        "- primary_text: Main slogan or phrase (1-5 words, punchy)\n"
-        "- secondary_text: Supporting text or subheading (optional, can be null)\n"
-        "- tagline: Short descriptor (optional, can be null)\n\n"
-        "Make it emotionally resonant, community-specific, and merchandise-ready.\n"
-        "Reply with JSON: {\"primary_text\": \"...\", \"secondary_text\": null, \"tagline\": null}"
+        "Generate 3 text concept candidates for a print-on-demand design.\n\n"
+        "TEXT CONCEPT GUIDELINES:\n"
+        "- Single words or very short phrases (1-4 words MAXIMUM)\n"
+        "- Conceptually open — the reader fills in the meaning\n"
+        "- Emotionally resonant — something you'd want on your body\n"
+        "- Cultural currency — feels like something you'd see in an indie coffee shop, "
+        "a street art installation, or a design museum gift shop, NOT a motivational poster\n"
+        "- RIGHT direction examples: \"Yet\", \"Almost\", \"Still Here\", \"Enough\", \"Not Yet\", \"Keep\", \"More\"\n"
+        "- WRONG direction examples: \"Nature Heals Us\", \"Live Your Best Life\", \"Good Vibes Only\"\n\n"
+        "For each candidate, score it 1-10 on these criteria:\n"
+        "- brevity: Is it 1-4 words? Single words score highest.\n"
+        "- openness: Is the meaning conceptually open, not literal or prescriptive?\n"
+        "- resonance: Would someone want this on their body? Does it carry emotional weight?\n"
+        "- cultural_currency: Does it feel current, indie, design-forward — not corporate or corny?\n\n"
+        "Reply with JSON:\n"
+        "{\n"
+        "  \"candidates\": [\n"
+        "    {\n"
+        "      \"primary_text\": \"...\",\n"
+        "      \"secondary_text\": null,\n"
+        "      \"scores\": {\"brevity\": 9, \"openness\": 8, \"resonance\": 9, \"cultural_currency\": 8},\n"
+        "      \"total\": 34,\n"
+        "      \"rationale\": \"one sentence why this works or doesn't\"\n"
+        "    }\n"
+        "  ],\n"
+        "  \"selected\": 0\n"
+        "}"
     )
     try:
         text, _ = claude.sonnet(
             "text_content_generation",
             [{"role": "user", "content": prompt}],
-            max_tokens=128,
+            max_tokens=600,
         )
         match = re.search(r"\{.*\}", text, re.DOTALL)
-        return json.loads(match.group()) if match else {"primary_text": raw_signal, "secondary_text": None, "tagline": None}
+        if not match:
+            return {"primary_text": raw_signal, "secondary_text": None, "tagline": None, "text_concept_scoring": None}
+
+        data = json.loads(match.group())
+        candidates = data.get("candidates", [])
+        if not candidates:
+            return {"primary_text": raw_signal, "secondary_text": None, "tagline": None, "text_concept_scoring": None}
+
+        selected_idx = data.get("selected", 0)
+        if selected_idx >= len(candidates):
+            selected_idx = 0
+
+        best = max(candidates, key=lambda c: c.get("total", 0))
+        if best.get("total", 0) > candidates[selected_idx].get("total", 0):
+            selected_idx = candidates.index(best)
+
+        winner = candidates[selected_idx]
+        scoring = {
+            "candidates": [
+                {
+                    "text": c.get("primary_text", ""),
+                    "scores": c.get("scores", {}),
+                    "total": c.get("total", 0),
+                    "rationale": c.get("rationale", ""),
+                }
+                for c in candidates
+            ],
+            "selected_index": selected_idx,
+        }
+
+        logger.info(
+            "text_content: topic='%s' winner='%s' score=%d/%d candidates",
+            raw_signal[:40], winner.get("primary_text", "")[:30],
+            winner.get("total", 0), len(candidates),
+        )
+
+        return {
+            "primary_text": winner.get("primary_text"),
+            "secondary_text": winner.get("secondary_text"),
+            "tagline": None,
+            "text_concept_scoring": scoring,
+        }
     except Exception as e:
         logger.error(f"Text content generation failed for '{raw_signal}': {e}")
-        return {"primary_text": raw_signal, "secondary_text": None, "tagline": None}
+        return {"primary_text": raw_signal, "secondary_text": None, "tagline": None, "text_concept_scoring": None}

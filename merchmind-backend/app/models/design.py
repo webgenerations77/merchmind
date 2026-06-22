@@ -34,6 +34,7 @@ class Design(Base):
     primary_text = Column(Text, nullable=True)
     secondary_text = Column(Text, nullable=True)
     tagline = Column(Text, nullable=True)
+    text_concept_scoring = Column(JSONB, nullable=True)
     design_style = Column(Text, nullable=True)
     quality_score = Column(Integer, default=0)
     quality_breakdown = Column(JSONB, default=dict)
@@ -44,6 +45,10 @@ class Design(Base):
     shopify_tags = Column(ARRAY(Text), default=list)
     classification = Column(String(20), nullable=True, default="design_idea")
     primary_product_type = Column(String(30), nullable=True, default="tshirt")
+    primary_product_type_reasoning = Column(Text, nullable=True)
+    is_featured = Column(Boolean, default=False)
+    featured_at = Column(DateTime(timezone=True), nullable=True)
+    conversation_history = Column(JSONB, nullable=True)
     is_deleted = Column(Boolean, default=False)
     status = Column(
         SAEnum(

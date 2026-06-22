@@ -1,6 +1,8 @@
 """
 Batch management endpoints including SSE progress streaming.
 """
+import csv
+import io
 import json
 import asyncio
 import logging
@@ -8,15 +10,17 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from sqlalchemy.orm import Session
 import redis as redis_lib
 
 from app.database import get_db
 from app.models.batch import Batch
+from app.models.batch_item import BatchItem
 from app.models.design import Design
 from app.models.product import Product
-from app.schemas.batch import BatchOut
+from app.models.trend import Trend
+from app.schemas.batch import BatchOut, BatchItemOut, BatchDetailOut
 from app.routers.auth import verify_api_key
 from app.config import settings
 
@@ -101,10 +105,11 @@ def cancel_batch(
                 {Design.parent_design_id: None}, synchronize_session=False
             )
         db.query(Alert).filter(Alert.batch_id == batch_id).delete(synchronize_session=False)
+        item_count = db.query(BatchItem).filter(BatchItem.batch_id == batch_id).delete(synchronize_session=False)
         prod_count = len(design_ids)
         design_count = db.query(Design).filter(Design.batch_id == batch_id).delete(synchronize_session=False)
         trend_count = db.query(Trend).filter(Trend.batch_id == batch_id).delete(synchronize_session=False)
-        purged = {"designs_deleted": design_count, "products_deleted": prod_count, "trends_deleted": trend_count}
+        purged = {"designs_deleted": design_count, "products_deleted": prod_count, "trends_deleted": trend_count, "items_deleted": item_count}
 
     try:
         _redis.flushdb()
@@ -115,6 +120,181 @@ def cancel_batch(
     db.commit()
     logger.info("Batch %s cancelled (purge=%s) %s", batch_id, purge, purged)
     return _envelope({"batch_id": str(batch_id), "status": "failed", "stuck_designs_rejected": len(stuck), **purged})
+
+
+@router.get("/{batch_id}/detail")
+def get_batch_detail(batch_id: UUID, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """Full batch detail with per-item results."""
+    batch = db.query(Batch).filter(Batch.id == batch_id).first()
+    if not batch:
+        raise HTTPException(404, f"Batch {batch_id} not found")
+
+    items = db.query(BatchItem).filter(BatchItem.batch_id == batch_id).order_by(BatchItem.created_at).all()
+
+    item_dicts = []
+    for item in items:
+        d = BatchItemOut.model_validate(item).model_dump()
+        if item.design_id:
+            design = db.query(Design).filter(Design.id == item.design_id).first()
+            if design:
+                d["processed_image_url"] = design.processed_image_url
+        item_dicts.append(d)
+
+    success_count = sum(1 for i in items if i.status == "success")
+    failed_count = sum(1 for i in items if i.status == "failed")
+
+    return _envelope({
+        "batch": BatchOut.model_validate(batch).model_dump(),
+        "items": item_dicts,
+        "success_count": success_count,
+        "failed_count": failed_count,
+    })
+
+
+@router.post("/{batch_id}/retry-failed")
+def retry_failed_items(batch_id: UUID, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """Re-queue failed items from a batch for regeneration."""
+    batch = db.query(Batch).filter(Batch.id == batch_id).first()
+    if not batch:
+        raise HTTPException(404, f"Batch {batch_id} not found")
+
+    failed_items = db.query(BatchItem).filter(
+        BatchItem.batch_id == batch_id, BatchItem.status == "failed"
+    ).all()
+
+    if not failed_items:
+        return _envelope({"retried": 0, "message": "No failed items to retry"})
+
+    from app.models.settings import AppSettings
+    settings_row = db.query(AppSettings).first()
+    quality_threshold = settings_row.quality_threshold if settings_row else 28
+    trend_boost_max = float(settings_row.trend_boost_max) if settings_row else 0.20
+    base_markup = settings_row.base_markup if settings_row else {}
+    floor_prices = settings_row.floor_prices if settings_row else {}
+    back_logo_url = settings_row.back_logo_url if settings_row else None
+    back_logo_products = settings_row.back_logo_products if settings_row else ["tshirt", "hat"]
+    marketing_enabled = settings_row.marketing_generation_enabled if settings_row else False
+
+    from app.tasks.batch_pipeline import _generate_design_for_trend
+    retried = 0
+    for item in failed_items:
+        if not item.trend_id:
+            continue
+        trend = db.query(Trend).filter(Trend.id == item.trend_id).first()
+        if not trend:
+            continue
+
+        # Clean up old failed design if any
+        if item.design_id:
+            old_design = db.query(Design).filter(Design.id == item.design_id).first()
+            if old_design and old_design.status == "rejected":
+                db.query(Product).filter(Product.design_id == old_design.id).delete(synchronize_session=False)
+                db.delete(old_design)
+
+        # Create new batch item for the retry
+        new_item = BatchItem(
+            batch_id=batch_id,
+            trend_id=item.trend_id,
+            concept_name=item.concept_name,
+            status="running",
+            started_at=datetime.utcnow(),
+        )
+        db.add(new_item)
+        db.commit()
+        db.refresh(new_item)
+
+        try:
+            _generate_design_for_trend(
+                str(item.trend_id), str(batch_id), {
+                    "quality_threshold": quality_threshold,
+                    "trend_boost_max": trend_boost_max,
+                    "base_markup": base_markup,
+                    "floor_prices": floor_prices,
+                    "back_logo_enabled": True,
+                    "back_logo_url": back_logo_url,
+                    "back_logo_products": back_logo_products,
+                    "archetype_bias": "image_only",
+                    "marketing_generation_enabled": marketing_enabled,
+                    "_batch_item_id": str(new_item.id),
+                },
+            )
+            design = db.query(Design).filter(
+                Design.batch_id == batch_id, Design.trend_id == item.trend_id
+            ).order_by(Design.created_at.desc()).first()
+            if design:
+                new_item.design_id = design.id
+                products = db.query(Product).filter(Product.design_id == design.id).all()
+                new_item.product_types = [p.product_type for p in products]
+            new_item.status = "success"
+            new_item.completed_at = datetime.utcnow()
+            batch.approved_count = (batch.approved_count or 0) + 1
+            db.commit()
+            retried += 1
+        except Exception as e:
+            import traceback
+            new_item.status = "failed"
+            from app.tasks.batch_pipeline import _detect_failed_step, _summarize_error
+            new_item.failed_step = _detect_failed_step(e)
+            new_item.error_summary = _summarize_error(e, new_item.failed_step)
+            new_item.error_detail = traceback.format_exc()
+            new_item.completed_at = datetime.utcnow()
+            db.commit()
+            logger.error("Retry failed for trend %s: %s", item.trend_id, e)
+
+    return _envelope({"retried": retried, "total_failed": len(failed_items), "message": f"Retried {retried}/{len(failed_items)} failed items"})
+
+
+@router.get("/{batch_id}/export")
+def export_batch_log(batch_id: UUID, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """Export batch results as CSV."""
+    batch = db.query(Batch).filter(Batch.id == batch_id).first()
+    if not batch:
+        raise HTTPException(404, f"Batch {batch_id} not found")
+
+    items = db.query(BatchItem).filter(BatchItem.batch_id == batch_id).order_by(BatchItem.created_at).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Concept", "Status", "Failed Step", "Error", "Product Types", "Started", "Completed", "Duration (s)"])
+
+    for item in items:
+        duration = ""
+        if item.started_at and item.completed_at:
+            duration = str(round((item.completed_at - item.started_at).total_seconds(), 1))
+        writer.writerow([
+            item.concept_name,
+            item.status,
+            item.failed_step or "",
+            item.error_summary or "",
+            ", ".join(item.product_types or []),
+            item.started_at.isoformat() if item.started_at else "",
+            item.completed_at.isoformat() if item.completed_at else "",
+            duration,
+        ])
+
+    # If no batch items exist, fall back to designs linked to the batch
+    if not items:
+        designs = db.query(Design).filter(Design.batch_id == batch_id).all()
+        for d in designs:
+            products = db.query(Product).filter(Product.design_id == d.id).all()
+            writer.writerow([
+                d.concept_name,
+                "success" if d.status == "ready" else "failed",
+                "" if d.status == "ready" else "design_generation",
+                "" if d.status == "ready" else f"Status: {d.status}",
+                ", ".join(p.product_type for p in products),
+                d.created_at.isoformat() if d.created_at else "",
+                "",
+                "",
+            ])
+
+    csv_content = output.getvalue()
+    filename = f"batch_{str(batch_id)[:8]}_{batch.week_start}.csv"
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/{batch_id}/progress")

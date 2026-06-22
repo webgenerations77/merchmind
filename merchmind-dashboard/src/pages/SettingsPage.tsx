@@ -115,6 +115,66 @@ export default function SettingsPage() {
       </section>
 
       <section className="bg-bg-secondary border border-border rounded-xl p-5">
+        <h2 className="text-base font-semibold text-text-primary mb-4">Marketing Generation</h2>
+        <div className="flex items-center justify-between p-3 bg-bg-tertiary rounded-lg mb-4">
+          <div>
+            <p className="text-sm text-text-primary font-medium">
+              {settings.marketing_generation_enabled ? 'Marketing generation is active' : 'Marketing generation is currently paused'}
+            </p>
+            <p className="text-xs text-text-tertiary mt-0.5">
+              {settings.marketing_generation_enabled
+                ? 'New designs will generate marketing assets for all 5 channels'
+                : 'New designs will skip marketing asset generation during batches'}
+            </p>
+          </div>
+          <button
+            onClick={() => save({ marketing_generation_enabled: !settings.marketing_generation_enabled })}
+            className={`relative w-11 h-6 rounded-full transition-colors ${settings.marketing_generation_enabled ? 'bg-accent' : 'bg-bg-secondary border border-border'}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${settings.marketing_generation_enabled ? 'translate-x-5' : ''}`} />
+          </button>
+        </div>
+        {!settings.marketing_generation_enabled && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+            <span className="text-yellow-400 text-sm">&#9888;</span>
+            <span className="text-xs text-yellow-300">Paused — batch runs will skip marketing assets until re-enabled</span>
+          </div>
+        )}
+      </section>
+
+      <section className="bg-bg-secondary border border-border rounded-xl p-5">
+        <h2 className="text-base font-semibold text-text-primary mb-4">Social Media</h2>
+        <p className="text-xs text-text-tertiary mb-4">Profile links used by the marketing pipeline when publishing content</p>
+        <div className="space-y-3">
+          {([
+            { key: 'instagram_url' as const, label: 'Instagram', placeholder: 'https://instagram.com/yourprofile' },
+            { key: 'tiktok_url' as const, label: 'TikTok', placeholder: 'https://tiktok.com/@yourprofile' },
+            { key: 'pinterest_url' as const, label: 'Pinterest', placeholder: 'https://pinterest.com/yourprofile' },
+            { key: 'facebook_url' as const, label: 'Facebook', placeholder: 'https://facebook.com/yourpage' },
+          ]).map(({ key, label, placeholder }) => (
+            <div key={key}>
+              <label className="text-xs text-text-tertiary">{label}</label>
+              <input
+                type="url"
+                placeholder={placeholder}
+                value={(settings.social_links || {})[key] || ''}
+                onChange={(e) =>
+                  setSettings({
+                    ...settings,
+                    social_links: { ...{ instagram_url: '', tiktok_url: '', pinterest_url: '', facebook_url: '' }, ...settings.social_links, [key]: e.target.value },
+                  })
+                }
+                onBlur={() =>
+                  save({ social_links: { ...{ instagram_url: '', tiktok_url: '', pinterest_url: '', facebook_url: '' }, ...settings.social_links } })
+                }
+                className="mt-1 w-full px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm text-text-primary placeholder:text-text-tertiary/50"
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="bg-bg-secondary border border-border rounded-xl p-5">
         <h2 className="text-base font-semibold text-text-primary mb-4">Niche Clusters</h2>
         {clusters.length === 0 ? (
           <p className="text-sm text-text-tertiary">No clusters configured</p>

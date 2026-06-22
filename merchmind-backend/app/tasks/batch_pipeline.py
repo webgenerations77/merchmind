@@ -20,14 +20,16 @@ from app.models.marketing_asset import MarketingAsset
 from app.models.alert import Alert
 from app.models.niche_cluster import NicheCluster
 from app.models.settings import AppSettings
+from app.models.batch_item import BatchItem
 
 from app.services.intelligence import google_trends, reddit_scraper, twitter_scraper, seasonal_calendar
 from app.services.intelligence.trend_scorer import score_trend_signal, score_merch_viability, check_risk
 from app.services.design.archetype_classifier import classify_archetype, select_image_api
-from app.services.design.prompt_builder import build_image_prompt, generate_text_content
+from app.services.design.prompt_builder import build_image_prompt, generate_text_content, get_product_format
 from app.services.design.image_generator import generate_image
 from app.services.design.post_processor import process_image, image_to_bytes
-from app.services.design.quality_scorer import score_design_quality, assign_product_bundle, select_primary_product_type
+from app.services.design.quality_scorer import score_design_quality, assign_product_bundle, select_primary_product_type, default_primary_product_type
+from app.utils.text import to_title_case
 from app.services.design.text_compositor import composite_text_on_image, should_composite
 from app.services.design.font_selector import select_font_pair
 from app.services.design.shopify_copy_generator import generate_shopify_copy
@@ -104,6 +106,7 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
         floor_prices = settings_row.floor_prices if settings_row else {}
         back_logo_url = settings_row.back_logo_url if settings_row else None
         back_logo_products = settings_row.back_logo_products if settings_row else ["tshirt", "hat"]
+        marketing_generation_enabled = settings_row.marketing_generation_enabled if settings_row else False
 
         # Load active niche clusters
         active_clusters = db.query(NicheCluster).filter(NicheCluster.active == True).all()
@@ -237,6 +240,18 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
         _emit_progress(bid, 4, 8, f"Generating {len(queued_trends)} designs")
         approved_count = 0
         for i, trend in enumerate(queued_trends):
+            concept = to_title_case(trend.raw_signal[:100])
+            item = BatchItem(
+                batch_id=batch.id,
+                trend_id=trend.id,
+                concept_name=concept,
+                status="running",
+                started_at=datetime.utcnow(),
+            )
+            db.add(item)
+            db.commit()
+            db.refresh(item)
+
             try:
                 _emit_progress(
                     bid, 4, 8,
@@ -255,11 +270,35 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                     "back_logo_url": back_logo_url,
                     "back_logo_products": back_logo_products,
                     "archetype_bias": archetype_bias,
+                    "marketing_generation_enabled": marketing_generation_enabled,
+                    "_batch_item_id": str(item.id),
                 })
                 approved_count += 1
+
+                # Update item on success — pull design_id + product types from DB
+                db.refresh(item)
+                design = db.query(Design).filter(
+                    Design.batch_id == batch.id, Design.trend_id == trend.id
+                ).order_by(Design.created_at.desc()).first()
+                if design:
+                    item.design_id = design.id
+                    products = db.query(Product).filter(Product.design_id == design.id).all()
+                    item.product_types = [p.product_type for p in products]
+                item.status = "success"
+                item.completed_at = datetime.utcnow()
+                db.commit()
+
             except Exception as e:
                 logger.error(f"Design generation failed for trend {trend.id}: {e}")
                 _log_batch_error(batch, db, f"Design error for trend {trend.id}: {type(e).__name__}: {e}")
+
+                import traceback
+                item.status = "failed"
+                item.failed_step = _detect_failed_step(e)
+                item.error_summary = _summarize_error(e, item.failed_step or "design_generation")
+                item.error_detail = traceback.format_exc()
+                item.completed_at = datetime.utcnow()
+                db.commit()
 
         batch.approved_count = approved_count
         batch.status = "complete"
@@ -348,7 +387,7 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
         design = Design(
             trend_id=trend.id,
             batch_id=batch_id,
-            concept_name=trend.raw_signal[:100],
+            concept_name=to_title_case(trend.raw_signal[:100]),
             archetype=archetype,
             image_api_used=image_api,
             status="generating",
@@ -359,8 +398,13 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
         design_id = str(design.id)
         logger.info(f"design_task[{trend_id[:8]}] design created id={design_id[:8]}")
 
-        # 4c: Build image prompt (with preference learning)
-        image_prompt = build_image_prompt(trend.raw_signal, archetype, niche_name, design.concept_name)
+        # 4c: Build image prompt (with preference learning + product format)
+        primary_product = default_primary_product_type(archetype)
+        fmt = get_product_format(primary_product)
+        image_prompt = build_image_prompt(
+            trend.raw_signal, archetype, niche_name, design.concept_name,
+            product_type=primary_product,
+        )
         if image_prompt:
             from app.services.design.preference_learner import get_prompt_preferences
             pref_suffix = get_prompt_preferences(db)
@@ -368,15 +412,19 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                 image_prompt = f"{image_prompt} {pref_suffix}"
         design.image_prompt = image_prompt
         db.commit()
-        logger.info(f"design_task[{trend_id[:8]}] prompt built")
+        logger.info(
+            "design_task[%s] prompt built product_type=%s aspect=%s prompt='%s'",
+            trend_id[:8], primary_product, fmt["aspect_ratio"],
+            (image_prompt or "")[:150],
+        )
 
         # 4d: Generate image (if applicable)
         processed_url = None
         color_palette = []
         if image_api and image_prompt:
             try:
-                logger.info(f"design_task[{trend_id[:8]}] generating image via {image_api}...")
-                raw_bytes, api_used = generate_image(image_prompt, image_api)
+                logger.info(f"design_task[{trend_id[:8]}] generating image via {image_api} aspect={fmt['aspect_ratio']}...")
+                raw_bytes, api_used = generate_image(image_prompt, image_api, aspect_ratio=fmt["aspect_ratio"])
                 design.image_api_used = api_used
                 logger.info(f"design_task[{trend_id[:8]}] image generated via {api_used}, {len(raw_bytes)} bytes")
 
@@ -420,6 +468,7 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
         design.primary_text = text_content.get("primary_text")
         design.secondary_text = text_content.get("secondary_text")
         design.tagline = text_content.get("tagline")
+        design.text_concept_scoring = text_content.get("text_concept_scoring")
         db.commit()
 
         # 4f-2: Composite text onto image for hybrid/text_icon
@@ -443,6 +492,7 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                 logger.warning(f"Text compositing failed for design {design_id}: {comp_err}")
 
         # 4f-3: Generate text preview for text_only/typographic designs without images
+        light_variant_url = None
         if not processed_url and archetype in ("text_only", "typographic"):
             try:
                 preview_bytes = generate_text_preview(
@@ -450,11 +500,22 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                     secondary_text=text_content.get("secondary_text"),
                     font_pair=font_result["font_pair"],
                     color_palette=color_palette,
+                    dark_mode=True,
                 )
                 preview_path = storage.design_processed_path(design_id)
                 processed_url = storage.upload(preview_path, preview_bytes, "image/png")
                 design.processed_image_url = processed_url
+                light_bytes = generate_text_preview(
+                    primary_text=text_content.get("primary_text", trend.raw_signal),
+                    secondary_text=text_content.get("secondary_text"),
+                    font_pair=font_result["font_pair"],
+                    color_palette=color_palette,
+                    dark_mode=False,
+                )
+                light_path = storage.design_light_variant_path(design_id)
+                light_variant_url = storage.upload(light_path, light_bytes, "image/png")
                 db.commit()
+                logger.info(f"design_task[{trend_id[:8]}] text preview: dark + light variants generated")
             except Exception as preview_err:
                 logger.warning(f"Text preview generation failed for design {design_id}: {preview_err}")
 
@@ -507,9 +568,13 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                 db.commit()
                 break
 
-        # 4h: Assign product bundle + primary product type
+        # 4h: Assign product bundle + AI-driven primary product type
         product_types = assign_product_bundle(design.archetype, design.quality_breakdown or {})
-        design.primary_product_type = select_primary_product_type(design.archetype)
+        primary_result = select_primary_product_type(
+            design.concept_name, design.archetype, product_types, trend.raw_signal,
+        )
+        design.primary_product_type = primary_result["primary_product_type"]
+        design.primary_product_type_reasoning = primary_result["reasoning"]
         design.classification = "collection" if len(product_types) >= 3 else "design_idea"
 
         # 4i: Generate Shopify copy
@@ -559,18 +624,21 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
         image_url = design.processed_image_url or design.raw_image_url
         if image_url:
             from app.services.publishing.printify_publisher import create_product as printify_create, _get as _get_printify
+            from app.services.design.text_preview import _LIGHT_PRODUCT_TYPES
             for product in db.query(Product).filter(Product.design_id == design.id).all():
                 try:
                     product_label = product.product_type.replace("_", " ").title()
                     base_name = design.concept_name or design.shopify_title or "Design"
                     product_back_logo = back_logo_url if (back_logo_enabled and product.product_type in back_logo_products) else None
+                    use_image = light_variant_url if (light_variant_url and product.product_type in _LIGHT_PRODUCT_TYPES) else image_url
                     printify_id = printify_create(
                         product_type=product.product_type,
                         title=f"{base_name} — {product_label}",
                         description=design.shopify_description or "",
-                        image_url=image_url,
+                        image_url=use_image,
                         retail_price=float(product.retail_price),
                         back_logo_url=product_back_logo,
+                        archetype=design.archetype,
                     )
                     product.printify_product_id = printify_id
                     mockups = _get_printify().generate_mockups(printify_id)
@@ -601,7 +669,7 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                     try:
                         import httpx
                         img_resp = httpx.get(image_url, timeout=15)
-                        mockup_bytes = generate_mockup(product.product_type, img_resp.content)
+                        mockup_bytes = generate_mockup(product.product_type, img_resp.content, archetype=design.archetype)
                         if mockup_bytes:
                             mockup_path = storage.mockup_path(design_id, product.product_type, "front")
                             mockup_url = storage.upload(mockup_path, mockup_bytes)
@@ -611,8 +679,11 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                     except Exception as e:
                         logger.warning(f"design_task[{trend_id[:8]}] Pillow mockup failed for {product.product_type}: {e}")
 
-        # Step 7: Generate marketing assets
-        _generate_marketing_assets(design, trend, niche_name, product_types, db)
+        # Step 7: Generate marketing assets (if enabled)
+        if pipeline_settings.get("marketing_generation_enabled", False):
+            _generate_marketing_assets(design, trend, niche_name, product_types, db)
+        else:
+            logger.info("Marketing generation paused — skipping marketing assets for design %s", design.id)
 
         # Mark design ready
         design.status = "ready"
@@ -625,13 +696,31 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
         if design:
             design.status = "rejected"
             db.commit()
+
+        # Update batch item with failure details from inside the task
+        item_id = pipeline_settings.get("_batch_item_id")
+        if item_id:
+            import traceback as tb_mod
+            bi = db.query(BatchItem).filter(BatchItem.id == item_id).first()
+            if bi and bi.status == "running":
+                bi.status = "failed"
+                bi.failed_step = _detect_failed_step(e)
+                bi.error_summary = _summarize_error(e, bi.failed_step)
+                bi.error_detail = tb_mod.format_exc()
+                bi.completed_at = datetime.utcnow()
+                if design:
+                    bi.design_id = design.id
+                db.commit()
         raise
     finally:
         db.close()
 
 
 def _generate_marketing_assets(design: Design, trend: Trend, niche: str, product_types: list[str], db):
-    """Generate all 5 marketing channel assets in a single Claude call."""
+    """Generate all 5 marketing channel assets in a single Claude call.
+    Featured designs are processed first at the batch level and receive priority scheduling.
+    """
+    # TODO: increase ad spend allocation for featured items
     try:
         all_content = generate_all_marketing_assets(
             design.concept_name, trend.raw_signal, design.archetype, niche,
@@ -663,3 +752,37 @@ def _log_batch_error(batch: Batch, db, message: str):
     errors.append({"time": datetime.utcnow().isoformat(), "error": message})
     batch.error_log = errors
     db.commit()
+
+
+def _detect_failed_step(exc: Exception) -> str:
+    """Infer which pipeline step failed from the exception context."""
+    msg = str(exc).lower()
+    if "archetype" in msg or "classify" in msg:
+        return "archetype"
+    if "image" in msg or "flux" in msg or "dalle" in msg or "replicate" in msg or "openai" in msg:
+        return "image_generation"
+    if "quality" in msg or "score" in msg:
+        return "quality"
+    if "printify" in msg or "mockup" in msg:
+        return "mockups"
+    if "price" in msg or "pricing" in msg or "product" in msg:
+        return "products"
+    if "marketing" in msg:
+        return "marketing"
+    return "design_generation"
+
+
+def _summarize_error(exc: Exception, step: str) -> str:
+    """Turn an exception into a short human-readable summary."""
+    etype = type(exc).__name__
+    msg = str(exc)[:300]
+    summaries = {
+        "scoring": f"Trend scoring failed: {etype}",
+        "archetype": f"Archetype classification failed: {etype}",
+        "image_generation": f"Image generation failed: {etype} — {msg[:100]}",
+        "quality": f"Quality scoring failed: {etype}",
+        "products": f"Product creation failed: {etype}",
+        "mockups": f"Mockup generation failed: {etype}",
+        "marketing": f"Marketing asset generation failed: {etype}",
+    }
+    return summaries.get(step, f"{step} failed: {etype} — {msg[:100]}")

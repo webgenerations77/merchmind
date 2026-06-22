@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { listBatches, triggerBatch } from '../api/batches';
 import type { BatchOut } from '../types/api';
 import StatusBadge from '../components/shared/StatusBadge';
+import BatchDetailModal from '../components/batches/BatchDetailModal';
 import { formatDate, formatTimeAgo } from '../utils/formatters';
 
 export default function BatchesPage() {
   const [batches, setBatches] = useState<BatchOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
 
   const load = () => listBatches().then(setBatches).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
@@ -48,7 +49,8 @@ export default function BatchesPage() {
               <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">Week</th>
               <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">Status</th>
               <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">Ideas</th>
-              <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">Queued</th>
+              <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">Succeeded</th>
+              <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">Failed</th>
               <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">Duration</th>
               <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">When</th>
             </tr>
@@ -58,16 +60,24 @@ export default function BatchesPage() {
               const duration = batch.run_completed_at
                 ? `${Math.round((new Date(batch.run_completed_at).getTime() - new Date(batch.run_started_at).getTime()) / 1000)}s`
                 : '...';
+              const failedCount = batch.queued_count - batch.approved_count;
               return (
                 <tr
                   key={batch.id}
                   className="border-b border-border last:border-b-0 hover:bg-bg-tertiary/50 cursor-pointer"
-                  onClick={() => setExpandedId(expandedId === batch.id ? null : batch.id)}
+                  onClick={() => setSelectedBatchId(batch.id)}
                 >
                   <td className="px-4 py-3 text-sm text-text-primary">{formatDate(batch.week_start)}</td>
                   <td className="px-4 py-3"><StatusBadge status={batch.status} /></td>
                   <td className="px-4 py-3 text-sm text-text-secondary">{batch.total_ideas}</td>
-                  <td className="px-4 py-3 text-sm text-text-primary font-medium">{batch.queued_count}</td>
+                  <td className="px-4 py-3 text-sm text-approve font-medium">{batch.approved_count}</td>
+                  <td className="px-4 py-3 text-sm font-medium">
+                    {failedCount > 0 ? (
+                      <span className="text-confidence-low">{failedCount}</span>
+                    ) : (
+                      <span className="text-text-tertiary">0</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-sm text-text-secondary">{duration}</td>
                   <td className="px-4 py-3 text-sm text-text-tertiary">{formatTimeAgo(batch.run_started_at)}</td>
                 </tr>
@@ -77,23 +87,13 @@ export default function BatchesPage() {
         </table>
       </div>
 
-      {expandedId && (() => {
-        const batch = batches.find((b) => b.id === expandedId);
-        if (!batch || batch.error_log.length === 0) return null;
-        return (
-          <div className="mt-4 p-4 bg-bg-secondary border border-border rounded-xl">
-            <h3 className="text-sm font-semibold text-text-primary mb-2">Error Log</h3>
-            <div className="space-y-2">
-              {batch.error_log.map((err, i) => (
-                <div key={i} className="text-xs">
-                  <span className="text-text-tertiary">{formatTimeAgo(err.time)}</span>
-                  <span className="text-confidence-low ml-2">{err.error}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
+      {selectedBatchId && (
+        <BatchDetailModal
+          batchId={selectedBatchId}
+          onClose={() => setSelectedBatchId(null)}
+          onRefresh={load}
+        />
+      )}
     </div>
   );
 }

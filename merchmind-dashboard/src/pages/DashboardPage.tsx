@@ -3,15 +3,17 @@ import { Link, useNavigate } from 'react-router-dom';
 import { listAlerts, resolveAlert } from '../api/alerts';
 import { listBatches } from '../api/batches';
 import { listProducts } from '../api/products';
-import { getReviewQueue } from '../api/designs';
-import type { AlertOut, BatchOut, ProductOut } from '../types/api';
+import { getReviewQueue, getFeaturedDesigns, toggleFeatured } from '../api/designs';
+import type { AlertOut, BatchOut, ProductOut, DesignQueueItem } from '../types/api';
 import StatusBadge from '../components/shared/StatusBadge';
-import { formatTimeAgo, formatCurrency, formatProductType } from '../utils/formatters';
+import ConfidenceBadge from '../components/shared/ConfidenceBadge';
+import { formatTimeAgo, formatCurrency, formatProductType, toTitleCase } from '../utils/formatters';
 
 export default function DashboardPage() {
   const [alerts, setAlerts] = useState<AlertOut[]>([]);
   const [batches, setBatches] = useState<BatchOut[]>([]);
   const [products, setProducts] = useState<ProductOut[]>([]);
+  const [featured, setFeatured] = useState<DesignQueueItem[]>([]);
   const [queueCount, setQueueCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -22,8 +24,14 @@ export default function DashboardPage() {
       listBatches().then(setBatches),
       listProducts().then(setProducts),
       getReviewQueue().then((q) => setQueueCount(q.length)).catch(() => null),
+      getFeaturedDesigns().then(setFeatured).catch(() => null),
     ]).finally(() => setLoading(false));
   }, []);
+
+  const handleUnfeature = async (id: string) => {
+    await toggleFeatured(id);
+    setFeatured((f) => f.filter((d) => d.id !== id));
+  };
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -83,6 +91,70 @@ export default function DashboardPage() {
             <span className="text-approve text-2xl font-bold">{queueCount}</span>
           </div>
         </Link>
+      )}
+
+      {featured.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 rounded-xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-3.5 h-3.5">
+                  <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clipRule="evenodd" />
+                </svg>
+              </span>
+              <h2 className="text-lg font-bold text-amber-400">Featured</h2>
+              <span className="text-xs text-amber-400/60 bg-amber-500/10 px-2 py-0.5 rounded-full">{featured.length}</span>
+            </div>
+            <Link to="/review" className="text-xs text-amber-400 hover:text-amber-300 transition-colors">
+              Review all &rarr;
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {featured.map((item) => (
+              <div
+                key={item.id}
+                className="group relative bg-bg-secondary border border-border rounded-lg overflow-hidden hover:border-amber-500/50 transition-all cursor-pointer"
+                onClick={() => navigate('/review', { state: { openDesignId: item.id } })}
+              >
+                <div className="relative aspect-square bg-bg-tertiary">
+                  {(item.primary_mockup_url || item.processed_image_url) ? (
+                    <img
+                      src={item.primary_mockup_url || item.processed_image_url!}
+                      alt={item.concept_name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-text-tertiary text-xs">
+                      Text Only
+                    </div>
+                  )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleUnfeature(item.id); }}
+                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/30 hover:bg-amber-600 transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
+                      <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                  <div className="absolute bottom-1.5 left-1.5">
+                    <StatusBadge status={item.status} />
+                  </div>
+                </div>
+                <div className="p-2">
+                  <p className="text-xs font-semibold text-text-primary leading-tight line-clamp-1">
+                    {toTitleCase(item.concept_name)}
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <ConfidenceBadge score={item.quality_score} />
+                    {(item.product_count ?? 0) > 0 && (
+                      <span className="text-[10px] text-text-tertiary">{item.product_count} products</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

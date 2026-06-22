@@ -28,6 +28,7 @@ def generate_all_marketing_assets(
     Generate marketing content for all 5 channels in one Claude call.
     Returns {instagram: {...}, tiktok: {...}, pinterest: {...}, email: {...}, blog: {...}}.
     """
+    # TODO: use stored social links for publishing
     products_str = ", ".join(product_types)
     prompt = (
         f"Product: \"{shopify_title}\"\n"

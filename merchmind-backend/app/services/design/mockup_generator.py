@@ -15,6 +15,7 @@ _TEMPLATES = {
         "size": (800, 1000),
         "bg_color": (30, 30, 30),
         "design_area": (200, 200, 600, 600),
+        "design_area_text": (200, 140, 600, 480),
         "label": "T-Shirt",
     },
     "mug": {
@@ -56,7 +57,7 @@ def _load_font(size: int):
         return ImageFont.load_default()
 
 
-def generate_mockup(product_type: str, design_bytes: bytes) -> bytes | None:
+def generate_mockup(product_type: str, design_bytes: bytes, archetype: str | None = None) -> bytes | None:
     """Generate a mockup composite for a product type. Returns PNG bytes or None."""
     template = _TEMPLATES.get(product_type)
     if not template:
@@ -68,7 +69,11 @@ def generate_mockup(product_type: str, design_bytes: bytes) -> bytes | None:
 
         design = Image.open(io.BytesIO(design_bytes)).convert("RGBA")
 
-        area = template["design_area"]
+        is_text_design = archetype in ("text_only", "typographic", "text_icon")
+        if is_text_design and "design_area_text" in template:
+            area = template["design_area_text"]
+        else:
+            area = template["design_area"]
         area_w = area[2] - area[0]
         area_h = area[3] - area[1]
         design_resized = design.resize((area_w, area_h), Image.LANCZOS)

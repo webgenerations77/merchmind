@@ -20,6 +20,7 @@ class DesignOut(BaseModel):
     font_pair: Optional[str]
     font_reasoning: Optional[str]
     color_palette: Optional[list]
+    text_concept_scoring: Optional[dict] = None
     design_style: Optional[str]
     quality_score: int
     quality_breakdown: Optional[dict]
@@ -30,6 +31,10 @@ class DesignOut(BaseModel):
     shopify_tags: Optional[list]
     classification: Optional[str] = "design_idea"
     primary_product_type: Optional[str] = "tshirt"
+    primary_product_type_reasoning: Optional[str] = None
+    is_featured: bool = False
+    featured_at: Optional[datetime] = None
+    conversation_history: Optional[list] = None
     status: str
     delayed_to_week: Optional[date]
     approved_at: Optional[datetime]
@@ -53,6 +58,7 @@ class DesignQueueItem(BaseModel):
     status: str
     collection_id: Optional[UUID] = None
     primary_product_type: Optional[str] = "tshirt"
+    is_featured: bool = False
     revisit_count: Optional[int] = 0
     claude_reasoning: Optional[str] = None
 
@@ -64,3 +70,11 @@ class DelayRequest(BaseModel):
 class RegenerateRequest(BaseModel):
     new_prompt: Optional[str] = None
     force_archetype: Optional[str] = None
+
+
+class ChatMessageIn(BaseModel):
+    message: str
+
+
+class SuggestRegenerateRequest(BaseModel):
+    conversation: list[dict]

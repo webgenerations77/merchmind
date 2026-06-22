@@ -12,12 +12,13 @@ from app.models.design import Design
 from app.models.product import Product
 from app.models.settings import AppSettings
 from app.services.design.archetype_classifier import classify_archetype, select_image_api
-from app.services.design.prompt_builder import build_image_prompt, generate_text_content
+from app.services.design.prompt_builder import build_image_prompt, generate_text_content, get_product_format
 from app.services.design.image_generator import generate_image
-from app.services.design.quality_scorer import assign_product_bundle, select_primary_product_type
+from app.services.design.quality_scorer import assign_product_bundle, select_primary_product_type, default_primary_product_type
 from app.services.design.font_selector import select_font_pair
 from app.services.design.text_compositor import composite_text_on_image, should_composite
 from app.services.design.shopify_copy_generator import generate_shopify_copy
+from app.utils.text import to_title_case
 from app.services.pricing.pricing_engine import calculate_price
 from app.services.publishing.printify_publisher import get_base_cost, _DUAL_PRINT_SURCHARGE
 from app.utils.storage import storage
@@ -52,7 +53,7 @@ def generate_idea_design(self, idea_id: str):
         design = Design(
             trend_id=None,
             batch_id=None,
-            concept_name=idea.input_text[:100],
+            concept_name=to_title_case(idea.input_text[:100]),
             archetype=archetype,
             image_api_used=image_api,
             status="generating",
@@ -62,14 +63,16 @@ def generate_idea_design(self, idea_id: str):
         db.refresh(design)
         design_id = str(design.id)
 
-        image_prompt = build_image_prompt(idea.input_text, archetype, "", idea.input_text[:100])
+        primary_product = default_primary_product_type(archetype)
+        fmt = get_product_format(primary_product)
+        image_prompt = build_image_prompt(idea.input_text, archetype, "", idea.input_text[:100], product_type=primary_product)
         design.image_prompt = image_prompt
         db.commit()
 
         processed_url = None
         if image_api and image_prompt:
             try:
-                raw_bytes, api_used = generate_image(image_prompt, image_api)
+                raw_bytes, api_used = generate_image(image_prompt, image_api, aspect_ratio=fmt["aspect_ratio"])
                 design.image_api_used = api_used
                 raw_path = storage.design_raw_path(design_id)
                 storage.upload(raw_path, raw_bytes)
@@ -95,6 +98,7 @@ def generate_idea_design(self, idea_id: str):
         design.primary_text = text_content.get("primary_text")
         design.secondary_text = text_content.get("secondary_text")
         design.tagline = text_content.get("tagline")
+        design.text_concept_scoring = text_content.get("text_concept_scoring")
 
         if processed_url and should_composite(archetype):
             try:
@@ -141,7 +145,11 @@ def generate_idea_design(self, idea_id: str):
         design.quality_breakdown = {"concept_clarity": 8, "visual_appeal": 8, "merch_suitability": 8, "originality": 8}
 
         product_types = assign_product_bundle(archetype, design.quality_breakdown)
-        design.primary_product_type = select_primary_product_type(archetype)
+        primary_result = select_primary_product_type(
+            design.concept_name, archetype, product_types, idea.input_text,
+        )
+        design.primary_product_type = primary_result["primary_product_type"]
+        design.primary_product_type_reasoning = primary_result["reasoning"]
         design.classification = "collection" if len(product_types) >= 3 else "design_idea"
         copy = generate_shopify_copy(idea.input_text, idea.input_text, archetype, product_types, "")
         design.shopify_title = copy["shopify_title"]
@@ -185,6 +193,7 @@ def generate_idea_design(self, idea_id: str):
                         image_url=use_image,
                         retail_price=float(product.retail_price),
                         back_logo_url=product_back_logo,
+                        archetype=design.archetype,
                     )
                     product.printify_product_id = printify_id
                     mockups = svc.generate_mockups(printify_id)

@@ -4,7 +4,7 @@ import { getDesign } from '../api/designs';
 import type { DesignOut } from '../types/api';
 import StatusBadge from '../components/shared/StatusBadge';
 import ClickableImage from '../components/shared/ClickableImage';
-import { formatTimeAgo } from '../utils/formatters';
+import { formatTimeAgo, toTitleCase } from '../utils/formatters';
 
 const ARCHETYPE_OPTIONS = [
   { value: '', label: 'Let AI decide' },
@@ -61,7 +61,7 @@ function IdeaResult({ idea, onGenerate, onDelete }: { idea: CustomIdea; onGenera
             </div>
           )}
           <div className="min-w-0">
-            <p className="text-sm text-text-primary font-medium">{design.shopify_title || design.concept_name}</p>
+            <p className="text-sm text-text-primary font-medium">{design.shopify_title || toTitleCase(design.concept_name)}</p>
             <div className="flex items-center gap-2 mt-1">
               <StatusBadge status={design.archetype} />
               {design.image_api_used && (

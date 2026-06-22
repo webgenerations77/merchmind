@@ -18,6 +18,9 @@ export interface DesignQueueItem {
   source?: 'batch' | 'collection' | 'drews_mind';
   primary_product_type?: string;
   primary_mockup_url?: string;
+  is_featured: boolean;
+  featured_at?: string | null;
+  product_count: number;
   revisit_count?: number;
   claude_reasoning: string | null;
 }
@@ -36,6 +39,15 @@ export interface DesignOut {
   font_pair: string | null;
   font_reasoning: string | null;
   color_palette: string[] | null;
+  text_concept_scoring: {
+    candidates: {
+      text: string;
+      scores: Record<string, number>;
+      total: number;
+      rationale: string;
+    }[];
+    selected_index: number;
+  } | null;
   design_style: string | null;
   quality_score: number;
   quality_breakdown: Record<string, number> | null;
@@ -46,6 +58,10 @@ export interface DesignOut {
   shopify_tags: string[] | null;
   classification: string | null;
   primary_product_type: string | null;
+  primary_product_type_reasoning: string | null;
+  is_featured: boolean;
+  featured_at: string | null;
+  conversation_history: { role: 'user' | 'assistant'; content: string }[] | null;
   status: string;
   delayed_to_week: string | null;
   approved_at: string | null;
@@ -53,6 +69,14 @@ export interface DesignOut {
   archived_at: string | null;
   revisit_count: number;
   created_at: string;
+  // Trend reasoning (populated from joined trend record)
+  trend_source?: string | null;
+  trend_signal?: string | null;
+  trend_source_metadata?: Record<string, unknown> | null;
+  trend_score?: number | null;
+  viability_score?: number | null;
+  final_score?: number | null;
+  claude_reasoning?: string | null;
 }
 
 export interface BatchOut {
@@ -68,6 +92,30 @@ export interface BatchOut {
   delayed_count: number;
   error_log: { time: string; error: string }[];
   created_at: string;
+}
+
+export interface BatchItemOut {
+  id: string;
+  batch_id: string;
+  trend_id: string | null;
+  design_id: string | null;
+  concept_name: string;
+  status: string;
+  failed_step: string | null;
+  error_summary: string | null;
+  error_detail: string | null;
+  product_types: string[];
+  started_at: string;
+  completed_at: string | null;
+  created_at: string;
+  processed_image_url: string | null;
+}
+
+export interface BatchDetailOut {
+  batch: BatchOut;
+  items: BatchItemOut[];
+  success_count: number;
+  failed_count: number;
 }
 
 export interface ProductOut {
@@ -122,6 +170,13 @@ export interface AppSettings {
   back_logo_products: string[] | null;
   shopify_store_url: string | null;
   active_clusters: string[] | null;
+  marketing_generation_enabled: boolean;
+  social_links: {
+    instagram_url: string;
+    tiktok_url: string;
+    pinterest_url: string;
+    facebook_url: string;
+  } | null;
   updated_at: string;
 }
 

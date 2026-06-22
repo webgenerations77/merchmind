@@ -80,16 +80,16 @@ class DALLe3Service:
 
 
 class FluxSchnellService:
-    def generate(self, prompt: str) -> bytes:
+    def generate(self, prompt: str, aspect_ratio: str = "1:1") -> bytes:
         for attempt in range(_MAX_RETRIES):
             try:
                 replicate_limiter.consume()
-                prediction = self._create_prediction(prompt)
+                prediction = self._create_prediction(prompt, aspect_ratio)
                 image_url = self._poll_prediction(prediction["id"])
                 with httpx.Client(timeout=_TIMEOUT) as http:
                     r = http.get(image_url)
                     r.raise_for_status()
-                logger.info("flux_schnell.generate ok prompt_len=%d attempt=%d", len(prompt), attempt + 1)
+                logger.info("flux_schnell.generate ok prompt_len=%d aspect=%s attempt=%d", len(prompt), aspect_ratio, attempt + 1)
                 _log_image_usage("replicate", "image_generate", "flux-schnell", 0.003)
                 return r.content
             except (ImageGenerationError, ContentPolicyRejectionError, ImageGenerationTimeoutError):
@@ -103,7 +103,7 @@ class FluxSchnellService:
                     raise ImageProviderUnavailableError(f"Flux Schnell failed after {_MAX_RETRIES} attempts: {e}") from e
         raise ImageGenerationError("Flux Schnell: unreachable")
 
-    def _create_prediction(self, prompt: str) -> dict:
+    def _create_prediction(self, prompt: str, aspect_ratio: str = "1:1") -> dict:
         enhanced_prompt = (
             f"{prompt} "
             "Professional vector art, flat design, clean crisp edges, "
@@ -118,7 +118,7 @@ class FluxSchnellService:
                         "prompt": enhanced_prompt,
                         "go_fast": True,
                         "num_outputs": 1,
-                        "aspect_ratio": "1:1",
+                        "aspect_ratio": aspect_ratio,
                         "output_format": "png",
                         "output_quality": 100,
                         "num_inference_steps": 4,
@@ -180,7 +180,7 @@ def get_image_generator_service() -> ImageGeneratorService:
     return ImageGeneratorService()
 
 
-def generate_image(prompt: str, api: str) -> tuple[bytes, str]:
+def generate_image(prompt: str, api: str, aspect_ratio: str = "1:1") -> tuple[bytes, str]:
     """Generate image. Tries Flux Schnell first, falls back to DALL-E."""
     svc = get_image_generator_service()
     providers = [("flux_schnell", svc._flux), ("dalle3", svc._dalle3)]
@@ -190,7 +190,10 @@ def generate_image(prompt: str, api: str) -> tuple[bytes, str]:
     last_error: Exception = RuntimeError("No providers")
     for name, provider in providers:
         try:
-            return provider.generate(prompt), name
+            if name == "flux_schnell":
+                return provider.generate(prompt, aspect_ratio=aspect_ratio), name
+            else:
+                return provider.generate(prompt), name
         except ContentPolicyRejectionError:
             raise
         except Exception as e:

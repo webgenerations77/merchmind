@@ -4,11 +4,12 @@ import { getDesign, getReviewQueue } from '../api/designs';
 import { listBatches, triggerBatch } from '../api/batches';
 import { listProducts } from '../api/products';
 import { getApiBalance, type ApiBalanceResult } from '../api/health';
-import ClickableImage from '../components/shared/ClickableImage';
+import MockupTabs from '../components/shared/MockupTabs';
+import SuggestDrawer from '../components/shared/SuggestDrawer';
 import type { DesignOut, DesignQueueItem, BatchOut, ProductOut } from '../types/api';
 import ConfidenceBadge from '../components/shared/ConfidenceBadge';
 import StatusBadge from '../components/shared/StatusBadge';
-import { formatCurrency, formatProductType } from '../utils/formatters';
+import { formatCurrency, formatProductType, toTitleCase } from '../utils/formatters';
 import { calculateCostBreakdown } from '../utils/profitCalc';
 
 function BatchProgress({ batch, productCount, designCount }: { batch: BatchOut; productCount: number; designCount: number }) {
@@ -113,91 +114,304 @@ function BatchComplete({ batch, onRefresh }: { batch: BatchOut; onRefresh: () =>
   );
 }
 
-function DesignCard({ item, action, onClick }: { item: DesignQueueItem; action?: string; onClick: () => void }) {
+const ARCHETYPE_LABELS: Record<string, string> = {
+  illustration: 'Illustration',
+  hybrid: 'Hybrid',
+  text_icon: 'Text + Icon',
+  typographic: 'Typography',
+  text_only: 'Text',
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  google: 'Google Trends',
+  reddit: 'Reddit',
+  twitter: 'Twitter/X',
+  seasonal: 'Seasonal Calendar',
+  manual: 'Manual Entry',
+};
+
+function AiReasoningSection({ design, products }: { design: DesignOut; products: ProductOut[] }) {
+  const [open, setOpen] = useState(false);
+
+  const hasTrend = !!(design.trend_source || design.claude_reasoning);
+  const hasQualityBreakdown = !!design.quality_breakdown;
+  const hasProductReasoning = !!design.primary_product_type_reasoning;
+  const hasTextScoring = !!design.text_concept_scoring;
+  const hasAnyReasoning = hasTrend || hasQualityBreakdown || hasProductReasoning || hasTextScoring;
+
+  return (
+    <div className="bg-bg-secondary rounded-lg border border-border overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between p-3 hover:bg-bg-tertiary/50 transition-colors text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-purple-400 text-sm">&#9670;</span>
+          <span className="text-sm font-medium text-text-primary">Why did the AI create this?</span>
+        </div>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className={`w-4 h-4 text-text-tertiary transition-transform ${open ? 'rotate-180' : ''}`}
+        >
+          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="px-3 pb-3 space-y-4">
+          {!hasAnyReasoning ? (
+            <p className="text-sm text-text-tertiary italic">Reasoning not available for this concept.</p>
+          ) : (
+            <>
+              {hasTrend && (
+                <div>
+                  <p className="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-1.5">Trend Source</p>
+                  <p className="text-sm text-text-secondary leading-relaxed">
+                    {design.trend_source && (
+                      <>Spotted on <span className="text-text-primary font-medium">{SOURCE_LABELS[design.trend_source] || design.trend_source}</span></>
+                    )}
+                    {design.trend_source_metadata?.subreddit && (
+                      <> in <span className="text-text-primary font-medium">r/{String(design.trend_source_metadata.subreddit)}</span></>
+                    )}
+                    {design.trend_signal && (
+                      <> &mdash; &ldquo;{design.trend_signal}&rdquo;</>
+                    )}
+                    {design.trend_source_metadata?.volume_change && (
+                      <>, search volume {String(design.trend_source_metadata.volume_change)}</>
+                    )}
+                    {'.'}
+                  </p>
+                  {(design.trend_score != null || design.viability_score != null) && (
+                    <p className="text-xs text-text-tertiary mt-1">
+                      Trend strength {design.trend_score ?? '?'}/100, merch viability {design.viability_score ?? '?'}/100
+                      {design.final_score != null && <> (combined {design.final_score}/100)</>}
+                      {'.'}
+                    </p>
+                  )}
+                  {design.claude_reasoning && (
+                    <p className="text-sm text-text-secondary mt-1.5 leading-relaxed">{design.claude_reasoning}</p>
+                  )}
+                </div>
+              )}
+
+              {hasQualityBreakdown && (
+                <div>
+                  <p className="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-1.5">Quality Assessment</p>
+                  <p className="text-sm text-text-secondary leading-relaxed">
+                    {'This '}
+                    {ARCHETYPE_LABELS[design.archetype]?.toLowerCase() || design.archetype.replace(/_/g, ' ')}
+                    {' design scored '}
+                    <span className="text-text-primary font-medium">{design.quality_score}/40</span>
+                    {' overall. '}
+                    {Object.entries(design.quality_breakdown!).map(([key, val], i, arr) => {
+                      const label = key.replace(/_/g, ' ');
+                      const strength = val >= 8 ? 'strong' : val >= 6 ? 'solid' : 'weaker';
+                      return (
+                        <span key={key}>
+                          {i === arr.length - 1 && arr.length > 1 ? 'and ' : ''}
+                          <span className="capitalize">{label}</span>
+                          {' was '}
+                          <span className={val >= 8 ? 'text-approve' : val >= 6 ? 'text-text-primary' : 'text-confidence-medium'}>
+                            {strength} ({val}/10)
+                          </span>
+                          {i < arr.length - 1 ? ', ' : '.'}
+                        </span>
+                      );
+                    })}
+                  </p>
+                </div>
+              )}
+
+              {products.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-1.5">Product Selection</p>
+                  <p className="text-sm text-text-secondary leading-relaxed">
+                    {'Assigned to '}
+                    <span className="text-text-primary font-medium">{products.length} product type{products.length !== 1 ? 's' : ''}</span>
+                    {': '}
+                    {products.map((p) => formatProductType(p.product_type)).join(', ')}
+                    {'. '}
+                    {design.primary_product_type && (
+                      <>
+                        <span className="text-text-primary font-medium">{formatProductType(design.primary_product_type)}</span>
+                        {' was chosen as the primary product type.'}
+                      </>
+                    )}
+                  </p>
+                  {hasProductReasoning && (
+                    <p className="text-sm text-text-secondary mt-1.5 leading-relaxed">{design.primary_product_type_reasoning}</p>
+                  )}
+                </div>
+              )}
+
+              {hasTextScoring && (
+                <div>
+                  <p className="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-1.5">Text Selection</p>
+                  <p className="text-sm text-text-secondary leading-relaxed mb-2">
+                    {'The AI evaluated '}
+                    <span className="text-text-primary font-medium">{design.text_concept_scoring!.candidates.length} text candidates</span>
+                    {' and selected the highest-scoring option:'}
+                  </p>
+                  <div className="space-y-2">
+                    {design.text_concept_scoring!.candidates.map((c, i) => {
+                      const isSelected = i === design.text_concept_scoring!.selected_index;
+                      return (
+                        <div key={i} className={`p-2 rounded-lg border ${
+                          isSelected ? 'border-accent/50 bg-accent/5' : 'border-border/50 bg-bg-tertiary/50'
+                        }`}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`text-sm font-semibold ${isSelected ? 'text-accent' : 'text-text-secondary'}`}>
+                              &ldquo;{c.text}&rdquo;
+                              {isSelected && (
+                                <span className="ml-2 text-[10px] font-bold uppercase bg-accent/20 text-accent px-1.5 py-0.5 rounded">Selected</span>
+                              )}
+                            </span>
+                            <span className="text-xs font-bold text-text-primary">{c.total}/40</span>
+                          </div>
+                          <div className="flex gap-3 mb-1">
+                            {Object.entries(c.scores).map(([key, val]) => (
+                              <span key={key} className="text-[10px] text-text-tertiary">
+                                {key}: <span className="text-text-secondary font-medium">{val}</span>
+                              </span>
+                            ))}
+                          </div>
+                          <p className="text-xs text-text-secondary italic">{c.rationale}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DesignCard({ item, action, onClick, onToggleFeatured }: {
+  item: DesignQueueItem;
+  action?: string;
+  onClick: () => void;
+  onToggleFeatured?: (id: string) => void;
+}) {
+  const handleStar = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleFeatured?.(item.id);
+  };
+
   return (
     <button
       onClick={onClick}
-      className="bg-bg-secondary border border-border rounded-xl p-4 text-left hover:border-accent/50 transition-colors w-full"
+      className="group bg-bg-secondary border border-border rounded-xl overflow-hidden text-left hover:border-accent/50 transition-all w-full flex flex-col"
     >
-      {(item.primary_mockup_url || item.processed_image_url) ? (
-        <ClickableImage src={item.primary_mockup_url || item.processed_image_url!} alt={item.concept_name} className="w-full h-40 object-cover rounded-lg mb-3" />
-      ) : (
-        <div className="w-full h-40 bg-bg-tertiary rounded-lg mb-3 flex items-center justify-center text-text-tertiary text-sm">
-          Text Only
+      {/* PRIMARY: Large mockup image */}
+      <div className="relative w-full aspect-square bg-bg-tertiary">
+        {(item.primary_mockup_url || item.processed_image_url) ? (
+          <img
+            src={item.primary_mockup_url || item.processed_image_url!}
+            alt={item.concept_name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-text-tertiary text-sm">
+            Text Only
+          </div>
+        )}
+
+        {/* Featured star overlay */}
+        <div
+          onClick={handleStar}
+          className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
+            item.is_featured
+              ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
+              : 'bg-black/40 text-white/60 opacity-0 group-hover:opacity-100 hover:bg-black/60 hover:text-amber-400'
+          }`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+            <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clipRule="evenodd" />
+          </svg>
         </div>
-      )}
-      <div className="flex items-center justify-between mb-1">
-        <h3 className="text-sm font-semibold text-text-primary truncate">{item.concept_name}</h3>
-        <ConfidenceBadge score={item.quality_score} />
-      </div>
-      <div className="flex items-center gap-2 mb-2">
-        <p className="text-xs text-text-tertiary">{item.archetype.replace(/_/g, ' ')}</p>
-        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${
-          item.classification === 'collection'
-            ? 'bg-purple-500/20 text-purple-400'
-            : 'bg-accent/20 text-accent'
-        }`}>
-          {item.classification === 'collection' ? 'Collection' : 'Design Idea'}
-        </span>
+
+        {/* Session action overlay */}
+        {action && (
+          <div className="absolute bottom-2 left-2">
+            <StatusBadge status={action} />
+          </div>
+        )}
+
+        {/* Revisit badge overlay */}
         {(item.revisit_count ?? 0) > 0 && (
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase bg-blue-500/20 text-blue-400">
-            Revisit {item.revisit_count! > 1 ? `x${item.revisit_count}` : ''}
-          </span>
+          <div className="absolute top-2 left-2">
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase bg-blue-500/80 text-white backdrop-blur-sm">
+              Revisit{item.revisit_count! > 1 ? ` x${item.revisit_count}` : ''}
+            </span>
+          </div>
         )}
       </div>
-      {item.shopify_title && (
-        <p className="text-xs text-text-secondary truncate">{item.shopify_title}</p>
-      )}
-      {action && (
-        <div className="mt-2">
-          <StatusBadge status={action} />
+
+      {/* Card info */}
+      <div className="p-3 flex flex-col gap-2">
+        {/* SECONDARY: Title + classification + featured */}
+        <div>
+          <h3 className="text-sm font-semibold text-text-primary leading-tight line-clamp-2">
+            {toTitleCase(item.concept_name)}
+          </h3>
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${
+              item.classification === 'collection'
+                ? 'bg-purple-500/20 text-purple-400'
+                : 'bg-accent/20 text-accent'
+            }`}>
+              {item.classification === 'collection' ? 'Collection' : 'Idea'}
+            </span>
+          </div>
         </div>
-      )}
+
+        {/* TERTIARY: Quality score, product count, style tag */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <ConfidenceBadge score={item.quality_score} />
+          {(item.product_count ?? 0) > 0 && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-bg-tertiary text-text-tertiary">
+              {item.product_count} product{item.product_count !== 1 ? 's' : ''}
+            </span>
+          )}
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-bg-tertiary text-text-tertiary">
+            {ARCHETYPE_LABELS[item.archetype] || item.archetype.replace(/_/g, ' ')}
+          </span>
+        </div>
+      </div>
     </button>
   );
 }
 
-function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisit, onDelay }: {
+function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisit, onSuggestRegenerated, onToggleFeatured }: {
   design: DesignOut;
   onBack: () => void;
   onApprove: (productTypes?: string[]) => void;
   onReject: () => void;
   onArchive: () => void;
   onRevisit: () => void;
-  onDelay: () => void;
+  onSuggestRegenerated: () => void;
+  onToggleFeatured?: () => void;
 }) {
   const [products, setProducts] = useState<ProductOut[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<string>('design');
   const [showPublishDialog, setShowPublishDialog] = useState(false);
   const [selectedPublishTypes, setSelectedPublishTypes] = useState<Set<string>>(new Set());
-
-  const clothingOrder = ['tshirt', 'hat', 'mug', 'phone_case', 'poster', 'sticker'];
+  const [isFeatured, setIsFeatured] = useState(design.is_featured);
+  const [showSuggestDrawer, setShowSuggestDrawer] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   useEffect(() => {
     listProducts().then((all) => {
       const matched = all.filter((p) => p.design_id === design.id);
       setProducts(matched);
       setSelectedPublishTypes(new Set(matched.map((p) => p.product_type)));
-      const withMockups = matched.filter((p) => p.mockup_urls && Object.keys(p.mockup_urls).length > 0);
-      const primary = design.primary_product_type
-        ? withMockups.find((p) => p.product_type === design.primary_product_type)
-        : null;
-      const defaultMockup = primary || withMockups[0];
-      if (defaultMockup) setSelectedProduct(defaultMockup.id);
     }).catch(() => null);
   }, [design.id]);
-
-  const productsWithMockups = products
-    .filter((p) => p.mockup_urls && Object.keys(p.mockup_urls).length > 0)
-    .sort((a, b) => clothingOrder.indexOf(a.product_type) - clothingOrder.indexOf(b.product_type));
-  const viewOptions = [
-    ...productsWithMockups.map((p) => ({ key: p.id, label: formatProductType(p.product_type) })),
-    { key: 'design', label: 'Original Design' },
-  ];
-
-  const currentMockup = selectedProduct === 'design'
-    ? null
-    : productsWithMockups.find((p) => p.id === selectedProduct);
 
   return (
     <div>
@@ -206,46 +420,33 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
       </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div>
-          {viewOptions.length > 1 && (
-            <div className="flex gap-2 mb-3 flex-wrap">
-              {viewOptions.map((opt) => (
-                <button
-                  key={opt.key}
-                  onClick={() => setSelectedProduct(opt.key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    selectedProduct === opt.key
-                      ? 'bg-accent text-white'
-                      : 'bg-bg-secondary text-text-secondary hover:text-text-primary border border-border'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {currentMockup ? (
-            <div className="space-y-2">
-              {['front', 'back'].filter((pos) => currentMockup.mockup_urls[pos]).map((pos) => (
-                <ClickableImage key={pos} src={currentMockup.mockup_urls[pos] as string} alt={`${pos} mockup`} className="w-full rounded-xl" />
-              ))}
-            </div>
-          ) : design.processed_image_url ? (
-            <ClickableImage src={design.processed_image_url} alt={design.concept_name} className="w-full rounded-xl" />
-          ) : (
-            <div className="w-full h-64 bg-bg-tertiary rounded-xl flex items-center justify-center text-text-tertiary">
-              Text Only Design
-            </div>
-          )}
-          {design.image_api_used && (
-            <p className="text-xs text-text-tertiary mt-2">Generated via {design.image_api_used}</p>
-          )}
-        </div>
+        <MockupTabs
+          products={products}
+          designImageUrl={design.processed_image_url}
+          designName={design.concept_name}
+          defaultProductType={design.primary_product_type}
+          imageApiUsed={design.image_api_used}
+          primaryProductTypeReasoning={design.primary_product_type_reasoning}
+        />
 
         <div className="space-y-4">
           <div>
-            <h2 className="text-xl font-bold text-text-primary">{design.concept_name}</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-bold text-text-primary">{toTitleCase(design.concept_name)}</h2>
+              <button
+                onClick={() => { setIsFeatured(!isFeatured); onToggleFeatured?.(); }}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shrink-0 ${
+                  isFeatured
+                    ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
+                    : 'bg-bg-tertiary text-text-tertiary hover:text-amber-400 hover:bg-amber-500/20'
+                }`}
+                title={isFeatured ? 'Remove from Featured' : 'Mark as Featured'}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
+                  <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clipRule="evenodd" />
+                </svg>
+              </button>
+            </div>
             <div className="flex items-center gap-2 mt-2">
               <ConfidenceBadge score={design.quality_score} />
               <StatusBadge status={design.archetype} />
@@ -296,6 +497,8 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
             </div>
           )}
 
+          <AiReasoningSection design={design} products={products} />
+
           {design.shopify_title && (
             <div className="p-3 bg-bg-secondary rounded-lg border border-border">
               <p className="text-xs text-text-tertiary mb-1">Shopify Title</p>
@@ -334,13 +537,25 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
             <button onClick={onRevisit} className="py-2.5 px-3 rounded-lg bg-blue-500/20 text-blue-400 font-semibold text-sm hover:bg-blue-500/30 transition-colors">
               Revisit
             </button>
-            <button onClick={onDelay} className="py-2.5 px-3 rounded-lg bg-delay/20 text-delay font-semibold text-sm hover:bg-delay/30 transition-colors">
-              Delay
+            <button onClick={() => setShowSuggestDrawer(true)} className="py-2.5 px-3 rounded-lg bg-purple-500/20 text-purple-400 font-semibold text-sm hover:bg-purple-500/30 transition-colors">
+              Suggest
             </button>
-            <button onClick={() => setShowPublishDialog(true)} className="flex-1 py-2.5 rounded-lg bg-approve/20 text-approve font-semibold text-sm hover:bg-approve/30 transition-colors">
-              Approve & Publish
+            <button
+              onClick={() => setShowPublishDialog(true)}
+              disabled={isPublishing}
+              className="flex-1 py-2.5 rounded-lg bg-approve/20 text-approve font-semibold text-sm hover:bg-approve/30 disabled:opacity-50 transition-colors"
+            >
+              {isPublishing ? 'Publishing...' : 'Approve & Publish'}
             </button>
           </div>
+
+          {showSuggestDrawer && (
+            <SuggestDrawer
+              design={design}
+              onClose={() => setShowSuggestDrawer(false)}
+              onRegenerated={() => { setShowSuggestDrawer(false); onSuggestRegenerated(); }}
+            />
+          )}
 
           {showPublishDialog && (() => {
             const deselectedTypes = products.filter((p) => !selectedPublishTypes.has(p.product_type));
@@ -395,11 +610,11 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
                       Cancel
                     </button>
                     <button
-                      onClick={() => { setShowPublishDialog(false); onApprove(Array.from(selectedPublishTypes)); }}
-                      disabled={noneSelected}
+                      onClick={() => { setIsPublishing(true); setShowPublishDialog(false); onApprove(Array.from(selectedPublishTypes)); }}
+                      disabled={noneSelected || isPublishing}
                       className="flex-1 py-2.5 rounded-lg bg-approve text-white font-semibold text-sm hover:bg-approve/90 disabled:opacity-50 transition-colors"
                     >
-                      Publish {selectedPublishTypes.size} Product{selectedPublishTypes.size !== 1 ? 's' : ''}
+                      {isPublishing ? 'Publishing...' : `Publish ${selectedPublishTypes.size} Product${selectedPublishTypes.size !== 1 ? 's' : ''}`}
                     </button>
                   </div>
                 </div>
@@ -413,7 +628,7 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
 }
 
 export default function ReviewPage() {
-  const { queue, archivedQueue, sessionActions, publishErrors, isLoading, error, fetchQueue, fetchArchived, approveDesign, rejectDesign, archiveDesign, unarchiveDesign, revisitDesign, delayDesign } = useReviewStore();
+  const { queue, archivedQueue, sessionActions, publishErrors, isLoading, error, fetchQueue, fetchArchived, approveDesign, rejectDesign, archiveDesign, unarchiveDesign, revisitDesign, toggleFeatured } = useReviewStore();
   const [selectedDesign, setSelectedDesign] = useState<DesignOut | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [runningBatch, setRunningBatch] = useState<BatchOut | null>(null);
@@ -509,7 +724,7 @@ export default function ReviewPage() {
     setLoadingDetail(false);
   };
 
-  const handleAction = async (action: 'approve' | 'reject' | 'archive' | 'revisit' | 'delay', id: string, productTypes?: string[]) => {
+  const handleAction = async (action: 'approve' | 'reject' | 'archive' | 'revisit', id: string, productTypes?: string[]) => {
     if (action === 'approve') {
       await approveDesign(id, productTypes);
     } else if (action === 'reject') {
@@ -519,10 +734,6 @@ export default function ReviewPage() {
       fetchArchived();
     } else if (action === 'revisit') {
       await revisitDesign(id);
-    } else {
-      const nextWeek = new Date();
-      nextWeek.setDate(nextWeek.getDate() + 7);
-      await delayDesign(id, nextWeek.toISOString().split('T')[0]);
     }
     setSelectedDesign(null);
   };
@@ -539,7 +750,13 @@ export default function ReviewPage() {
         onReject={() => handleAction('reject', selectedDesign.id)}
         onArchive={() => handleAction('archive', selectedDesign.id)}
         onRevisit={() => handleAction('revisit', selectedDesign.id)}
-        onDelay={() => handleAction('delay', selectedDesign.id)}
+        onSuggestRegenerated={async () => {
+          const refreshed = await getDesign(selectedDesign.id).catch(() => null);
+          if (refreshed) setSelectedDesign(refreshed);
+          else setSelectedDesign(null);
+          fetchQueue();
+        }}
+        onToggleFeatured={() => toggleFeatured(selectedDesign.id)}
       />
     );
   }
@@ -614,9 +831,9 @@ export default function ReviewPage() {
 
       {reviewTab === 'batch' && (
         batchDesigns.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
             {batchDesigns.map((item) => (
-              <DesignCard key={item.id} item={item} onClick={() => openDetail(item.id)} />
+              <DesignCard key={item.id} item={item} onClick={() => openDetail(item.id)} onToggleFeatured={toggleFeatured} />
             ))}
           </div>
         ) : (
@@ -637,9 +854,9 @@ export default function ReviewPage() {
                   {group.designs.length} designs
                 </span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {group.designs.map((item) => (
-                  <DesignCard key={item.id} item={item} onClick={() => openDetail(item.id)} />
+                  <DesignCard key={item.id} item={item} onClick={() => openDetail(item.id)} onToggleFeatured={toggleFeatured} />
                 ))}
               </div>
             </div>
@@ -654,9 +871,9 @@ export default function ReviewPage() {
 
       {reviewTab === 'drews_mind' && (
         drewsDesigns.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
             {drewsDesigns.map((item) => (
-              <DesignCard key={item.id} item={item} onClick={() => openDetail(item.id)} />
+              <DesignCard key={item.id} item={item} onClick={() => openDetail(item.id)} onToggleFeatured={toggleFeatured} />
             ))}
           </div>
         ) : (
@@ -669,10 +886,10 @@ export default function ReviewPage() {
 
       {reviewTab === 'archived' && (
         archivedQueue.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
             {archivedQueue.map((item) => (
               <div key={item.id} className="relative">
-                <DesignCard item={item} onClick={() => openDetail(item.id)} />
+                <DesignCard item={item} onClick={() => openDetail(item.id)} onToggleFeatured={toggleFeatured} />
                 <button
                   onClick={async (e) => { e.stopPropagation(); await unarchiveDesign(item.id); }}
                   className="absolute top-2 right-2 px-2 py-1 rounded-lg bg-approve/20 text-approve text-xs font-semibold hover:bg-approve/30 transition-colors"
@@ -693,7 +910,7 @@ export default function ReviewPage() {
       {actioned.length > 0 && (
         <>
           <h2 className="text-lg font-semibold text-text-primary mb-3">Reviewed this session</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {actioned.map((item) => {
               const pubErr = publishErrors[item.id];
               return (
@@ -702,6 +919,7 @@ export default function ReviewPage() {
                     item={item}
                     action={sessionActions[item.id]}
                     onClick={() => openDetail(item.id)}
+                    onToggleFeatured={toggleFeatured}
                   />
                   {pubErr && pubErr.failed.length > 0 && (
                     <div className="mt-1 p-2 rounded-lg bg-confidence-low/10 border border-confidence-low/30">

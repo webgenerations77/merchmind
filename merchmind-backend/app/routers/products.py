@@ -24,12 +24,15 @@ def _envelope(data=None, error: str = None) -> dict:
 @router.get("")
 def list_products(
     status: str = None,
+    include_retired: bool = False,
     db: Session = Depends(get_db),
     _: str = Depends(verify_api_key),
 ):
     query = db.query(Product)
     if status:
         query = query.filter(Product.publish_status == status)
+    elif not include_retired:
+        query = query.filter(Product.publish_status != "retired")
     products = query.order_by(Product.created_at.desc()).limit(200).all()
     return _envelope([ProductOut.model_validate(p).model_dump() for p in products])
 

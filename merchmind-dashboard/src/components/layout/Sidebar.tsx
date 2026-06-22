@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react';
 import { logout, type User } from '../../firebase';
 
 const links = [
-  { to: '/', label: 'Dashboard', icon: '~' },
   { to: '/review', label: 'Review', icon: '#' },
+  { to: '/', label: 'Dashboard', icon: '~' },
   { to: '/collections', label: 'Collections', icon: '&' },
   { to: '/drews-mind', label: "Drew's Mind", icon: '!' },
   { to: '/marketing', label: 'Marketing', icon: '^' },
@@ -68,7 +68,7 @@ export default function Sidebar({ user }: { user: User }) {
       `}>
         <div className="p-5 border-b border-border">
           <h1 className="text-lg font-bold text-accent">MerchMind</h1>
-          <p className="text-xs text-text-tertiary mt-0.5">AI Merch Pipeline</p>
+          <p className="text-xs text-text-tertiary mt-0.5">Spinach The Cow Merch Pipe</p>
         </div>
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {links.map((link) => (

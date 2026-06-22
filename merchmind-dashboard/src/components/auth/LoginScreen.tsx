@@ -20,7 +20,7 @@ export default function LoginScreen() {
     <div className="min-h-screen bg-bg-primary flex items-center justify-center">
       <div className="bg-bg-secondary border border-border rounded-2xl p-8 w-full max-w-sm text-center">
         <h1 className="text-2xl font-bold text-accent mb-1">MerchMind</h1>
-        <p className="text-sm text-text-tertiary mb-8">AI Merch Pipeline</p>
+        <p className="text-sm text-text-tertiary mb-8">Spinach The Cow Merch Pipe</p>
 
         <button
           onClick={handleSignIn}
