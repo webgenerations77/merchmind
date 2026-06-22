@@ -210,7 +210,6 @@ export const mockDesigns: DesignQueueItem[] = [
     mockup_urls: {
       t_shirt: ['https://picsum.photos/seed/shirt6/600/600'],
       sticker: ['https://picsum.photos/seed/sticker6/600/600'],
-      poster: ['https://picsum.photos/seed/poster6/600/600'],
     },
     final_score: 63,
     trend_score: 60,
@@ -547,7 +546,6 @@ export const mockSalesAnalytics: SalesAnalytics = {
     hat: 0,
     sticker: 0,
     phone_case: 0,
-    poster: 0,
   },
   revenue_by_channel: {
     direct: 234.0,
@@ -669,7 +667,6 @@ export const mockSettings: AppSettings = {
     hat: 26.99,
     sticker: 6.99,
     phone_case: 22.99,
-    poster: 29.99,
   },
   quality_threshold: 28,
   score_filter: 35,

@@ -31,7 +31,6 @@ _BLUEPRINT_MAP = {
     "hat": 1447,
     "phone_case": 269,
     "sticker": 400,
-    "poster": 282,
 }
 
 _PROVIDER_MAP = {
@@ -40,7 +39,6 @@ _PROVIDER_MAP = {
     "hat": 410,
     "phone_case": 1,
     "sticker": 99,
-    "poster": 99,
 }
 
 _FALLBACK_BASE_COSTS = {
@@ -49,7 +47,6 @@ _FALLBACK_BASE_COSTS = {
     "hat": 10.00,
     "phone_case": 8.00,
     "sticker": 2.50,
-    "poster": 12.00,
 }
 
 _DUAL_PRINT_SURCHARGE = {

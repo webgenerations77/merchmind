@@ -3,7 +3,7 @@ import ClickableImage from './ClickableImage';
 import type { ProductOut } from '../../types/api';
 import { formatProductType } from '../../utils/formatters';
 
-const PRODUCT_ORDER = ['tshirt', 'hat', 'mug', 'phone_case', 'poster', 'sticker'];
+const PRODUCT_ORDER = ['tshirt', 'hat', 'mug', 'phone_case', 'sticker'];
 
 interface MockupTabsProps {
   products: ProductOut[];

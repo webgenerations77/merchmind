@@ -51,8 +51,8 @@ class TestCalculatePrice:
             calculate_price("jetpack", 10.00, 50)
 
     def test_all_product_types(self):
-        types = ["tshirt", "mug", "hat", "phone_case", "sticker", "poster"]
-        costs = {"tshirt": 8.50, "mug": 5.00, "hat": 9.00, "phone_case": 7.00, "sticker": 2.00, "poster": 11.00}
+        types = ["tshirt", "mug", "hat", "phone_case", "sticker"]
+        costs = {"tshirt": 8.50, "mug": 5.00, "hat": 9.00, "phone_case": 7.00, "sticker": 2.00}
         for pt in types:
             result = calculate_price(pt, costs[pt], 60)
             assert result["retail_price"] > 0

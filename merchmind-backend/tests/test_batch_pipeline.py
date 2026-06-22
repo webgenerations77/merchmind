@@ -52,19 +52,19 @@ class TestProductBundleAssignment:
     def test_illustration_gets_at_least_five_types(self):
         result = assign_product_bundle("illustration", {"visual_appeal": 8})
         assert "tshirt" in result
-        assert "poster" in result
+        assert "sticker" in result
         assert "mug" in result
         assert len(result) >= 5
 
     def test_text_only_gets_all_products(self):
         result = assign_product_bundle("text_only", {})
-        assert len(result) == 6
+        assert len(result) == 5
         assert "tshirt" in result
         assert "mug" in result
 
     def test_typographic_gets_all_products(self):
         result = assign_product_bundle("typographic", {})
-        assert len(result) == 6
+        assert len(result) == 5
 
     def test_text_icon_gets_at_least_five(self):
         result = assign_product_bundle("text_icon", {})
@@ -73,7 +73,7 @@ class TestProductBundleAssignment:
 
     def test_hybrid_gets_all_products(self):
         result = assign_product_bundle("hybrid", {"visual_appeal": 9})
-        assert len(result) == 6
+        assert len(result) == 5
 
     def test_all_archetypes_include_tshirt(self):
         for arch in ["illustration", "hybrid", "text_only", "typographic", "text_icon"]:

@@ -7,7 +7,6 @@ export const PRODUCT_TYPE_LABELS: Record<string, string> = {
   hat: 'Hat',
   sticker: 'Sticker',
   phone_case: 'Phone Case',
-  poster: 'Poster',
 };
 
 export const NICHE_CLUSTERS = [

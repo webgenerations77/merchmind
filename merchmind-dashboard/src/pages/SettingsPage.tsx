@@ -4,7 +4,7 @@ import { getIntegrationHealth } from '../api/health';
 import type { AppSettings, NicheCluster, IntegrationHealth } from '../types/api';
 import { formatCurrency } from '../utils/formatters';
 
-const PRODUCT_TYPES = ['tshirt', 'mug', 'hat', 'sticker', 'phone_case', 'poster'];
+const PRODUCT_TYPES = ['tshirt', 'mug', 'hat', 'sticker', 'phone_case'];
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings | null>(null);

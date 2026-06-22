@@ -240,7 +240,7 @@ def _perform_reject(design: Design, design_id: UUID, db: Session):
             deleted_assets.append(path)
         except Exception:
             pass
-    for pt in ["tshirt", "mug", "hat", "phone_case", "sticker", "poster"]:
+    for pt in ["tshirt", "mug", "hat", "phone_case", "sticker"]:
         for variant in ["front", "back", "lifestyle"]:
             try:
                 storage.delete(storage.mockup_path(did, pt, variant))
@@ -691,6 +691,23 @@ def update_design_text(
         "primary_text": design.primary_text,
         "secondary_text": design.secondary_text,
     })
+
+
+@router.post("/fix-poster-product-types")
+def fix_poster_product_types(db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """One-off: migrate designs with primary_product_type='poster' to 'tshirt'."""
+    updated = db.query(Design).filter(
+        Design.primary_product_type == "poster",
+        Design.is_deleted == False,
+    ).update(
+        {
+            Design.primary_product_type: "tshirt",
+            Design.primary_product_type_reasoning: "Migrated from poster (removed product type)",
+        },
+        synchronize_session=False,
+    )
+    db.commit()
+    return _envelope({"fixed": updated})
 
 
 @router.post("/{design_id}/rerender-preview")

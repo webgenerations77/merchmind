@@ -15,7 +15,6 @@ DEFAULT_BASE_MARKUP = {
     "hat": Decimal("2.5"),
     "phone_case": Decimal("2.5"),
     "sticker": Decimal("3.0"),
-    "poster": Decimal("2.5"),
 }
 
 DEFAULT_FLOOR_PRICES = {
@@ -24,7 +23,6 @@ DEFAULT_FLOOR_PRICES = {
     "hat": Decimal("26.99"),
     "phone_case": Decimal("22.99"),
     "sticker": Decimal("6.99"),
-    "poster": Decimal("29.99"),
 }
 
 

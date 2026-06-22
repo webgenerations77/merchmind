@@ -85,7 +85,7 @@ _PRIMARY_MAP = {
     "hybrid": "tshirt",
     "text_icon": "tshirt",
     "text_only": "mug",
-    "typographic": "poster",
+    "typographic": "mug",
 }
 
 
@@ -115,7 +115,7 @@ def select_primary_product_type(
         f'Trend/topic: "{raw_signal or concept_name}"\n'
         f"Available product types: {', '.join(product_types)}\n\n"
         "Which product type is this design MOST optimized for? Consider:\n"
-        "1. Design composition — does the layout best suit a wearable, drinkware, wall art, accessory, or sticker?\n"
+        "1. Design composition — does the layout best suit a wearable (tshirt/hat), drinkware (mug), phone accessory, or sticker?\n"
         "2. Format fit — which product's format (aspect ratio, print area, viewing distance) best showcases this design?\n"
         "3. Core visual intent — what was this design primarily conceived to be?\n"
         "4. Commercial appeal — on which product would this design sell best?\n\n"
@@ -159,16 +159,16 @@ def assign_product_bundle(archetype: str, quality_breakdown: dict, max_products:
     Assign product types based on archetype and quality.
     Always includes at least 5 types. Returns list of product type strings.
     """
-    all_types = ["tshirt", "mug", "hat", "phone_case", "sticker", "poster"]
+    all_types = ["tshirt", "mug", "hat", "phone_case", "sticker"]
 
     if archetype == "illustration":
-        types = ["tshirt", "mug", "poster", "phone_case", "sticker"]
+        types = ["tshirt", "mug", "phone_case", "sticker"]
     elif archetype in ("text_only", "typographic"):
-        types = ["tshirt", "mug", "hat", "phone_case", "sticker", "poster"]
+        types = ["tshirt", "mug", "hat", "phone_case", "sticker"]
     elif archetype == "text_icon":
         types = ["tshirt", "mug", "hat", "phone_case", "sticker"]
     else:
-        types = ["tshirt", "mug", "hat", "phone_case", "sticker", "poster"]
+        types = ["tshirt", "mug", "hat", "phone_case", "sticker"]
 
     for t in all_types:
         if t not in types:

@@ -132,8 +132,7 @@ export type ProductType =
   | 'mug'
   | 'hat'
   | 'sticker'
-  | 'phone_case'
-  | 'poster';
+  | 'phone_case';
 
 export type PublishStatus =
   | 'queued'
@@ -259,7 +258,6 @@ export interface FloorPrices {
   hat: number;
   sticker: number;
   phone_case: number;
-  poster: number;
 }
 
 export interface AppSettings {

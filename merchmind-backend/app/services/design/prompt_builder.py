@@ -25,7 +25,6 @@ _PRODUCT_BACKGROUND_CONTEXT = {
     "mug": {"bg": "light", "text_color": "dark (near-black or deep saturated color)", "reason": "printed on white ceramic"},
     "phone_case": {"bg": "light", "text_color": "dark (near-black or deep saturated color)", "reason": "printed on light case surface"},
     "sticker": {"bg": "transparent", "text_color": "dark with outline/shadow for contrast", "reason": "die-cut on various surfaces"},
-    "poster": {"bg": "light", "text_color": "dark (near-black or deep rich color)", "reason": "printed on white paper stock"},
 }
 
 _PRODUCT_FORMAT_TEMPLATES = {
@@ -48,16 +47,6 @@ _PRODUCT_FORMAT_TEMPLATES = {
             "Bold colors that pop against white ceramic."
         ),
         "prompt_keywords": "mug print design, wraparound graphic, ceramic-ready artwork",
-    },
-    "poster": {
-        "aspect_ratio": "3:4",
-        "composition": (
-            "Full bleed wall art composition — uses the entire canvas edge to edge. "
-            "Designed as a standalone art print for display at 18x24 or 24x36 inches. "
-            "Typographic hierarchy if text is involved. Rich detail that rewards close viewing. "
-            "Think gallery art print, not merch graphic."
-        ),
-        "prompt_keywords": "art print, wall art, poster design, full bleed illustration, gallery piece",
     },
     "phone_case": {
         "aspect_ratio": "9:16",
@@ -103,7 +92,7 @@ _ARCHETYPE_TEMPLATES = {
         "A bold, eye-catching graphic design of {subject}. "
         "Strong visual impact with a clear central motif, professional quality with space for text overlay. "
         "Clean layered composition, vibrant colors with limited palette (3-5 colors), modern design aesthetic. "
-        "Graphic poster style with strong shapes and contrast. {style_lock}"
+        "Strong graphic style with bold shapes and contrast. {style_lock}"
     ),
     "text_icon": (
         "A bold, iconic symbol representing {subject}. "
@@ -129,8 +118,9 @@ _SYSTEM = (
     "color palette (name 3-5 specific colors), composition, "
     "and rendering quality (sharp, clean edges, print-ready). "
     "IMPORTANT: Tailor composition and format to the specific product type. "
-    "A poster should be full-bleed wall art; a phone case needs vertical format with central focus; "
-    "a hat needs a compact emblem; a sticker needs a die-cut shape. "
+    "A phone case needs vertical format with central focus; "
+    "a hat needs a compact emblem; a sticker needs a die-cut shape with high contrast, "
+    "clean edges, and a design that works at small scale on both transparent and white backgrounds. "
     "Avoid: photorealism, 3D renders, complex scenes, busy backgrounds, gradients. "
     "Reply with only the prompt text, no extra commentary."
 )
@@ -225,7 +215,7 @@ def preview_all_product_prompts(
     Returns {product_type: {prompt, aspect_ratio, composition, keywords, background}}.
     Used for reviewing format-specific prompts before a batch run.
     """
-    all_types = ["tshirt", "mug", "poster", "phone_case", "hat", "sticker"]
+    all_types = ["tshirt", "mug", "phone_case", "hat", "sticker"]
     results = {}
     for pt in all_types:
         fmt = get_product_format(pt)

@@ -37,7 +37,6 @@ _TEMPLATE_MAP: dict[str, dict] = {
     # },
     # "hat": { ... },
     # "phone_case": { ... },
-    # "poster": { ... },
     # "sticker": { ... },
 }
 

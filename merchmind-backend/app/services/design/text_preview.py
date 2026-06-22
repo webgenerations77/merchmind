@@ -51,7 +51,7 @@ def _wrap_text(text: str, font: ImageFont.FreeTypeFont | ImageFont.ImageFont, ma
     return lines or [text]
 
 
-_LIGHT_PRODUCT_TYPES = {"mug", "poster", "sticker", "phone_case"}
+_LIGHT_PRODUCT_TYPES = {"mug", "sticker", "phone_case"}
 _DARK_PRODUCT_TYPES = {"tshirt", "hat"}
 
 

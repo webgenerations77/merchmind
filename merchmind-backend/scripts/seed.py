@@ -73,8 +73,8 @@ def seed():
 
         print("Seeding settings...")
         settings = AppSettings(
-            base_markup={"tshirt": 2.5, "mug": 2.8, "hat": 2.5, "phone_case": 2.5, "sticker": 3.0, "poster": 2.5},
-            floor_prices={"tshirt": 24.99, "mug": 18.99, "hat": 26.99, "phone_case": 22.99, "sticker": 6.99, "poster": 29.99},
+            base_markup={"tshirt": 2.5, "mug": 2.8, "hat": 2.5, "phone_case": 2.5, "sticker": 3.0},
+            floor_prices={"tshirt": 24.99, "mug": 18.99, "hat": 26.99, "phone_case": 22.99, "sticker": 6.99},
             trend_boost_max=0.20,
             batch_day="sunday",
             min_queue_size=10,
@@ -138,7 +138,7 @@ def seed():
                 "quality_score": 30,
                 "quality_breakdown": {"concept_clarity": 8, "visual_appeal": 8, "merch_suitability": 7, "originality": 7},
                 "final_score": 71,
-                "product_types": ["tshirt", "poster"],
+                "product_types": ["tshirt", "sticker"],
             },
         ]
 
@@ -176,9 +176,9 @@ def seed():
             db.flush()
 
             for pt in sd["product_types"]:
-                base_cost = {"tshirt": 8.50, "mug": 6.00, "hat": 10.00, "phone_case": 8.00, "sticker": 2.50, "poster": 12.00}[pt]
+                base_cost = {"tshirt": 8.50, "mug": 6.00, "hat": 10.00, "phone_case": 8.00, "sticker": 2.50}[pt]
                 markup = 2.5
-                retail = round(max(base_cost * markup, {"tshirt": 24.99, "mug": 18.99, "hat": 26.99, "phone_case": 22.99, "sticker": 6.99, "poster": 29.99}[pt]), 2)
+                retail = round(max(base_cost * markup, {"tshirt": 24.99, "mug": 18.99, "hat": 26.99, "phone_case": 22.99, "sticker": 6.99}[pt]), 2)
                 product = Product(
                     design_id=design.id,
                     product_type=pt,
@@ -186,7 +186,7 @@ def seed():
                     base_markup=markup,
                     trend_adjustment=round(sd["final_score"] / 100 * 0.20 * base_cost * markup, 2),
                     retail_price=retail,
-                    floor_price={"tshirt": 24.99, "mug": 18.99, "hat": 26.99, "phone_case": 22.99, "sticker": 6.99, "poster": 29.99}[pt],
+                    floor_price={"tshirt": 24.99, "mug": 18.99, "hat": 26.99, "phone_case": 22.99, "sticker": 6.99}[pt],
                     publish_status="pending",
                 )
                 db.add(product)

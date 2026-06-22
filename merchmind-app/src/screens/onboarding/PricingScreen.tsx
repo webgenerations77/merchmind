@@ -11,7 +11,6 @@ const DEFAULT_FLOORS: Record<string, number> = {
   'Hat': 26.99,
   'Sticker': 6.99,
   'Phone Case': 22.99,
-  'Poster': 29.99,
 };
 
 export default function PricingScreen({ navigation }: OnboardingPricingProps) {

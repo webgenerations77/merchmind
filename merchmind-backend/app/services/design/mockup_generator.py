@@ -24,18 +24,16 @@ _TEMPLATES = {
         "design_area": (175, 100, 625, 450),
         "label": "Mug",
     },
-    "poster": {
-        "size": (800, 1000),
-        "bg_color": (245, 242, 237),
-        "design_area": (80, 120, 640, 760),
-        "frame_color": (60, 60, 60),
-        "frame_width": 4,
-        "label": "Poster",
+    "sticker": {
+        "size": (600, 600),
+        "bg_color": (240, 240, 240),
+        "design_area": (100, 100, 500, 500),
+        "label": "Sticker",
     },
     "phone_case": {
         "size": (500, 900),
         "bg_color": (30, 30, 30),
-        "design_area": (75, 180, 350, 550),
+        "design_area": (70, 120, 430, 700),
         "corner_radius": 40,
         "label": "Phone Case",
     },
@@ -93,12 +91,9 @@ def generate_mockup(product_type: str, design_bytes: bytes, archetype: str | Non
             draw.arc([650, 150, 770, 400], start=270, end=90, fill=mug_color, width=3)
             draw.line([(120, 500), (680, 500)], fill=mug_color, width=3)
 
-        elif product_type == "poster":
-            fc = template["frame_color"]
-            fw = template["frame_width"]
-            draw.rectangle([area[0] - fw, area[1] - fw, area[2] + fw, area[3] + fw], outline=fc, width=fw)
-            shadow_color = (220, 218, 213)
-            draw.rectangle([area[0] + 4, area[3] + fw, area[2] + fw + 4, area[3] + fw + 20], fill=shadow_color)
+        elif product_type == "sticker":
+            outline_color = (200, 200, 200)
+            draw.rounded_rectangle([area[0] - 8, area[1] - 8, area[2] + 8, area[3] + 8], radius=20, outline=outline_color, width=2)
 
         elif product_type == "phone_case":
             outline_color = (80, 80, 80)

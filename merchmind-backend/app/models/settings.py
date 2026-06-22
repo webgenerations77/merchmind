@@ -13,14 +13,14 @@ class AppSettings(Base):
         JSONB,
         default=lambda: {
             "tshirt": 2.5, "mug": 2.8, "hat": 2.5,
-            "phone_case": 2.5, "sticker": 3.0, "poster": 2.5,
+            "phone_case": 2.5, "sticker": 3.0,
         },
     )
     floor_prices = Column(
         JSONB,
         default=lambda: {
             "tshirt": 24.99, "mug": 18.99, "hat": 26.99,
-            "phone_case": 22.99, "sticker": 6.99, "poster": 29.99,
+            "phone_case": 22.99, "sticker": 6.99,
         },
     )
     trend_boost_max = Column(Numeric(5, 4), default=0.20)

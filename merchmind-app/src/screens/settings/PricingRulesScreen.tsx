@@ -13,7 +13,6 @@ const PRODUCT_TYPE_LABELS: Array<{ key: keyof FloorPrices; label: string }> = [
   { key: 'hat', label: 'Hat' },
   { key: 'sticker', label: 'Sticker' },
   { key: 'phone_case', label: 'Phone Case' },
-  { key: 'poster', label: 'Poster' },
 ];
 
 export default function PricingRulesScreen({}: PricingRulesScreenProps) {
