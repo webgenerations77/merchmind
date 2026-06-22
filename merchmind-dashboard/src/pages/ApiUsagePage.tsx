@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { getUsageSummary, getUsageHistory, type UsageSummary, type UsageLogEntry } from '../api/apiUsage';
+import { useEffect, useState, useCallback } from 'react';
+import { getUsageSummary, getUsageHistory, getApiBalances, type UsageSummary, type UsageLogEntry, type ApiBalanceResult } from '../api/apiUsage';
 import { formatCurrency, formatCostPrecise } from '../utils/formatters';
 
 const PERIODS = [
@@ -137,11 +137,92 @@ function CallHistoryPanel({ period, service, operation, onClose }: {
   );
 }
 
+const SERVICE_LABELS: Record<string, string> = {
+  anthropic: 'Anthropic (Claude)',
+  openai: 'OpenAI (DALL-E)',
+  replicate: 'Replicate (Flux)',
+  printify: 'Printify',
+};
+
+const SERVICE_ICONS: Record<string, string> = {
+  anthropic: '🧠',
+  openai: '🎨',
+  replicate: '⚡',
+  printify: '🖨️',
+};
+
+function BalanceCards({ balances, onRefresh, refreshing }: { balances: ApiBalanceResult | null; onRefresh: () => void; refreshing: boolean }) {
+  if (!balances) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold text-text-primary">Provider Status</h2>
+        <div className="flex items-center gap-3">
+          {balances.checked_at && (
+            <span className="text-xs text-text-tertiary">
+              Updated {new Date(balances.checked_at).toLocaleTimeString()}
+            </span>
+          )}
+          <button
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="px-3 py-1.5 rounded-lg bg-bg-tertiary border border-border text-xs text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50"
+          >
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {balances.providers.map((p) => (
+          <a
+            key={p.service}
+            href={p.console_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-bg-secondary border border-border rounded-xl p-4 hover:border-accent/50 transition-colors group"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">{SERVICE_ICONS[p.service] || '🔌'}</span>
+              <span className="text-sm font-medium text-text-primary capitalize">{SERVICE_LABELS[p.service] || p.service}</span>
+            </div>
+            {p.available ? (
+              <div>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-approve/15 text-approve text-xs font-medium">
+                  Connected
+                </span>
+                {p.username && <p className="text-xs text-text-tertiary mt-1">{p.username}</p>}
+                {p.shop_count !== undefined && <p className="text-xs text-text-tertiary mt-1">{p.shop_count} shop(s)</p>}
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs text-text-tertiary">{p.message}</p>
+                <span className="text-xs text-accent group-hover:underline mt-1 inline-block">View console →</span>
+              </div>
+            )}
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function ApiUsagePage() {
   const [summary, setSummary] = useState<UsageSummary | null>(null);
   const [period, setPeriod] = useState('month');
   const [loading, setLoading] = useState(true);
   const [historyFilter, setHistoryFilter] = useState<{ service?: string; operation?: string } | null>(null);
+  const [balances, setBalances] = useState<ApiBalanceResult | null>(null);
+  const [balanceRefreshing, setBalanceRefreshing] = useState(false);
+
+  const fetchBalances = useCallback(() => {
+    setBalanceRefreshing(true);
+    getApiBalances().then(setBalances).catch(() => null).finally(() => setBalanceRefreshing(false));
+  }, []);
+
+  useEffect(() => {
+    fetchBalances();
+  }, [fetchBalances]);
 
   useEffect(() => {
     setLoading(true);
@@ -171,6 +252,8 @@ export default function ApiUsagePage() {
           ))}
         </div>
       </div>
+
+      <BalanceCards balances={balances} onRefresh={fetchBalances} refreshing={balanceRefreshing} />
 
       {summary && (
         <>

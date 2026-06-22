@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { listIdeas, createIdea, generateSavedIdea, deleteIdea, type CustomIdea } from '../api/ideas';
 import { getDesign } from '../api/designs';
 import type { DesignOut } from '../types/api';
@@ -15,7 +16,7 @@ const ARCHETYPE_OPTIONS = [
   { value: 'text_only', label: 'Text Only — slogan/phrase' },
 ];
 
-function IdeaResult({ idea, onGenerate, onDelete }: { idea: CustomIdea; onGenerate: (id: string) => void; onDelete: (id: string) => void }) {
+function IdeaResult({ idea, onGenerate, onDelete, onOpenDesign }: { idea: CustomIdea; onGenerate: (id: string) => void; onDelete: (id: string) => void; onOpenDesign: (designId: string) => void }) {
   const [design, setDesign] = useState<DesignOut | null>(null);
 
   useEffect(() => {
@@ -52,7 +53,10 @@ function IdeaResult({ idea, onGenerate, onDelete }: { idea: CustomIdea; onGenera
       </div>
 
       {design && (
-        <div className="flex gap-4 mt-3 pt-3 border-t border-border">
+        <div
+          className="flex gap-4 mt-3 pt-3 border-t border-border cursor-pointer hover:bg-bg-tertiary/30 rounded-lg -mx-2 px-2 py-2 transition-colors"
+          onClick={() => onOpenDesign(design.id)}
+        >
           {design.processed_image_url ? (
             <ClickableImage src={design.processed_image_url} alt={design.concept_name} className="w-24 h-24 object-cover rounded-lg shrink-0" />
           ) : (
@@ -75,6 +79,7 @@ function IdeaResult({ idea, onGenerate, onDelete }: { idea: CustomIdea; onGenera
                 ))}
               </div>
             )}
+            <p className="text-xs text-accent mt-2">View design →</p>
           </div>
         </div>
       )}
@@ -83,6 +88,7 @@ function IdeaResult({ idea, onGenerate, onDelete }: { idea: CustomIdea; onGenera
 }
 
 export default function DrewsMindPage() {
+  const navigate = useNavigate();
   const [ideas, setIdeas] = useState<CustomIdea[]>([]);
   const [inputText, setInputText] = useState('');
   const [archetype, setArchetype] = useState('');
@@ -90,6 +96,10 @@ export default function DrewsMindPage() {
   const [loading, setLoading] = useState(true);
 
   const load = () => listIdeas().then(setIdeas).catch(() => null).finally(() => setLoading(false));
+
+  const handleOpenDesign = (designId: string) => {
+    navigate('/review', { state: { openDesignId: designId, from: '/drews-mind' } });
+  };
 
   useEffect(() => { load(); }, []);
 
@@ -186,7 +196,7 @@ export default function DrewsMindPage() {
           <h2 className="text-lg font-semibold text-text-primary mb-3">Saved for Later ({saved.length})</h2>
           <div className="space-y-3">
             {saved.map((idea) => (
-              <IdeaResult key={idea.id} idea={idea} onGenerate={handleGenerate} onDelete={handleDelete} />
+              <IdeaResult key={idea.id} idea={idea} onGenerate={handleGenerate} onDelete={handleDelete} onOpenDesign={handleOpenDesign} />
             ))}
           </div>
         </div>
@@ -197,7 +207,7 @@ export default function DrewsMindPage() {
           <h2 className="text-lg font-semibold text-text-primary mb-3">Your Ideas</h2>
           <div className="space-y-3">
             {active.map((idea) => (
-              <IdeaResult key={idea.id} idea={idea} onGenerate={handleGenerate} onDelete={handleDelete} />
+              <IdeaResult key={idea.id} idea={idea} onGenerate={handleGenerate} onDelete={handleDelete} onOpenDesign={handleOpenDesign} />
             ))}
           </div>
         </div>

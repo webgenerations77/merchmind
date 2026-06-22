@@ -65,3 +65,23 @@ export async function getUsageHistory(
   const { data } = await apiClient.get<ApiResponse<UsageHistoryResult>>(`/api-usage/history?${params}`);
   return data.data;
 }
+
+export interface ProviderBalance {
+  service: string;
+  available: boolean;
+  message?: string;
+  console_url: string;
+  username?: string;
+  type?: string;
+  shop_count?: number;
+}
+
+export interface ApiBalanceResult {
+  providers: ProviderBalance[];
+  checked_at: string;
+}
+
+export async function getApiBalances(): Promise<ApiBalanceResult> {
+  const { data } = await apiClient.get<ApiResponse<ApiBalanceResult>>('/api-usage/balances');
+  return data.data;
+}

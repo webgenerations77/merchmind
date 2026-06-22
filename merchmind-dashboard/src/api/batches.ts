@@ -21,8 +21,15 @@ export async function getCurrentBatch(): Promise<BatchOut | null> {
   return data.data;
 }
 
-export async function triggerBatch(): Promise<{ task_id: string; message: string }> {
-  const { data } = await apiClient.post<ApiResponse<{ task_id: string; message: string }>>('/batches/trigger');
+export interface BatchConfig {
+  num_designs?: number;
+  trend_sources?: string[];
+  style_filter?: string;
+  product_focus?: string[];
+}
+
+export async function triggerBatch(config?: BatchConfig): Promise<{ task_id: string; message: string }> {
+  const { data } = await apiClient.post<ApiResponse<{ task_id: string; message: string }>>('/batches/trigger', config || {});
   return data.data;
 }
 

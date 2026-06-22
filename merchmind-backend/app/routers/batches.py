@@ -57,11 +57,38 @@ def get_batch(batch_id: UUID, db: Session = Depends(get_db), _: str = Depends(ve
 
 
 @router.post("/trigger")
-def trigger_batch(max_designs: Optional[int] = None, max_trends: Optional[int] = None, _: str = Depends(verify_api_key)):
-    """Manually trigger the weekly batch pipeline. Optional max_designs and max_trends for testing."""
+def trigger_batch(
+    body: Optional[dict] = None,
+    max_designs: Optional[int] = None,
+    max_trends: Optional[int] = None,
+    _: str = Depends(verify_api_key),
+):
+    """Manually trigger the weekly batch pipeline with optional configuration."""
     from app.tasks.batch_pipeline import run_weekly_batch
-    task = run_weekly_batch.delay(None, max_designs, max_trends)
-    return _envelope({"task_id": task.id, "message": "Batch pipeline triggered", "max_designs": max_designs, "max_trends": max_trends})
+
+    config = body or {}
+    num_designs = config.get("num_designs") or max_designs
+    trend_sources = config.get("trend_sources")
+    style_filter = config.get("style_filter")
+    product_focus = config.get("product_focus")
+
+    task = run_weekly_batch.delay(
+        None,
+        num_designs,
+        max_trends,
+        trend_sources=trend_sources,
+        style_filter=style_filter,
+        product_focus=product_focus,
+    )
+    return _envelope({
+        "task_id": task.id,
+        "message": "Batch pipeline triggered",
+        "max_designs": num_designs,
+        "max_trends": max_trends,
+        "trend_sources": trend_sources,
+        "style_filter": style_filter,
+        "product_focus": product_focus,
+    })
 
 
 @router.post("/{batch_id}/cancel")

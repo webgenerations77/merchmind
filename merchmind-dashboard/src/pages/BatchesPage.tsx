@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { listBatches, triggerBatch } from '../api/batches';
+import { listBatches, triggerBatch, type BatchConfig } from '../api/batches';
 import type { BatchOut } from '../types/api';
 import StatusBadge from '../components/shared/StatusBadge';
 import BatchDetailModal from '../components/batches/BatchDetailModal';
+import BatchConfigModal from '../components/batches/BatchConfigModal';
 import { formatDate, formatTimeAgo } from '../utils/formatters';
 
 export default function BatchesPage() {
@@ -10,15 +11,16 @@ export default function BatchesPage() {
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState(false);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+  const [showConfigModal, setShowConfigModal] = useState(false);
 
   const load = () => listBatches().then(setBatches).finally(() => setLoading(false));
   useEffect(() => { load(); }, []);
 
-  const handleTrigger = async () => {
-    if (!confirm('Run a new batch now? This will scrape trends, score them, and generate designs.')) return;
+  const handleTrigger = async (config: BatchConfig) => {
+    setShowConfigModal(false);
     setTriggering(true);
     try {
-      await triggerBatch();
+      await triggerBatch(config);
       setTimeout(load, 3000);
     } catch { /* ignore */ }
     setTriggering(false);
@@ -34,11 +36,11 @@ export default function BatchesPage() {
           <p className="text-sm text-text-secondary mt-1">{batches.length} batch runs</p>
         </div>
         <button
-          onClick={handleTrigger}
+          onClick={() => setShowConfigModal(true)}
           disabled={triggering}
           className="px-4 py-2 rounded-lg bg-accent text-white font-semibold text-sm hover:bg-accent/80 transition-colors disabled:opacity-50"
         >
-          {triggering ? 'Triggering...' : 'Run Batch Now'}
+          {triggering ? 'Running...' : 'Run Batch'}
         </button>
       </div>
 
@@ -92,6 +94,13 @@ export default function BatchesPage() {
           batchId={selectedBatchId}
           onClose={() => setSelectedBatchId(null)}
           onRefresh={load}
+        />
+      )}
+
+      {showConfigModal && (
+        <BatchConfigModal
+          onRun={handleTrigger}
+          onClose={() => setShowConfigModal(false)}
         />
       )}
     </div>

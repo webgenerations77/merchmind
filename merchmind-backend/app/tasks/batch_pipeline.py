@@ -67,7 +67,7 @@ def _emit_progress(batch_id: str, step: int, total: int, message: str, data: dic
     acks_late=True,
     name="app.tasks.batch_pipeline.run_weekly_batch",
 )
-def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional[int] = None, max_trends: Optional[int] = 30):
+def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional[int] = None, max_trends: Optional[int] = 30, trend_sources: Optional[list] = None, style_filter: Optional[str] = None, product_focus: Optional[list] = None):
     """
     Main Sunday batch task. Creates or resumes a batch and runs all 8 pipeline steps.
     Optional max_designs/max_trends limit output for testing.
@@ -98,7 +98,6 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
         # Load active settings
         settings_row = db.query(AppSettings).first()
         score_threshold = settings_row.score_threshold if settings_row else 35
-        min_queue = settings_row.min_queue_size if settings_row else 10
         max_queue = settings_row.max_queue_size if settings_row else 25
         quality_threshold = settings_row.quality_threshold if settings_row else 28
         trend_boost_max = float(settings_row.trend_boost_max) if settings_row else 0.20
@@ -112,37 +111,42 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
         active_clusters = db.query(NicheCluster).filter(NicheCluster.active == True).all()
 
         # Step 2: Scrape intelligence sources
-        _emit_progress(bid, 2, 8, "Scraping trend sources")
+        enabled_sources = set(trend_sources) if trend_sources else {"google_trends", "reddit", "twitter", "seasonal"}
+        _emit_progress(bid, 2, 8, f"Scraping trend sources: {', '.join(enabled_sources)}")
         raw_signals = []
 
         # Google Trends
-        try:
-            raw_signals.extend(google_trends.fetch_us_trending())
-            for cluster in active_clusters:
-                raw_signals.extend(google_trends.fetch_rising_queries(cluster.keywords, cluster.name))
-        except Exception as e:
-            _log_batch_error(batch, db, f"Google Trends scraper failed: {e}")
+        if "google_trends" in enabled_sources:
+            try:
+                raw_signals.extend(google_trends.fetch_us_trending())
+                for cluster in active_clusters:
+                    raw_signals.extend(google_trends.fetch_rising_queries(cluster.keywords, cluster.name))
+            except Exception as e:
+                _log_batch_error(batch, db, f"Google Trends scraper failed: {e}")
 
         # Reddit
-        try:
-            for cluster in active_clusters:
-                raw_signals.extend(reddit_scraper.fetch_subreddit_signals(cluster.subreddits, cluster.name))
-        except Exception as e:
-            _log_batch_error(batch, db, f"Reddit scraper failed: {e}")
+        if "reddit" in enabled_sources:
+            try:
+                for cluster in active_clusters:
+                    raw_signals.extend(reddit_scraper.fetch_subreddit_signals(cluster.subreddits, cluster.name))
+            except Exception as e:
+                _log_batch_error(batch, db, f"Reddit scraper failed: {e}")
 
         # Twitter
-        try:
-            raw_signals.extend(twitter_scraper.fetch_us_trends())
-            for cluster in active_clusters:
-                raw_signals.extend(twitter_scraper.fetch_keyword_tweets(cluster.keywords, cluster.name))
-        except Exception as e:
-            _log_batch_error(batch, db, f"Twitter scraper failed: {e}")
+        if "twitter" in enabled_sources:
+            try:
+                raw_signals.extend(twitter_scraper.fetch_us_trends())
+                for cluster in active_clusters:
+                    raw_signals.extend(twitter_scraper.fetch_keyword_tweets(cluster.keywords, cluster.name))
+            except Exception as e:
+                _log_batch_error(batch, db, f"Twitter scraper failed: {e}")
 
         # Seasonal calendar
-        try:
-            raw_signals.extend(seasonal_calendar.get_upcoming_events())
-        except Exception as e:
-            _log_batch_error(batch, db, f"Seasonal calendar failed: {e}")
+        if "seasonal" in enabled_sources:
+            try:
+                raw_signals.extend(seasonal_calendar.get_upcoming_events())
+            except Exception as e:
+                _log_batch_error(batch, db, f"Seasonal calendar failed: {e}")
 
         logger.info(f"Scraped {len(raw_signals)} raw signals")
 
@@ -261,7 +265,7 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                 _BIAS_ROTATION = ("image_only", "text", "image_text")
                 archetype_bias = _BIAS_ROTATION[i % 3]
                 logger.info(f"Running design generation inline for trend {trend.id} (bias={archetype_bias})")
-                _generate_design_for_trend(str(trend.id), str(batch.id), {
+                pipeline_cfg = {
                     "quality_threshold": quality_threshold,
                     "trend_boost_max": trend_boost_max,
                     "base_markup": base_markup,
@@ -272,7 +276,12 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                     "archetype_bias": archetype_bias,
                     "marketing_generation_enabled": marketing_generation_enabled,
                     "_batch_item_id": str(item.id),
-                })
+                }
+                if style_filter:
+                    pipeline_cfg["style_filter"] = style_filter
+                if product_focus:
+                    pipeline_cfg["product_focus"] = product_focus
+                _generate_design_for_trend(str(trend.id), str(batch.id), pipeline_cfg)
                 approved_count += 1
 
                 # Update item on success — pull design_id + product types from DB
@@ -307,17 +316,6 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
 
         # Step 8: Finalize
         _emit_progress(bid, 8, 8, "Batch complete — sending notifications")
-
-        # Fire alert if below min queue
-        if len(queued_trends) < min_queue:
-            alert = Alert(
-                batch_id=batch.id,
-                type="empty_batch",
-                severity="warning",
-                message=f"Batch generated only {len(queued_trends)} ideas (minimum: {min_queue}). Manual ideas unlocked.",
-            )
-            db.add(alert)
-            db.commit()
 
         notify_batch_ready(str(batch.id), len(queued_trends))
         logger.info(f"Batch {bid} complete: {len(queued_trends)} designs queued")
@@ -399,7 +397,8 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
         logger.info(f"design_task[{trend_id[:8]}] design created id={design_id[:8]}")
 
         # 4c: Build image prompt (with preference learning + product format)
-        primary_product = default_primary_product_type(archetype)
+        product_focus_list = pipeline_settings.get("product_focus")
+        primary_product = product_focus_list[0] if product_focus_list else default_primary_product_type(archetype)
         fmt = get_product_format(primary_product)
         image_prompt = build_image_prompt(
             trend.raw_signal, archetype, niche_name, design.concept_name,
@@ -410,6 +409,9 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
             pref_suffix = get_prompt_preferences(db)
             if pref_suffix:
                 image_prompt = f"{image_prompt} {pref_suffix}"
+            style_hint = pipeline_settings.get("style_filter")
+            if style_hint:
+                image_prompt = f"{image_prompt} Style direction: {style_hint}."
         design.image_prompt = image_prompt
         db.commit()
         logger.info(
@@ -570,6 +572,9 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
 
         # 4h: Assign product bundle + AI-driven primary product type
         product_types = assign_product_bundle(design.archetype, design.quality_breakdown or {})
+        if pipeline_settings.get("product_focus"):
+            focus = pipeline_settings["product_focus"]
+            product_types = [pt for pt in focus if pt in product_types] or focus[:4]
         primary_result = select_primary_product_type(
             design.concept_name, design.archetype, product_types, trend.raw_signal,
         )

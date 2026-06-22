@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useReviewStore } from '../stores/reviewStore';
 import { getDesign, getReviewQueue } from '../api/designs';
-import { listBatches, triggerBatch } from '../api/batches';
+import { listBatches, triggerBatch, type BatchConfig } from '../api/batches';
+import BatchConfigModal from '../components/batches/BatchConfigModal';
 import { listProducts } from '../api/products';
 import { getApiBalance, type ApiBalanceResult } from '../api/health';
 import MockupTabs from '../components/shared/MockupTabs';
@@ -792,6 +794,9 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
 
 export default function ReviewPage() {
   const { queue, archivedQueue, sessionActions, publishErrors, isLoading, error, fetchQueue, fetchArchived, approveDesign, rejectDesign, archiveDesign, unarchiveDesign, revisitDesign, toggleFeatured } = useReviewStore();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const navFrom = (location.state as { from?: string } | null)?.from;
   const [selectedDesign, setSelectedDesign] = useState<DesignOut | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [runningBatch, setRunningBatch] = useState<BatchOut | null>(null);
@@ -831,19 +836,32 @@ export default function ReviewPage() {
   }, []);  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    const openId = (location.state as { openDesignId?: string } | null)?.openDesignId;
+    if (openId && !selectedDesign) {
+      openDetail(openId);
+    }
+  }, [location.state]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (!runningBatch) return;
     const interval = setInterval(checkBatchStatus, 5000);
     return () => clearInterval(interval);
   }, [runningBatch, checkBatchStatus]);
 
-  const handleTrigger = async () => {
+  const [showBatchConfig, setShowBatchConfig] = useState(false);
+
+  const handleTriggerClick = async () => {
     const balance = await getApiBalance().catch(() => null);
     setApiBalance(balance);
     if (balance && !balance.ok && !balanceOverride) return;
-    if (!confirm('Run a new batch now?')) return;
+    setShowBatchConfig(true);
+  };
+
+  const handleTrigger = async (config: BatchConfig) => {
+    setShowBatchConfig(false);
     setTriggering(true);
     try {
-      await triggerBatch();
+      await triggerBatch(config);
       setTimeout(checkBatchStatus, 2000);
     } catch { /* ignore */ }
     setTriggering(false);
@@ -892,6 +910,10 @@ export default function ReviewPage() {
       await approveDesign(id, productTypes);
     } else if (action === 'reject') {
       await rejectDesign(id);
+      if (navFrom) {
+        navigate(navFrom);
+        return;
+      }
     } else if (action === 'archive') {
       await archiveDesign(id);
       fetchArchived();
@@ -942,7 +964,7 @@ export default function ReviewPage() {
           </button>
           {!runningBatch && (
             <button
-              onClick={handleTrigger}
+              onClick={handleTriggerClick}
               disabled={triggering}
               className="px-3 py-1.5 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/80 transition-colors disabled:opacity-50"
             >
@@ -967,7 +989,7 @@ export default function ReviewPage() {
               </div>
             </div>
             <button
-              onClick={() => { setBalanceOverride(true); handleTrigger(); }}
+              onClick={() => { setBalanceOverride(true); handleTriggerClick(); }}
               className="px-3 py-1.5 rounded-lg bg-confidence-low/20 text-confidence-low text-xs font-medium hover:bg-confidence-low/30 transition-colors shrink-0"
             >
               Continue Anyway
@@ -1110,6 +1132,13 @@ export default function ReviewPage() {
             })}
           </div>
         </>
+      )}
+
+      {showBatchConfig && (
+        <BatchConfigModal
+          onRun={handleTrigger}
+          onClose={() => setShowBatchConfig(false)}
+        />
       )}
     </div>
   );
