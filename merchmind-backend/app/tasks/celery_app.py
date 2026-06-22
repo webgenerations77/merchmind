@@ -19,6 +19,7 @@ celery_app = Celery(
         "app.tasks.social_tasks",
         "app.tasks.collection_generator",
         "app.tasks.idea_generator",
+        "app.tasks.drop_publisher",
     ],
 )
 
@@ -106,6 +107,10 @@ celery_app.conf.beat_schedule = {
     "analytics-sync": {
         "task": "tasks.analytics_sync",
         "schedule": crontab(hour=6, minute=0, day_of_week=1),   # Monday 6am UTC
+    },
+    "check-scheduled-drops": {
+        "task": "app.tasks.drop_publisher.check_scheduled_drops",
+        "schedule": crontab(minute="*/5"),                       # Every 5 minutes
     },
     # "health-monitor": {
     #     "task": "tasks.health_monitor",

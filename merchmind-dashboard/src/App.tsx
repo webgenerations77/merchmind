@@ -12,6 +12,7 @@ import ApiUsagePage from './pages/ApiUsagePage';
 import CollectionsPage from './pages/CollectionsPage';
 import MarketingPage from './pages/MarketingPage';
 import DrewsMindPage from './pages/DrewsMindPage';
+import DropsPage from './pages/DropsPage';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/review" element={<ReviewPage />} />
         <Route path="/collections" element={<CollectionsPage />} />
         <Route path="/drews-mind" element={<DrewsMindPage />} />
+        <Route path="/drops" element={<DropsPage />} />
         <Route path="/marketing" element={<MarketingPage />} />
         <Route path="/products" element={<ProductsPage />} />
         <Route path="/batches" element={<BatchesPage />} />

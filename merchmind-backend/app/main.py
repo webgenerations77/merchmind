@@ -19,6 +19,7 @@ from app.routers import (
     batches,
     collections,
     designs,
+    drops,
     products,
     sales,
     alerts,
@@ -77,6 +78,7 @@ app.include_router(api_usage.router)
 app.include_router(batches.router)
 app.include_router(collections.router)
 app.include_router(designs.router)
+app.include_router(drops.router)
 app.include_router(products.router)
 app.include_router(sales.router)
 app.include_router(alerts.router)

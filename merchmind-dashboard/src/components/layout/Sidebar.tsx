@@ -7,6 +7,7 @@ const links = [
   { to: '/', label: 'Dashboard', icon: '~' },
   { to: '/collections', label: 'Collections', icon: '&' },
   { to: '/drews-mind', label: "Drew's Mind", icon: '!' },
+  { to: '/drops', label: 'Drops', icon: '>' },
   { to: '/marketing', label: 'Marketing', icon: '^' },
   { to: '/products', label: 'Products', icon: '%' },
   { to: '/batches', label: 'Batches', icon: '@' },

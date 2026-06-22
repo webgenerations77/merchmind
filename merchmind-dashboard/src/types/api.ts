@@ -136,6 +136,7 @@ export interface ProductOut {
   publish_status: string;
   published_at: string | null;
   unpublished_at: string | null;
+  drop_id: string | null;
   created_at: string;
 }
 
@@ -230,4 +231,27 @@ export interface SalesAnalytics {
   best_seller_product_id: string | null;
   revenue_by_product_type: Record<string, number>;
   weekly_trend: { week: string; revenue: number }[];
+}
+
+export interface MerchDropOut {
+  id: string;
+  name: string;
+  scheduled_at: string;
+  status: string;
+  product_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MerchDropDetail extends MerchDropOut {
+  products: {
+    id: string;
+    design_id: string;
+    product_type: string;
+    publish_status: string;
+    retail_price: number;
+    mockup_urls: Record<string, string>;
+    concept_name: string;
+    processed_image_url: string | null;
+  }[];
 }

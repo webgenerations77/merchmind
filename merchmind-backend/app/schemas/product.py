@@ -23,6 +23,7 @@ class ProductOut(BaseModel):
     publish_status: str
     published_at: Optional[datetime]
     unpublished_at: Optional[datetime]
+    drop_id: Optional[UUID] = None
     created_at: datetime
 
 

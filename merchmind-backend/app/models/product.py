@@ -38,8 +38,10 @@ class Product(Base):
     )
     published_at = Column(DateTime(timezone=True), nullable=True)
     unpublished_at = Column(DateTime(timezone=True), nullable=True)
+    drop_id = Column(UUID(as_uuid=True), ForeignKey("merch_drops.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
     design = relationship("Design", back_populates="products")
+    merch_drop = relationship("MerchDrop", back_populates="products")
     sales = relationship("Sale", back_populates="product")
     alerts = relationship("Alert", back_populates="product")

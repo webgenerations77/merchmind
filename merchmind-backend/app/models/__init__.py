@@ -13,9 +13,11 @@ from app.models.email_subscriber import EmailSubscriber
 from app.models.custom_idea import CustomIdea
 from app.models.api_usage_log import ApiUsageLog
 from app.models.batch_item import BatchItem
+from app.models.merch_drop import MerchDrop
+from app.models.drop_marketing_asset import DropMarketingAsset
 
 __all__ = [
     "Trend", "Batch", "Collection", "Design", "Product", "Sale", "Alert",
     "NicheCluster", "FeedbackLog", "AppSettings", "MarketingAsset",
-    "EmailSubscriber", "CustomIdea", "BatchItem",
+    "EmailSubscriber", "CustomIdea", "BatchItem", "MerchDrop", "DropMarketingAsset",
 ]

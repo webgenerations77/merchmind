@@ -392,7 +392,150 @@ function DesignCard({ item, action, onClick, onToggleFeatured }: {
   );
 }
 
-function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisit, onSuggestRegenerated, onToggleFeatured }: {
+function ScheduleDropModal({ designId, onClose, onScheduled }: {
+  designId: string;
+  onClose: () => void;
+  onScheduled: () => void;
+}) {
+  const [upcomingDrops, setUpcomingDrops] = useState<{ id: string; name: string; scheduled_at: string; product_count: number }[]>([]);
+  const [mode, setMode] = useState<'existing' | 'new'>('existing');
+  const [selectedDropId, setSelectedDropId] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newDate, setNewDate] = useState('');
+  const [newTime, setNewTime] = useState('12:00');
+  const [scheduling, setScheduling] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    import('../api/drops').then(({ listUpcomingDrops }) =>
+      listUpcomingDrops().then((drops) => {
+        setUpcomingDrops(drops);
+        if (drops.length === 0) setMode('new');
+        else setSelectedDropId(drops[0].id);
+      })
+    ).catch(() => null);
+  }, []);
+
+  const handleSchedule = async () => {
+    setScheduling(true);
+    setError('');
+    try {
+      const { scheduleDesignForDrop } = await import('../api/drops');
+      if (mode === 'existing') {
+        if (!selectedDropId) { setError('Select a drop'); setScheduling(false); return; }
+        await scheduleDesignForDrop(designId, { drop_id: selectedDropId });
+      } else {
+        if (!newName.trim() || !newDate) { setError('Name and date required'); setScheduling(false); return; }
+        const scheduled_at = new Date(`${newDate}T${newTime}:00`).toISOString();
+        await scheduleDesignForDrop(designId, { drop_name: newName.trim(), scheduled_at });
+      }
+      onScheduled();
+    } catch (e) {
+      setError((e as Error).message || 'Failed to schedule');
+    }
+    setScheduling(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-bg-secondary rounded-2xl border border-border w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-lg font-bold text-text-primary mb-1">Schedule for Drop</h3>
+        <p className="text-xs text-text-secondary mb-4">Products will be published to Printify now and go live on Shopify when the drop fires.</p>
+
+        {upcomingDrops.length > 0 && (
+          <div className="flex gap-1 mb-4 bg-bg-tertiary rounded-lg p-1">
+            <button
+              onClick={() => setMode('existing')}
+              className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === 'existing' ? 'bg-accent text-white' : 'text-text-secondary'}`}
+            >
+              Existing Drop
+            </button>
+            <button
+              onClick={() => setMode('new')}
+              className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === 'new' ? 'bg-accent text-white' : 'text-text-secondary'}`}
+            >
+              New Drop
+            </button>
+          </div>
+        )}
+
+        {mode === 'existing' ? (
+          <div className="space-y-2 mb-4">
+            {upcomingDrops.map((d) => (
+              <label key={d.id} className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer border transition-colors ${
+                selectedDropId === d.id ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/30'
+              }`}>
+                <input
+                  type="radio"
+                  name="drop"
+                  checked={selectedDropId === d.id}
+                  onChange={() => setSelectedDropId(d.id)}
+                  className="accent-accent"
+                />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-text-primary">{d.name}</p>
+                  <p className="text-xs text-text-tertiary">
+                    {new Date(d.scheduled_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                    {' · '}{d.product_count} product{d.product_count !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </label>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3 mb-4">
+            <div>
+              <label className="text-xs text-text-tertiary block mb-1">Drop Name</label>
+              <input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder='e.g. "Summer Drop Vol. 1"'
+                className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-border text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-text-tertiary block mb-1">Date</label>
+                <input
+                  type="date"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-border text-sm text-text-primary focus:outline-none focus:border-accent"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-text-tertiary block mb-1">Time</label>
+                <input
+                  type="time"
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg bg-bg-tertiary border border-border text-sm text-text-primary focus:outline-none focus:border-accent"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {error && <p className="text-xs text-reject mb-3">{error}</p>}
+
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-lg bg-bg-tertiary border border-border text-sm text-text-secondary hover:text-text-primary transition-colors">
+            Cancel
+          </button>
+          <button
+            onClick={handleSchedule}
+            disabled={scheduling}
+            className="flex-1 py-2.5 rounded-lg bg-blue-500 text-white font-semibold text-sm hover:bg-blue-500/90 disabled:opacity-50 transition-colors"
+          >
+            {scheduling ? 'Scheduling...' : 'Schedule'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisit, onSuggestRegenerated, onToggleFeatured, onScheduledForDrop }: {
   design: DesignOut;
   onBack: () => void;
   onApprove: (productTypes?: string[]) => void;
@@ -401,9 +544,11 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
   onRevisit: () => void;
   onSuggestRegenerated: () => void;
   onToggleFeatured?: () => void;
+  onScheduledForDrop?: () => void;
 }) {
   const [products, setProducts] = useState<ProductOut[]>([]);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [showScheduleDropDialog, setShowScheduleDropDialog] = useState(false);
   const [selectedPublishTypes, setSelectedPublishTypes] = useState<Set<string>>(new Set());
   const [isFeatured, setIsFeatured] = useState(design.is_featured);
   const [showSuggestDrawer, setShowSuggestDrawer] = useState(false);
@@ -545,6 +690,12 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
               Suggest
             </button>
             <button
+              onClick={() => setShowScheduleDropDialog(true)}
+              className="py-2.5 px-3 rounded-lg bg-blue-500/20 text-blue-400 font-semibold text-sm hover:bg-blue-500/30 transition-colors"
+            >
+              Schedule Drop
+            </button>
+            <button
               onClick={() => setShowPublishDialog(true)}
               disabled={isPublishing}
               className="flex-1 py-2.5 rounded-lg bg-approve/20 text-approve font-semibold text-sm hover:bg-approve/30 disabled:opacity-50 transition-colors"
@@ -558,6 +709,14 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
               design={design}
               onClose={() => setShowSuggestDrawer(false)}
               onRegenerated={() => { setShowSuggestDrawer(false); onSuggestRegenerated(); }}
+            />
+          )}
+
+          {showScheduleDropDialog && (
+            <ScheduleDropModal
+              designId={design.id}
+              onClose={() => setShowScheduleDropDialog(false)}
+              onScheduled={() => { setShowScheduleDropDialog(false); onScheduledForDrop?.(); }}
             />
           )}
 
@@ -761,6 +920,7 @@ export default function ReviewPage() {
           fetchQueue();
         }}
         onToggleFeatured={() => toggleFeatured(selectedDesign.id)}
+        onScheduledForDrop={() => { setSelectedDesign(null); fetchQueue(); }}
       />
     );
   }
