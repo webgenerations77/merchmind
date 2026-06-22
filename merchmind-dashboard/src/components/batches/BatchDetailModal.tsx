@@ -101,11 +101,6 @@ export default function BatchDetailModal({ batchId, onClose, onRefresh }: Props)
     ? (new Date(batch.run_completed_at).getTime() - new Date(batch.run_started_at).getTime()) / 1000
     : null;
 
-  const batchStatus = failed_count > 0 && success_count > 0
-    ? 'Completed with errors'
-    : batch.status === 'failed'
-      ? 'Failed'
-      : 'Completed';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { listProducts, updateProduct, unpublishProduct, retryPublish } from '../api/products';
+import { listProducts, updateProduct, retryPublish } from '../api/products';
 import { getDesign, retireDesign } from '../api/designs';
 import type { ProductOut, DesignOut } from '../types/api';
 import StatusBadge from '../components/shared/StatusBadge';

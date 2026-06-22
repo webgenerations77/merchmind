@@ -172,13 +172,13 @@ function AiReasoningSection({ design, products }: { design: DesignOut; products:
                     {design.trend_source && (
                       <>Spotted on <span className="text-text-primary font-medium">{SOURCE_LABELS[design.trend_source] || design.trend_source}</span></>
                     )}
-                    {design.trend_source_metadata?.subreddit && (
+                    {design.trend_source_metadata?.subreddit != null && (
                       <> in <span className="text-text-primary font-medium">r/{String(design.trend_source_metadata.subreddit)}</span></>
                     )}
                     {design.trend_signal && (
                       <> &mdash; &ldquo;{design.trend_signal}&rdquo;</>
                     )}
-                    {design.trend_source_metadata?.volume_change && (
+                    {design.trend_source_metadata?.volume_change != null && (
                       <>, search volume {String(design.trend_source_metadata.volume_change)}</>
                     )}
                     {'.'}
