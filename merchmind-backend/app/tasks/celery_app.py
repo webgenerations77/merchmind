@@ -107,8 +107,8 @@ celery_app.conf.beat_schedule = {
         "task": "tasks.analytics_sync",
         "schedule": crontab(hour=6, minute=0, day_of_week=1),   # Monday 6am UTC
     },
-    "health-monitor": {
-        "task": "tasks.health_monitor",
-        "schedule": crontab(minute=0, hour="*/6"),               # Every 6 hours
-    },
+    # "health-monitor": {
+    #     "task": "tasks.health_monitor",
+    #     "schedule": crontab(minute=0, hour="*/6"),               # Every 6 hours
+    # },
 }
