@@ -93,9 +93,15 @@ def _process_results(results: dict[str, dict]) -> None:
 
 
 def _check_anthropic() -> dict:
+    """Validate API key without spending tokens — count_tokens is free."""
     try:
-        from app.utils.claude_client import claude
-        text, _ = claude.haiku("health_check", [{"role": "user", "content": "Reply with just OK"}], max_tokens=5)
+        import anthropic
+        from app.config import settings
+        client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        client.messages.count_tokens(
+            model=settings.HAIKU_MODEL,
+            messages=[{"role": "user", "content": "ping"}],
+        )
         return {"service": "anthropic", "ok": True}
     except Exception as e:
         return {"service": "anthropic", "ok": False, "error": str(e)}
