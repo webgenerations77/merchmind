@@ -211,7 +211,6 @@ def reject_design(design_id: UUID, db: Session = Depends(get_db), _: str = Depen
 
 
 def _perform_reject(design: Design, design_id: UUID, db: Session):
-    _log_feedback(db, design, "rejected")
     did = str(design.id)
 
     # Delete Printify drafts
