@@ -49,6 +49,7 @@ class DesignQueueItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    batch_id: Optional[UUID] = None
     concept_name: str
     archetype: str
     processed_image_url: Optional[str]

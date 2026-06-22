@@ -6,6 +6,7 @@ export interface ApiResponse<T> {
 
 export interface DesignQueueItem {
   id: string;
+  batch_id: string | null;
   concept_name: string;
   archetype: string;
   processed_image_url: string | null;
