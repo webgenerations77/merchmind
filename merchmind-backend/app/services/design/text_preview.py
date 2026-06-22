@@ -61,8 +61,10 @@ def generate_text_preview(
     font_pair: str | None = None,
     color_palette: list[str] | None = None,
     dark_mode: bool = True,
+    position: str = "center",
 ) -> bytes:
-    """Generate text on transparent bg. dark_mode=True for white text (dark products), False for dark text (light products)."""
+    """Generate text on transparent bg. dark_mode=True for white text (dark products), False for dark text (light products).
+    position: 'center' (default), 'upper' (upper third, for chest placement on shirts)."""
     text_color = (255, 255, 255) if dark_mode else (30, 30, 30)
     secondary_color = (200, 200, 200) if dark_mode else (80, 80, 80)
 
@@ -84,7 +86,10 @@ def generate_text_preview(
     if secondary_text:
         total_text_height += 60
 
-    y_start = (_CANVAS_H - total_text_height) // 2
+    if position == "upper":
+        y_start = _CANVAS_H // 6
+    else:
+        y_start = (_CANVAS_H - total_text_height) // 2
 
     for i, line in enumerate(lines):
         bbox = primary_font.getbbox(line)

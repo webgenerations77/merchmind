@@ -635,6 +635,49 @@ def preview_product_prompts(
     return _envelope(results)
 
 
+@router.post("/{design_id}/rerender-preview")
+def rerender_preview(
+    design_id: UUID,
+    position: str = "center",
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key),
+):
+    """Re-render a text_only/typographic design's preview image with a new position."""
+    design = db.query(Design).filter(Design.id == design_id, Design.is_deleted == False).first()
+    if not design:
+        raise HTTPException(404, f"Design {design_id} not found")
+    if design.archetype not in ("text_only", "typographic"):
+        raise HTTPException(400, "Only text_only/typographic designs can be re-rendered")
+
+    from app.services.design.text_preview import generate_text_preview
+    from app.utils.storage import storage
+
+    primary = design.primary_text or design.concept_name
+    did = str(design.id)
+
+    dark_bytes = generate_text_preview(
+        primary_text=primary,
+        secondary_text=design.secondary_text,
+        font_pair=design.font_pair,
+        dark_mode=True,
+        position=position,
+    )
+    processed_url = storage.upload(storage.design_processed_path(did), dark_bytes, "image/png")
+    design.processed_image_url = processed_url
+
+    light_bytes = generate_text_preview(
+        primary_text=primary,
+        secondary_text=design.secondary_text,
+        font_pair=design.font_pair,
+        dark_mode=False,
+        position=position,
+    )
+    light_url = storage.upload(storage.design_light_variant_path(did), light_bytes, "image/png")
+
+    db.commit()
+    return _envelope({"id": str(design_id), "position": position, "processed_image_url": processed_url, "light_variant_url": light_url})
+
+
 def _log_feedback(db, design: Design, action: str, edited_prompt: str = None):
     log = FeedbackLog(
         design_id=design.id,
