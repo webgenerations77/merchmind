@@ -647,6 +647,52 @@ def fix_classifications(db: Session = Depends(get_db), _: str = Depends(verify_a
     return _envelope({"fixed": updated})
 
 
+@router.post("/{design_id}/update-text")
+def update_design_text(
+    design_id: UUID,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key),
+    primary_text: str | None = None,
+    secondary_text: str | None = None,
+    position: str = "center",
+):
+    """Update text fields and rerender preview in one call."""
+    design = db.query(Design).filter(Design.id == design_id, Design.is_deleted == False).first()
+    if not design:
+        raise HTTPException(404, f"Design {design_id} not found")
+
+    if primary_text is not None:
+        design.primary_text = primary_text
+    if secondary_text is not None:
+        design.secondary_text = secondary_text
+    db.commit()
+
+    if design.archetype in ("text_only", "typographic"):
+        from app.services.design.text_preview import generate_text_preview
+        from app.utils.storage import storage
+        did = str(design.id)
+        primary = design.primary_text or design.concept_name
+        for dark in (True, False):
+            img_bytes = generate_text_preview(
+                primary_text=primary,
+                secondary_text=design.secondary_text,
+                font_pair=design.font_pair,
+                dark_mode=dark,
+                position=position,
+            )
+            path = storage.design_processed_path(did) if dark else storage.design_light_variant_path(did)
+            url = storage.upload(path, img_bytes, "image/png")
+            if dark:
+                design.processed_image_url = url
+        db.commit()
+
+    return _envelope({
+        "id": str(design_id),
+        "primary_text": design.primary_text,
+        "secondary_text": design.secondary_text,
+    })
+
+
 @router.post("/{design_id}/rerender-preview")
 def rerender_preview(
     design_id: UUID,
