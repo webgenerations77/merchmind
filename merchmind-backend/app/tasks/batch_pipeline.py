@@ -575,7 +575,7 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
         )
         design.primary_product_type = primary_result["primary_product_type"]
         design.primary_product_type_reasoning = primary_result["reasoning"]
-        design.classification = "collection" if len(product_types) >= 3 else "design_idea"
+        design.classification = "collection" if design.collection_id else "design_idea"
 
         # 4i: Generate Shopify copy
         copy = generate_shopify_copy(
