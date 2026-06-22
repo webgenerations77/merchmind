@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getUsageSummary, type UsageSummary } from '../api/apiUsage';
+import { getUsageSummary, getUsageHistory, type UsageSummary, type UsageLogEntry } from '../api/apiUsage';
 import { formatCurrency, formatCostPrecise } from '../utils/formatters';
 
 const PERIODS = [
@@ -15,10 +15,133 @@ const SERVICE_COLORS: Record<string, string> = {
   replicate: 'text-confidence-medium',
 };
 
+function formatTimestamp(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  });
+}
+
+function CallHistoryPanel({ period, service, operation, onClose }: {
+  period: string;
+  service?: string;
+  operation?: string;
+  onClose: () => void;
+}) {
+  const [logs, setLogs] = useState<UsageLogEntry[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const pageSize = 50;
+
+  useEffect(() => {
+    setLoading(true);
+    getUsageHistory(period, service, operation, pageSize, page * pageSize)
+      .then((r) => { setLogs(r.logs); setTotal(r.total); })
+      .catch(() => null)
+      .finally(() => setLoading(false));
+  }, [period, service, operation, page]);
+
+  const title = service && operation
+    ? `${service} / ${operation.replace(/_/g, ' ')}`
+    : service
+    ? service
+    : 'All Calls';
+
+  return (
+    <section className="bg-bg-secondary border border-border rounded-xl p-5">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-base font-semibold text-text-primary capitalize">{title}</h2>
+          <p className="text-xs text-text-tertiary">{total} calls total</p>
+        </div>
+        <button onClick={onClose} className="px-3 py-1.5 rounded-lg bg-bg-tertiary border border-border text-sm text-text-secondary hover:text-text-primary transition-colors">
+          Close
+        </button>
+      </div>
+
+      {loading ? (
+        <p className="text-center text-text-tertiary text-sm py-8">Loading...</p>
+      ) : logs.length === 0 ? (
+        <p className="text-center text-text-tertiary text-sm py-8">No calls found</p>
+      ) : (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left px-3 py-2 text-xs text-text-tertiary font-medium">Time</th>
+                  <th className="text-left px-3 py-2 text-xs text-text-tertiary font-medium">Service</th>
+                  <th className="text-left px-3 py-2 text-xs text-text-tertiary font-medium">Operation</th>
+                  <th className="text-left px-3 py-2 text-xs text-text-tertiary font-medium">Model</th>
+                  <th className="text-right px-3 py-2 text-xs text-text-tertiary font-medium">Tokens</th>
+                  <th className="text-right px-3 py-2 text-xs text-text-tertiary font-medium">Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((log) => (
+                  <tr key={log.id} className="border-b border-border last:border-b-0 hover:bg-bg-tertiary/50">
+                    <td className="px-3 py-2 text-xs text-text-secondary font-mono whitespace-nowrap">
+                      {formatTimestamp(log.created_at)}
+                    </td>
+                    <td className={`px-3 py-2 text-sm capitalize ${SERVICE_COLORS[log.service] || 'text-text-primary'}`}>
+                      {log.service}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-text-secondary">{log.operation.replace(/_/g, ' ')}</td>
+                    <td className="px-3 py-2 text-xs text-text-tertiary font-mono">{log.model || '-'}</td>
+                    <td className="px-3 py-2 text-xs text-text-tertiary text-right whitespace-nowrap">
+                      {log.input_tokens > 0
+                        ? `${(log.input_tokens / 1000).toFixed(1)}K in / ${(log.output_tokens / 1000).toFixed(1)}K out`
+                        : '-'}
+                    </td>
+                    <td className="px-3 py-2 text-sm font-medium text-text-primary text-right">
+                      {formatCostPrecise(log.estimated_cost)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {total > pageSize && (
+            <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">
+              <span className="text-xs text-text-tertiary">
+                Showing {page * pageSize + 1}-{Math.min((page + 1) * pageSize, total)} of {total}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPage(Math.max(0, page - 1))}
+                  disabled={page === 0}
+                  className="px-2 py-1 rounded text-xs text-text-secondary hover:text-text-primary disabled:opacity-30"
+                >
+                  Prev
+                </button>
+                <button
+                  onClick={() => setPage(page + 1)}
+                  disabled={(page + 1) * pageSize >= total}
+                  className="px-2 py-1 rounded text-xs text-text-secondary hover:text-text-primary disabled:opacity-30"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function ApiUsagePage() {
   const [summary, setSummary] = useState<UsageSummary | null>(null);
   const [period, setPeriod] = useState('month');
   const [loading, setLoading] = useState(true);
+  const [historyFilter, setHistoryFilter] = useState<{ service?: string; operation?: string } | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -38,7 +161,7 @@ export default function ApiUsagePage() {
           {PERIODS.map((p) => (
             <button
               key={p.value}
-              onClick={() => setPeriod(p.value)}
+              onClick={() => { setPeriod(p.value); setHistoryFilter(null); }}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 period === p.value ? 'bg-accent text-white' : 'text-text-secondary hover:text-text-primary'
               }`}
@@ -53,22 +176,44 @@ export default function ApiUsagePage() {
         <>
           {/* Totals */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-bg-secondary border border-border rounded-xl p-4">
+            <button
+              onClick={() => setHistoryFilter({})}
+              className="bg-bg-secondary border border-border rounded-xl p-4 text-left hover:border-accent/50 transition-colors"
+            >
               <p className="text-xs text-text-tertiary">Total Spend</p>
               <p className="text-2xl font-bold text-text-primary mt-1">{formatCurrency(summary.total_cost)}</p>
-            </div>
-            <div className="bg-bg-secondary border border-border rounded-xl p-4">
+              <p className="text-xs text-text-tertiary mt-1">Click for history</p>
+            </button>
+            <button
+              onClick={() => setHistoryFilter({})}
+              className="bg-bg-secondary border border-border rounded-xl p-4 text-left hover:border-accent/50 transition-colors"
+            >
               <p className="text-xs text-text-tertiary">API Calls</p>
               <p className="text-2xl font-bold text-text-primary mt-1">{summary.total_calls.toLocaleString()}</p>
-            </div>
+              <p className="text-xs text-text-tertiary mt-1">Click for history</p>
+            </button>
             {summary.by_service.map((svc) => (
-              <div key={svc.service} className="bg-bg-secondary border border-border rounded-xl p-4">
+              <button
+                key={svc.service}
+                onClick={() => setHistoryFilter({ service: svc.service })}
+                className="bg-bg-secondary border border-border rounded-xl p-4 text-left hover:border-accent/50 transition-colors"
+              >
                 <p className={`text-xs ${SERVICE_COLORS[svc.service] || 'text-text-tertiary'} capitalize`}>{svc.service}</p>
                 <p className="text-xl font-bold text-text-primary mt-1">{formatCostPrecise(svc.total_cost)}</p>
                 <p className="text-xs text-text-tertiary">{svc.calls} calls</p>
-              </div>
+              </button>
             ))}
           </div>
+
+          {/* Call History (when a filter is active) */}
+          {historyFilter && (
+            <CallHistoryPanel
+              period={period}
+              service={historyFilter.service}
+              operation={historyFilter.operation}
+              onClose={() => setHistoryFilter(null)}
+            />
+          )}
 
           {/* By Service */}
           <section className="bg-bg-secondary border border-border rounded-xl p-5">
@@ -77,7 +222,11 @@ export default function ApiUsagePage() {
               {summary.by_service.map((svc) => {
                 const pct = summary.total_cost > 0 ? (svc.total_cost / summary.total_cost) * 100 : 0;
                 return (
-                  <div key={svc.service}>
+                  <button
+                    key={svc.service}
+                    onClick={() => setHistoryFilter({ service: svc.service })}
+                    className="w-full text-left hover:bg-bg-tertiary/30 rounded-lg p-1 -m-1 transition-colors"
+                  >
                     <div className="flex items-center justify-between mb-1">
                       <span className={`text-sm font-medium capitalize ${SERVICE_COLORS[svc.service] || 'text-text-primary'}`}>{svc.service}</span>
                       <div className="flex items-center gap-3">
@@ -91,7 +240,7 @@ export default function ApiUsagePage() {
                     <div className="w-full bg-bg-tertiary rounded-full h-2">
                       <div className="bg-accent rounded-full h-2 transition-all" style={{ width: `${Math.max(2, pct)}%` }} />
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -113,7 +262,11 @@ export default function ApiUsagePage() {
                 </thead>
                 <tbody>
                   {summary.by_operation.map((op, i) => (
-                    <tr key={i} className="border-b border-border last:border-b-0">
+                    <tr
+                      key={i}
+                      onClick={() => setHistoryFilter({ service: op.service, operation: op.operation })}
+                      className="border-b border-border last:border-b-0 cursor-pointer hover:bg-bg-tertiary/50 transition-colors"
+                    >
                       <td className={`px-3 py-2 text-sm capitalize ${SERVICE_COLORS[op.service] || 'text-text-primary'}`}>{op.service}</td>
                       <td className="px-3 py-2 text-sm text-text-secondary">{op.operation.replace(/_/g, ' ')}</td>
                       <td className="px-3 py-2 text-xs text-text-tertiary font-mono">{op.model || '-'}</td>

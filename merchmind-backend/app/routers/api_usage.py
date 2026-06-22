@@ -3,7 +3,7 @@ API usage tracking endpoints.
 """
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
+from sqlalchemy import func, desc
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -106,5 +106,57 @@ def usage_summary(
                 "calls": int(r.calls or 0),
             }
             for r in daily
+        ],
+    })
+
+
+@router.get("/history")
+def usage_history(
+    period: str = Query("day", regex="^(day|week|month|all)$"),
+    service: str | None = None,
+    operation: str | None = None,
+    limit: int = Query(200, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key),
+):
+    """Return individual API call logs, newest first."""
+    now = datetime.now(timezone.utc)
+    if period == "day":
+        cutoff = now - timedelta(days=1)
+    elif period == "week":
+        cutoff = now - timedelta(weeks=1)
+    elif period == "month":
+        cutoff = now - timedelta(days=30)
+    else:
+        cutoff = datetime(2020, 1, 1, tzinfo=timezone.utc)
+
+    query = db.query(ApiUsageLog).filter(ApiUsageLog.created_at >= cutoff)
+    if service:
+        query = query.filter(ApiUsageLog.service == service)
+    if operation:
+        query = query.filter(ApiUsageLog.operation == operation)
+
+    total = query.count()
+    rows = query.order_by(desc(ApiUsageLog.created_at)).offset(offset).limit(limit).all()
+
+    return _envelope({
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "logs": [
+            {
+                "id": str(r.id),
+                "service": r.service,
+                "operation": r.operation,
+                "model": r.model,
+                "input_tokens": r.input_tokens or 0,
+                "output_tokens": r.output_tokens or 0,
+                "estimated_cost": round(float(r.estimated_cost or 0), 6),
+                "design_id": str(r.design_id) if r.design_id else None,
+                "batch_id": str(r.batch_id) if r.batch_id else None,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in rows
         ],
     })
