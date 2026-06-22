@@ -5,6 +5,7 @@ import logging
 import logging.config
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text as sa_text
 
 from app.config import settings
 from app.utils.error_handler import (
@@ -101,3 +102,49 @@ async def on_startup():
         logger.info("Alembic migrations applied")
     except Exception as e:
         logger.warning(f"Alembic migration skipped: {e}")
+        _apply_critical_schema_fallback()
+
+
+def _apply_critical_schema_fallback():
+    """Ensure critical tables/columns exist if Alembic migration failed."""
+    from app.database import SessionLocal
+    db = SessionLocal()
+    try:
+        conn = db.connection()
+        conn.execute(sa_text(
+            "DO $$ BEGIN "
+            "  CREATE TYPE drop_status AS ENUM ('scheduled','in_progress','published','failed'); "
+            "EXCEPTION WHEN duplicate_object THEN NULL; END $$;"
+        ))
+        conn.execute(sa_text(
+            "CREATE TABLE IF NOT EXISTS merch_drops ("
+            "  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),"
+            "  name TEXT NOT NULL,"
+            "  scheduled_at TIMESTAMPTZ NOT NULL,"
+            "  status drop_status NOT NULL DEFAULT 'scheduled',"
+            "  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),"
+            "  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+            ")"
+        ))
+        conn.execute(sa_text(
+            "DO $$ BEGIN "
+            "  ALTER TABLE products ADD COLUMN drop_id UUID REFERENCES merch_drops(id); "
+            "EXCEPTION WHEN duplicate_column THEN NULL; END $$;"
+        ))
+        conn.execute(sa_text(
+            "CREATE TABLE IF NOT EXISTS drop_marketing_assets ("
+            "  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),"
+            "  drop_id UUID NOT NULL REFERENCES merch_drops(id),"
+            "  channel marketing_channel NOT NULL,"
+            "  content JSONB DEFAULT '{}',"
+            "  status asset_status NOT NULL DEFAULT 'pending',"
+            "  created_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+            ")"
+        ))
+        db.commit()
+        logger.info("Critical schema fallback applied successfully")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Schema fallback failed: {e}")
+    finally:
+        db.close()

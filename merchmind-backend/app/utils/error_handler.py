@@ -45,8 +45,5 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 
 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    import traceback
-    tb = traceback.format_exception(type(exc), exc, exc.__traceback__)
-    detail = "".join(tb[-3:]) if len(tb) > 3 else "".join(tb)
     logger.exception(f"Unhandled exception on {request.method} {request.url}")
-    return JSONResponse(status_code=500, content=_envelope(False, error=f"{type(exc).__name__}: {exc}", data={"traceback": detail}))
+    return JSONResponse(status_code=500, content=_envelope(False, error="Internal server error"))
