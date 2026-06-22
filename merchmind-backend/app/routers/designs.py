@@ -202,6 +202,15 @@ def reject_design(design_id: UUID, db: Session = Depends(get_db), _: str = Depen
     if not design:
         raise HTTPException(404, f"Design {design_id} not found")
 
+    try:
+        return _perform_reject(design, design_id, db)
+    except Exception as e:
+        db.rollback()
+        logger.exception("Reject failed for design %s", design_id)
+        raise HTTPException(500, f"Reject failed: {type(e).__name__}: {e}")
+
+
+def _perform_reject(design: Design, design_id: UUID, db: Session):
     _log_feedback(db, design, "rejected")
     did = str(design.id)
 
