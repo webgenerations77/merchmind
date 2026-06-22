@@ -651,15 +651,22 @@ def fix_classifications(db: Session = Depends(get_db), _: str = Depends(verify_a
 def rerender_preview(
     design_id: UUID,
     position: str = "center",
+    primary_text: str | None = None,
+    secondary_text: str | None = None,
     db: Session = Depends(get_db),
     _: str = Depends(verify_api_key),
 ):
-    """Re-render a text_only/typographic design's preview image with a new position."""
+    """Re-render a text_only/typographic design's preview image with optional text and position override."""
     design = db.query(Design).filter(Design.id == design_id, Design.is_deleted == False).first()
     if not design:
         raise HTTPException(404, f"Design {design_id} not found")
     if design.archetype not in ("text_only", "typographic"):
         raise HTTPException(400, "Only text_only/typographic designs can be re-rendered")
+
+    if primary_text is not None:
+        design.primary_text = primary_text
+    if secondary_text is not None:
+        design.secondary_text = secondary_text
 
     from app.services.design.text_preview import generate_text_preview
     from app.utils.storage import storage
