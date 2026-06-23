@@ -3,17 +3,18 @@ Design review queue endpoints — approve, reject, delay, regenerate.
 """
 import logging
 from datetime import datetime
+from typing import Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import func as sa_func
 from sqlalchemy.orm import Session, joinedload
 
-from sqlalchemy import func as sa_func
 from app.database import get_db
 from app.models.design import Design
 from app.models.trend import Trend
 from app.models.feedback_log import FeedbackLog
 from app.models.api_usage_log import ApiUsageLog
-from pydantic import BaseModel
 from app.schemas.design import DesignOut, DesignQueueItem, DelayRequest, RegenerateRequest, ChatMessageIn, SuggestRegenerateRequest
 from app.routers.auth import verify_api_key
 
