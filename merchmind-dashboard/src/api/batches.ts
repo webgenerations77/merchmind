@@ -33,6 +33,11 @@ export async function triggerBatch(config?: BatchConfig): Promise<{ task_id: str
   return data.data;
 }
 
+export async function cancelBatch(batchId: string): Promise<{ batch_id: string; status: string }> {
+  const { data } = await apiClient.post<ApiResponse<{ batch_id: string; status: string }>>(`/batches/${batchId}/cancel`);
+  return data.data;
+}
+
 export async function retryFailedItems(batchId: string): Promise<{ retried: number; total_failed: number; message: string }> {
   const { data } = await apiClient.post<ApiResponse<{ retried: number; total_failed: number; message: string }>>(`/batches/${batchId}/retry-failed`);
   return data.data;

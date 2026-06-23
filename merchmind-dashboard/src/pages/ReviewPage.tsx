@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useReviewStore } from '../stores/reviewStore';
 import { getDesign, getReviewQueue } from '../api/designs';
-import { listBatches, triggerBatch, type BatchConfig } from '../api/batches';
+import { listBatches, triggerBatch, cancelBatch, type BatchConfig } from '../api/batches';
 import BatchConfigModal from '../components/batches/BatchConfigModal';
 import { listProducts } from '../api/products';
 import { getApiBalance, type ApiBalanceResult } from '../api/health';
@@ -14,7 +14,7 @@ import StatusBadge from '../components/shared/StatusBadge';
 import { formatCurrency, formatProductType, toTitleCase } from '../utils/formatters';
 import { calculateCostBreakdown } from '../utils/profitCalc';
 
-function BatchProgress({ batch, productCount, designCount }: { batch: BatchOut; productCount: number; designCount: number }) {
+function BatchProgress({ batch, productCount, designCount, onCancel }: { batch: BatchOut; productCount: number; designCount: number; onCancel: () => void }) {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
     const start = new Date(batch.run_started_at).getTime();
@@ -62,7 +62,15 @@ function BatchProgress({ batch, productCount, designCount }: { batch: BatchOut; 
             </p>
           </div>
         </div>
-        <StatusBadge status={batch.status} />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onCancel}
+            className="px-3 py-1.5 rounded-lg bg-reject/20 text-reject text-xs font-medium hover:bg-reject/30 transition-colors"
+          >
+            Cancel
+          </button>
+          <StatusBadge status={batch.status} />
+        </div>
       </div>
 
       <div className="w-full bg-bg-tertiary rounded-full h-2 mb-4">
@@ -1015,7 +1023,12 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {runningBatch && <BatchProgress batch={runningBatch} productCount={productCount} designCount={batchDesignCount} />}
+      {runningBatch && <BatchProgress batch={runningBatch} productCount={productCount} designCount={batchDesignCount} onCancel={async () => {
+        if (!confirm('Cancel the running batch? Designs already generated will be kept.')) return;
+        try { await cancelBatch(runningBatch.id); } catch { /* ignore */ }
+        setRunningBatch(null);
+        fetchQueue();
+      }} />}
       {recentBatch && <BatchComplete batch={recentBatch} onRefresh={handleRefresh} />}
 
       <div className="flex gap-1 mb-6 bg-bg-secondary rounded-lg p-1 border border-border">
