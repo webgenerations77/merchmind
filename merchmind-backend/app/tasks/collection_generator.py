@@ -201,7 +201,7 @@ def generate_collection_task(self, collection_id: str, count: int):
                 design.quality_score = 32
                 design.quality_breakdown = {"concept_clarity": 8, "visual_appeal": 8, "merch_suitability": 8, "originality": 8}
 
-                product_types = assign_product_bundle(archetype, design.quality_breakdown)
+                product_types = assign_product_bundle(archetype, design.quality_breakdown, max_products=5, is_collection=True)
                 primary_result = select_primary_product_type(
                     design.concept_name, archetype, product_types, concept_subject,
                 )

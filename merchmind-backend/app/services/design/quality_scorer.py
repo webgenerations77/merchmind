@@ -112,24 +112,23 @@ def select_primary_product_type(
     }
 
 
-def assign_product_bundle(archetype: str, quality_breakdown: dict, max_products: int = 6) -> list[str]:
+def assign_product_bundle(archetype: str, quality_breakdown: dict, max_products: int = 3, is_collection: bool = False) -> list[str]:
     """
-    Assign product types based on archetype and quality.
-    Always includes at least 5 types. Returns list of product type strings.
+    Assign product types based on archetype.
+    Design ideas: max 3 products (tshirt + 2 best-fit types).
+    Collections: up to max_products (all 5 types).
+    Always includes tshirt first.
     """
-    all_types = ["tshirt", "mug", "hat", "phone_case", "sticker"]
+    if is_collection:
+        return ["tshirt", "mug", "hat", "phone_case", "sticker"][:max_products]
 
     if archetype == "illustration":
-        types = ["tshirt", "mug", "phone_case", "sticker"]
+        return ["tshirt", "mug", "sticker"][:max_products]
     elif archetype in ("text_only", "typographic"):
-        types = ["tshirt", "mug", "hat", "phone_case", "sticker"]
+        return ["tshirt", "mug", "hat"][:max_products]
     elif archetype == "text_icon":
-        types = ["tshirt", "mug", "hat", "phone_case", "sticker"]
+        return ["tshirt", "mug", "hat"][:max_products]
+    elif archetype == "hybrid":
+        return ["tshirt", "mug", "phone_case"][:max_products]
     else:
-        types = ["tshirt", "mug", "hat", "phone_case", "sticker"]
-
-    for t in all_types:
-        if t not in types:
-            types.append(t)
-
-    return types[:max_products]
+        return ["tshirt", "mug", "sticker"][:max_products]

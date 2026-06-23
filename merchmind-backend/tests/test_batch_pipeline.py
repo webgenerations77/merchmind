@@ -49,36 +49,27 @@ class TestArchetypeClassifier:
 
 
 class TestProductBundleAssignment:
-    def test_illustration_gets_at_least_five_types(self):
+    def test_design_idea_gets_max_three_types(self):
         result = assign_product_bundle("illustration", {"visual_appeal": 8})
         assert "tshirt" in result
-        assert "sticker" in result
-        assert "mug" in result
-        assert len(result) >= 5
+        assert len(result) <= 3
 
-    def test_text_only_gets_all_products(self):
+    def test_text_only_gets_three_products(self):
         result = assign_product_bundle("text_only", {})
-        assert len(result) == 5
+        assert len(result) == 3
         assert "tshirt" in result
         assert "mug" in result
 
-    def test_typographic_gets_all_products(self):
-        result = assign_product_bundle("typographic", {})
+    def test_collection_gets_all_products(self):
+        result = assign_product_bundle("illustration", {}, max_products=5, is_collection=True)
         assert len(result) == 5
-
-    def test_text_icon_gets_at_least_five(self):
-        result = assign_product_bundle("text_icon", {})
-        assert len(result) >= 5
         assert "tshirt" in result
-
-    def test_hybrid_gets_all_products(self):
-        result = assign_product_bundle("hybrid", {"visual_appeal": 9})
-        assert len(result) == 5
 
     def test_all_archetypes_include_tshirt(self):
         for arch in ["illustration", "hybrid", "text_only", "typographic", "text_icon"]:
             result = assign_product_bundle(arch, {})
             assert "tshirt" in result, f"{arch} missing tshirt"
+            assert len(result) <= 3, f"{arch} has more than 3 products"
 
 
 class TestBatchPipelineIntegration:
