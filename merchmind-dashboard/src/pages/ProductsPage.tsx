@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { listProducts, updateProduct, retryPublish } from '../api/products';
 import { getDesign, retireDesign } from '../api/designs';
@@ -254,26 +254,43 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<ProductOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [showRetired, setShowRetired] = useState(false);
   const [sortKey, setSortKey] = useState<'created_at' | 'retail_price' | 'product_type'>('created_at');
   const [selected, setSelected] = useState<ProductOut | null>(null);
   const location = useLocation();
+  const navStateApplied = useRef(false);
 
   const loadProducts = () => {
     setLoading(true);
-    listProducts(undefined, showRetired).then((p) => {
+    listProducts(undefined, showRetired, searchQuery || undefined).then((p) => {
       setProducts(p);
-      const navState = location.state as { selectedId?: string } | null;
-      if (navState?.selectedId) {
-        const match = p.find((prod) => prod.id === navState.selectedId);
-        if (match) setSelected(match);
+      if (!navStateApplied.current) {
+        navStateApplied.current = true;
+        const navState = location.state as { selectedId?: string; filterStatus?: string } | null;
+        if (navState?.selectedId) {
+          const match = p.find((prod) => prod.id === navState.selectedId);
+          if (match) setSelected(match);
+        }
+        if (navState?.filterStatus) {
+          setFilter(navState.filterStatus);
+        }
       }
     }).finally(() => setLoading(false));
   };
 
   useEffect(() => {
     loadProducts();
-  }, [showRetired, location.state]);
+  }, [showRetired, searchQuery]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setSearchQuery(searchInput), 300);
+    return () => clearTimeout(timeout);
+  }, [searchInput]);
+
+  const productTypes = Array.from(new Set(products.map((p) => p.product_type))).sort();
 
   if (selected) {
     return <ProductDetail
@@ -288,7 +305,8 @@ export default function ProductsPage() {
     />;
   }
 
-  const filtered = filter === 'all' ? products : products.filter((p) => p.publish_status === filter);
+  const statusFiltered = filter === 'all' ? products : products.filter((p) => p.publish_status === filter);
+  const filtered = typeFilter === 'all' ? statusFiltered : statusFiltered.filter((p) => p.product_type === typeFilter);
   const sorted = [...filtered].sort((a, b) => {
     if (sortKey === 'retail_price') return b.retail_price - a.retail_price;
     if (sortKey === 'product_type') return a.product_type.localeCompare(b.product_type);
@@ -315,7 +333,17 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
+      <div className="mb-4">
+        <input
+          type="text"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Search by product name..."
+          className="w-full max-w-md px-3 py-2 rounded-lg bg-bg-secondary border border-border text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent transition-colors"
+        />
+      </div>
+
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
         {filters.map((f) => (
           <button
             key={f}
@@ -340,25 +368,56 @@ export default function ProductsPage() {
         )}
       </div>
 
+      {productTypes.length > 1 && (
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <span className="text-xs text-text-tertiary mr-1">Type:</span>
+          <button
+            onClick={() => setTypeFilter('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              typeFilter === 'all' ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary hover:text-text-primary border border-border'
+            }`}
+          >
+            All
+          </button>
+          {productTypes.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTypeFilter(t)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                typeFilter === t ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary hover:text-text-primary border border-border'
+              }`}
+            >
+              {formatProductType(t)} ({products.filter((p) => p.product_type === t).length})
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="bg-bg-secondary border border-border rounded-xl overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="border-b border-border">
-              {[
-                { key: 'product_type', label: 'Type' },
-                { key: 'retail_price', label: 'Price' },
-                { key: 'created_at', label: 'Created' },
-              ].map((col) => (
-                <th
-                  key={col.key}
-                  onClick={() => setSortKey(col.key as typeof sortKey)}
-                  className="text-left px-4 py-3 text-xs text-text-tertiary font-medium cursor-pointer hover:text-text-primary"
-                >
-                  {col.label} {sortKey === col.key && '↓'}
-                </th>
-              ))}
+              <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium w-10"></th>
+              <th
+                onClick={() => setSortKey('product_type')}
+                className="text-left px-4 py-3 text-xs text-text-tertiary font-medium cursor-pointer hover:text-text-primary"
+              >
+                Product {sortKey === 'product_type' && '↓'}
+              </th>
+              <th
+                onClick={() => setSortKey('retail_price')}
+                className="text-left px-4 py-3 text-xs text-text-tertiary font-medium cursor-pointer hover:text-text-primary"
+              >
+                Price {sortKey === 'retail_price' && '↓'}
+              </th>
+              <th
+                onClick={() => setSortKey('created_at')}
+                className="text-left px-4 py-3 text-xs text-text-tertiary font-medium cursor-pointer hover:text-text-primary"
+              >
+                Created {sortKey === 'created_at' && '↓'}
+              </th>
               <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">Status</th>
-              <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">COGS</th>
+              <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">Batch</th>
               <th className="text-left px-4 py-3 text-xs text-text-tertiary font-medium">Net Profit</th>
             </tr>
           </thead>
@@ -372,11 +431,33 @@ export default function ProductsPage() {
                   onClick={() => setSelected(product)}
                   className={`border-b border-border last:border-b-0 hover:bg-bg-tertiary/50 cursor-pointer ${isRetired ? 'opacity-40' : ''}`}
                 >
-                  <td className="px-4 py-3 text-sm text-text-primary">{formatProductType(product.product_type)}</td>
+                  <td className="px-4 py-3">
+                    <div className="w-9 h-9 rounded-md bg-bg-tertiary overflow-hidden">
+                      {(product.primary_mockup_url || product.processed_image_url) ? (
+                        <img
+                          src={product.primary_mockup_url || product.processed_image_url!}
+                          alt={product.concept_name || product.product_type}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-text-tertiary text-[10px]">
+                          {formatProductType(product.product_type).slice(0, 2)}
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-sm text-text-primary">
+                      {product.concept_name ? toTitleCase(product.concept_name) : formatProductType(product.product_type)}
+                    </p>
+                    <p className="text-xs text-text-tertiary">{formatProductType(product.product_type)}</p>
+                  </td>
                   <td className="px-4 py-3 text-sm text-text-primary font-medium">{formatCurrency(product.retail_price)}</td>
                   <td className="px-4 py-3 text-sm text-text-secondary">{formatDate(product.created_at)}</td>
                   <td className="px-4 py-3"><StatusBadge status={product.publish_status} /></td>
-                  <td className="px-4 py-3 text-sm text-text-tertiary">{formatCurrency(b.totalCogs)}</td>
+                  <td className="px-4 py-3 text-xs text-text-tertiary font-mono">
+                    {product.batch_id ? product.batch_id.slice(0, 8) : '—'}
+                  </td>
                   <td className="px-4 py-3 text-sm">
                     <span className={b.netProfit > 0 ? 'text-approve' : 'text-confidence-low'}>
                       {formatCurrency(b.netProfit)}

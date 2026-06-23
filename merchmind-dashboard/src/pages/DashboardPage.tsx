@@ -7,7 +7,7 @@ import { getReviewQueue, getFeaturedDesigns, toggleFeatured } from '../api/desig
 import type { AlertOut, BatchOut, ProductOut, DesignQueueItem } from '../types/api';
 import StatusBadge from '../components/shared/StatusBadge';
 import ConfidenceBadge from '../components/shared/ConfidenceBadge';
-import { formatTimeAgo, formatCurrency, formatProductType, toTitleCase } from '../utils/formatters';
+import { formatTimeAgo, formatProductType, formatDate, toTitleCase } from '../utils/formatters';
 
 export default function DashboardPage() {
   const [alerts, setAlerts] = useState<AlertOut[]>([]);
@@ -114,7 +114,7 @@ export default function DashboardPage() {
               <div
                 key={item.id}
                 className="group relative bg-bg-secondary border border-border rounded-lg overflow-hidden hover:border-amber-500/50 transition-all cursor-pointer"
-                onClick={() => navigate('/review', { state: { openDesignId: item.id } })}
+                onClick={() => navigate('/review', { state: { openDesignId: item.id, from: '/' } })}
               >
                 <div className="relative aspect-square bg-bg-tertiary">
                   {(item.primary_mockup_url || item.processed_image_url) ? (
@@ -158,18 +158,18 @@ export default function DashboardPage() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-bg-secondary border border-border rounded-xl p-4">
+        <Link to="/products" className="bg-bg-secondary border border-border rounded-xl p-4 hover:border-accent/50 transition-colors cursor-pointer">
           <p className="text-xs text-text-tertiary">Total Products</p>
           <p className="text-2xl font-bold text-text-primary mt-1">{products.length}</p>
-        </div>
-        <div className="bg-bg-secondary border border-border rounded-xl p-4">
+        </Link>
+        <Link to="/products" state={{ filterStatus: 'pending' }} className="bg-bg-secondary border border-border rounded-xl p-4 hover:border-confidence-medium/50 transition-colors cursor-pointer">
           <p className="text-xs text-text-tertiary">Pending Publish</p>
           <p className="text-2xl font-bold text-confidence-medium mt-1">{pendingProducts}</p>
-        </div>
-        <div className="bg-bg-secondary border border-border rounded-xl p-4">
+        </Link>
+        <Link to="/batches" className="bg-bg-secondary border border-border rounded-xl p-4 hover:border-accent/50 transition-colors cursor-pointer">
           <p className="text-xs text-text-tertiary">Total Batches</p>
           <p className="text-2xl font-bold text-text-primary mt-1">{batches.length}</p>
-        </div>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -213,12 +213,30 @@ export default function DashboardPage() {
               {products.slice(0, 8).map((product) => (
                 <div
                   key={product.id}
-                  onClick={() => navigate('/products', { state: { selectedId: product.id } })}
-                  className="bg-bg-secondary border border-border rounded-lg p-3 flex items-center justify-between cursor-pointer hover:border-accent/50 transition-colors"
+                  onClick={() => navigate('/products', { state: { selectedId: product.id, from: '/' } })}
+                  className="bg-bg-secondary border border-border rounded-lg p-3 flex items-center gap-3 cursor-pointer hover:border-accent/50 transition-colors"
                 >
-                  <div>
-                    <p className="text-sm text-text-primary">{formatProductType(product.product_type)}</p>
-                    <p className="text-xs text-text-tertiary">{formatCurrency(product.retail_price)}</p>
+                  <div className="w-10 h-10 rounded-md bg-bg-tertiary overflow-hidden shrink-0">
+                    {(product.primary_mockup_url || product.processed_image_url) ? (
+                      <img
+                        src={product.primary_mockup_url || product.processed_image_url!}
+                        alt={product.concept_name || product.product_type}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-text-tertiary text-[10px]">
+                        {formatProductType(product.product_type).slice(0, 2)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-text-primary truncate">
+                      {product.concept_name ? toTitleCase(product.concept_name) : formatProductType(product.product_type)}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-text-tertiary">{formatProductType(product.product_type)}</span>
+                      <span className="text-xs text-text-tertiary">{formatDate(product.created_at)}</span>
+                    </div>
                   </div>
                   <StatusBadge status={product.publish_status} />
                 </div>

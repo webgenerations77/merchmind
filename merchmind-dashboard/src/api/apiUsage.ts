@@ -66,6 +66,13 @@ export async function getUsageHistory(
   return data.data;
 }
 
+export interface ProviderSpend {
+  month_cost: number;
+  month_calls: number;
+  total_cost: number;
+  total_calls: number;
+}
+
 export interface ProviderBalance {
   service: string;
   available: boolean;
@@ -74,6 +81,7 @@ export interface ProviderBalance {
   username?: string;
   type?: string;
   shop_count?: number;
+  spend?: ProviderSpend;
 }
 
 export interface ApiBalanceResult {

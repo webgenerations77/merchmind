@@ -138,6 +138,10 @@ export interface ProductOut {
   unpublished_at: string | null;
   drop_id: string | null;
   created_at: string;
+  concept_name: string | null;
+  batch_id: string | null;
+  processed_image_url: string | null;
+  primary_mockup_url: string | null;
 }
 
 export interface AlertOut {

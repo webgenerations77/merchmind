@@ -913,21 +913,24 @@ export default function ReviewPage() {
   };
 
   const handleAction = async (action: 'approve' | 'reject' | 'archive' | 'revisit', id: string, productTypes?: string[]) => {
-    if (action === 'approve') {
-      await approveDesign(id, productTypes);
-    } else if (action === 'reject') {
-      await rejectDesign(id);
-      if (navFrom) {
-        navigate(navFrom);
-        return;
+    try {
+      if (action === 'approve') {
+        await approveDesign(id, productTypes);
+      } else if (action === 'reject') {
+        await rejectDesign(id);
+      } else if (action === 'archive') {
+        await archiveDesign(id);
+        fetchArchived();
+      } else if (action === 'revisit') {
+        await revisitDesign(id);
       }
-    } else if (action === 'archive') {
-      await archiveDesign(id);
-      fetchArchived();
-    } else if (action === 'revisit') {
-      await revisitDesign(id);
+    } catch { /* continue to navigate back */ }
+
+    if (navFrom && action === 'reject') {
+      navigate(navFrom);
+    } else {
+      setSelectedDesign(null);
     }
-    setSelectedDesign(null);
   };
 
   if (isLoading) return <div className="flex items-center justify-center h-64 text-text-secondary">Loading queue...</div>;

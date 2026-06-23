@@ -157,7 +157,7 @@ function BalanceCards({ balances, onRefresh, refreshing }: { balances: ApiBalanc
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-base font-semibold text-text-primary">Provider Status</h2>
+        <h2 className="text-base font-semibold text-text-primary">API Balances</h2>
         <div className="flex items-center gap-3">
           {balances.checked_at && (
             <span className="text-xs text-text-tertiary">
@@ -191,12 +191,27 @@ function BalanceCards({ balances, onRefresh, refreshing }: { balances: ApiBalanc
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-approve/15 text-approve text-xs font-medium">
                   Connected
                 </span>
+                {p.spend && (
+                  <div className="mt-2 space-y-1">
+                    <p className="text-lg font-bold text-text-primary">{formatCostPrecise(p.spend.month_cost)}</p>
+                    <p className="text-xs text-text-tertiary">{p.spend.month_calls} calls this month</p>
+                    <p className="text-xs text-text-tertiary">All time: {formatCostPrecise(p.spend.total_cost)} ({p.spend.total_calls} calls)</p>
+                  </div>
+                )}
                 {p.username && <p className="text-xs text-text-tertiary mt-1">{p.username}</p>}
                 {p.shop_count !== undefined && <p className="text-xs text-text-tertiary mt-1">{p.shop_count} shop(s)</p>}
               </div>
             ) : (
               <div>
-                <p className="text-xs text-text-tertiary">{p.message}</p>
+                {p.spend && p.spend.total_calls > 0 ? (
+                  <div className="mb-2 space-y-1">
+                    <p className="text-lg font-bold text-text-primary">{formatCostPrecise(p.spend.month_cost)}</p>
+                    <p className="text-xs text-text-tertiary">{p.spend.month_calls} calls this month</p>
+                    <p className="text-xs text-text-tertiary">All time: {formatCostPrecise(p.spend.total_cost)}</p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-text-tertiary">{p.message}</p>
+                )}
                 <span className="text-xs text-accent group-hover:underline mt-1 inline-block">View console →</span>
               </div>
             )}
