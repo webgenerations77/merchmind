@@ -241,13 +241,56 @@ def _fetch_printify_balance() -> dict:
     return {"service": "printify", "available": False, "message": "Could not reach Printify API", "console_url": "https://printify.com/app/account/billing"}
 
 
+def _get_spend_by_service(db: Session) -> dict[str, dict]:
+    """Get spend totals from ApiUsageLog for this month and all time."""
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    service_map = {
+        "claude": "anthropic",
+        "openai": "openai",
+        "replicate": "replicate",
+    }
+
+    result: dict[str, dict] = {}
+    for db_service, provider_key in service_map.items():
+        month_row = (
+            db.query(
+                func.count().label("calls"),
+                func.sum(ApiUsageLog.estimated_cost).label("cost"),
+            )
+            .filter(ApiUsageLog.service == db_service, ApiUsageLog.created_at >= month_start)
+            .first()
+        )
+        all_row = (
+            db.query(
+                func.count().label("calls"),
+                func.sum(ApiUsageLog.estimated_cost).label("cost"),
+            )
+            .filter(ApiUsageLog.service == db_service)
+            .first()
+        )
+        result[provider_key] = {
+            "month_cost": round(float(month_row.cost or 0), 4),
+            "month_calls": int(month_row.calls or 0),
+            "total_cost": round(float(all_row.cost or 0), 4),
+            "total_calls": int(all_row.calls or 0),
+        }
+    return result
+
+
 @router.get("/balances")
-def api_balances(_: str = Depends(verify_api_key)):
-    """Return current balance/status for each API provider. Cached for 60s."""
+def api_balances(
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key),
+):
+    """Return current balance/status for each API provider with spend data. Cached for 60s."""
     global _balance_cache
     now = time.time()
     if _balance_cache and now - _balance_cache.get("_ts", 0) < _CACHE_TTL:
         return _envelope(_balance_cache["data"])
+
+    spend = _get_spend_by_service(db)
 
     providers = [
         _fetch_anthropic_balance(),
@@ -255,6 +298,11 @@ def api_balances(_: str = Depends(verify_api_key)):
         _fetch_replicate_balance(),
         _fetch_printify_balance(),
     ]
+
+    for p in providers:
+        svc = p["service"]
+        if svc in spend:
+            p["spend"] = spend[svc]
 
     result = {
         "providers": providers,

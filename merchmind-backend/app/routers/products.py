@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.product import Product
+from app.models.design import Design
 from app.models.alert import Alert
 from app.schemas.product import ProductOut, ProductUpdate
 from app.routers.auth import verify_api_key
@@ -25,16 +26,29 @@ def _envelope(data=None, error: str = None) -> dict:
 def list_products(
     status: str = None,
     include_retired: bool = False,
+    search: str = None,
     db: Session = Depends(get_db),
     _: str = Depends(verify_api_key),
 ):
-    query = db.query(Product)
+    query = db.query(Product).join(Design, Product.design_id == Design.id, isouter=True)
     if status:
         query = query.filter(Product.publish_status == status)
     elif not include_retired:
         query = query.filter(Product.publish_status != "retired")
+    if search:
+        query = query.filter(Design.concept_name.ilike(f"%{search}%"))
     products = query.order_by(Product.created_at.desc()).limit(200).all()
-    return _envelope([ProductOut.model_validate(p).model_dump() for p in products])
+    results = []
+    for p in products:
+        out = ProductOut.model_validate(p).model_dump()
+        if p.design:
+            out["concept_name"] = p.design.concept_name
+            out["batch_id"] = str(p.design.batch_id) if p.design.batch_id else None
+            out["processed_image_url"] = p.design.processed_image_url
+            mockups = out.get("mockup_urls") or {}
+            out["primary_mockup_url"] = mockups.get("front") or mockups.get(next(iter(mockups), ""), None) if mockups else None
+        results.append(out)
+    return _envelope(results)
 
 
 @router.get("/{product_id}")

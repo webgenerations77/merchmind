@@ -25,6 +25,10 @@ class ProductOut(BaseModel):
     unpublished_at: Optional[datetime]
     drop_id: Optional[UUID] = None
     created_at: datetime
+    concept_name: Optional[str] = None
+    batch_id: Optional[UUID] = None
+    processed_image_url: Optional[str] = None
+    primary_mockup_url: Optional[str] = None
 
 
 class ProductUpdate(BaseModel):

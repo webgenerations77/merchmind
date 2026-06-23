@@ -389,6 +389,9 @@ def regenerate_design(
     if not design:
         raise HTTPException(404, f"Design {design_id} not found")
 
+    if not design.trend_id:
+        raise HTTPException(400, "Cannot regenerate a design without a linked trend")
+
     _log_feedback(db, design, "regenerated", edited_prompt=body.new_prompt)
     db.commit()
 
@@ -397,7 +400,7 @@ def regenerate_design(
     settings_row = db.query(AppSettings).first()
     task = _generate_design_for_trend.delay(
         str(design.trend_id),
-        str(design.batch_id),
+        str(design.batch_id) if design.batch_id else str(design.trend_id),
         {
             "quality_threshold": settings_row.quality_threshold if settings_row else 28,
             "trend_boost_max": float(settings_row.trend_boost_max) if settings_row else 0.20,
@@ -471,6 +474,9 @@ def suggest_regenerate(
     if not design:
         raise HTTPException(404, f"Design {design_id} not found")
 
+    if not design.trend_id:
+        raise HTTPException(400, "Cannot regenerate a design without a linked trend")
+
     from app.utils.claude_client import claude
 
     synth_messages = [{"role": m["role"], "content": m["content"]} for m in body.conversation]
@@ -484,12 +490,16 @@ def suggest_regenerate(
         ),
     })
 
-    directive, _ = claude.sonnet(
-        "suggest_synthesize",
-        synth_messages,
-        system=_build_chat_context(design),
-        max_tokens=512,
-    )
+    try:
+        directive, _ = claude.sonnet(
+            "suggest_synthesize",
+            synth_messages,
+            system=_build_chat_context(design),
+            max_tokens=512,
+        )
+    except Exception as e:
+        logger.error("suggest-regenerate: Claude synthesis failed for %s: %s", design_id, e)
+        raise HTTPException(502, f"Failed to synthesize design directive: {e}")
 
     design.conversation_history = body.conversation
     new_version = (design.version or 1) + 1
@@ -501,17 +511,21 @@ def suggest_regenerate(
     from app.models.settings import AppSettings
     settings_row = db.query(AppSettings).first()
 
-    task = _generate_design_for_trend.delay(
-        str(design.trend_id),
-        str(design.batch_id),
-        {
-            "quality_threshold": settings_row.quality_threshold if settings_row else 28,
-            "trend_boost_max": float(settings_row.trend_boost_max) if settings_row else 0.20,
-            "base_markup": settings_row.base_markup if settings_row else {},
-            "floor_prices": settings_row.floor_prices if settings_row else {},
-            "custom_prompt": directive,
-        },
-    )
+    try:
+        task = _generate_design_for_trend.delay(
+            str(design.trend_id),
+            str(design.batch_id) if design.batch_id else str(design.trend_id),
+            {
+                "quality_threshold": settings_row.quality_threshold if settings_row else 28,
+                "trend_boost_max": float(settings_row.trend_boost_max) if settings_row else 0.20,
+                "base_markup": settings_row.base_markup if settings_row else {},
+                "floor_prices": settings_row.floor_prices if settings_row else {},
+                "custom_prompt": directive,
+            },
+        )
+    except Exception as e:
+        logger.error("suggest-regenerate: task dispatch failed for %s: %s", design_id, e)
+        raise HTTPException(502, f"Failed to queue regeneration task: {e}")
 
     return _envelope({
         "task_id": task.id,
