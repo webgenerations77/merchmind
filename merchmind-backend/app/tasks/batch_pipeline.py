@@ -650,7 +650,7 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                         archetype=design.archetype,
                     )
                     product.printify_product_id = printify_id
-                    mockups = _get_printify().generate_mockups(printify_id)
+                    mockups = _get_printify().generate_mockups(printify_id, design_id=design_id, product_type=product.product_type)
                     product.mockup_urls = mockups
                     db.commit()
                     logger.info(f"design_task[{trend_id[:8]}] Printify mockup for {product.product_type}")

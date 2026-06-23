@@ -84,13 +84,13 @@ _PRIMARY_MAP = {
     "illustration": "tshirt",
     "hybrid": "tshirt",
     "text_icon": "tshirt",
-    "text_only": "mug",
-    "typographic": "mug",
+    "text_only": "tshirt",
+    "typographic": "tshirt",
 }
 
 
 def default_primary_product_type(archetype: str) -> str:
-    return _PRIMARY_MAP.get(archetype, "tshirt")
+    return "tshirt"
 
 
 def select_primary_product_type(
@@ -100,58 +100,16 @@ def select_primary_product_type(
     raw_signal: str = "",
 ) -> dict:
     """
-    Use Claude to evaluate which product type best suits this design.
-    Returns {"primary_product_type": str, "reasoning": str}.
-    Falls back to archetype-based mapping on error.
+    T-shirt is always the primary product type — it's the hero product
+    shown in preview cards and the design is optimized for chest-print format.
     """
-    if not product_types:
-        fallback = default_primary_product_type(archetype)
-        logger.warning("select_primary_product_type: no product_types, defaulting to %s", fallback)
-        return {"primary_product_type": fallback, "reasoning": "No product types available — used archetype default."}
-
-    prompt = (
-        f'Design concept: "{concept_name}"\n'
-        f"Archetype: {archetype}\n"
-        f'Trend/topic: "{raw_signal or concept_name}"\n'
-        f"Available product types: {', '.join(product_types)}\n\n"
-        "Which product type is this design MOST optimized for? Consider:\n"
-        "1. Design composition — does the layout best suit a wearable (tshirt/hat), drinkware (mug), phone accessory, or sticker?\n"
-        "2. Format fit — which product's format (aspect ratio, print area, viewing distance) best showcases this design?\n"
-        "3. Core visual intent — what was this design primarily conceived to be?\n"
-        "4. Commercial appeal — on which product would this design sell best?\n\n"
-        'Reply with JSON only: {"primary_product_type": "<one of the available types>", "reasoning": "<2-3 sentences>"}'
-    )
-    try:
-        text, _ = claude.haiku(
-            "primary_product_type_selection",
-            [{"role": "user", "content": prompt}],
-            max_tokens=200,
-        )
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if match:
-            data = json.loads(match.group())
-            selected = data.get("primary_product_type", "").lower().strip()
-            if selected in product_types:
-                logger.info(
-                    "primary_product_type AI: concept='%s' selected=%s",
-                    concept_name[:40], selected,
-                )
-                return {
-                    "primary_product_type": selected,
-                    "reasoning": str(data.get("reasoning", "")),
-                }
-            logger.warning("AI selected invalid product type '%s', falling back", selected)
-
-        fallback = default_primary_product_type(archetype)
-        if fallback not in product_types:
-            fallback = product_types[0]
-        return {"primary_product_type": fallback, "reasoning": "AI response invalid — used archetype default."}
-    except Exception as e:
-        logger.error("Primary product type selection failed for '%s': %s", concept_name, e)
-        fallback = default_primary_product_type(archetype)
-        if fallback not in product_types:
-            fallback = product_types[0]
-        return {"primary_product_type": fallback, "reasoning": f"AI selection unavailable — used archetype default: {e}"}
+    primary = "tshirt"
+    if primary not in product_types and product_types:
+        primary = product_types[0]
+    return {
+        "primary_product_type": primary,
+        "reasoning": "T-shirt is always the primary product — hero display in preview cards.",
+    }
 
 
 def assign_product_bundle(archetype: str, quality_breakdown: dict, max_products: int = 6) -> list[str]:

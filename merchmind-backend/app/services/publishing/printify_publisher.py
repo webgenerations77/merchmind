@@ -2,11 +2,13 @@
 Printify API client — class-based service for creating products and generating mockups.
 Uploads mockup images to Supabase Storage after generation.
 """
+import io
 import logging
 import time
 from functools import lru_cache
 
 import httpx
+from PIL import Image
 
 from app.config import settings
 from app.utils.exceptions import (
@@ -54,7 +56,7 @@ _SCALE_MAP = {
     "mug": 1.0,
     "hat": 0.9,
     "phone_case": 1.0,
-    "sticker": 1.0,
+    "sticker": 1.2,
 }
 
 _DUAL_PRINT_SURCHARGE = {
@@ -246,11 +248,41 @@ class PrintifyService:
         except Exception as e:
             logger.error("printify.delete_product failed product_id=%s error=%s", printify_product_id, e)
 
-    def generate_mockups(self, printify_product_id: str, design_id: str | None = None) -> dict:
+    @staticmethod
+    def _replace_white_bg(image_bytes: bytes, bg_color: tuple = (30, 30, 35)) -> bytes:
+        """Replace white/near-white background pixels with a dark color."""
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        pixels = img.load()
+        w, h = img.size
+        threshold = 240
+        for y in range(h):
+            for x in range(w):
+                r, g, b = pixels[x, y]
+                if r >= threshold and g >= threshold and b >= threshold:
+                    pixels[x, y] = bg_color
+        buf = io.BytesIO()
+        img.save(buf, format="PNG", quality=95)
+        return buf.getvalue()
+
+    def _rehost_mockup(self, url: str, design_id: str, product_type: str, position: str) -> str:
+        """Download a Printify mockup, replace white bg, upload to Supabase."""
+        try:
+            with httpx.Client(timeout=15) as client:
+                resp = client.get(url)
+                resp.raise_for_status()
+            processed = self._replace_white_bg(resp.content)
+            path = f"designs/{design_id}/mockups/{product_type}/{position}.png"
+            return storage.upload(path, processed, "image/png")
+        except Exception as e:
+            logger.warning("printify.rehost_mockup failed type=%s pos=%s: %s", product_type, position, e)
+            return url
+
+    def generate_mockups(self, printify_product_id: str, design_id: str | None = None, product_type: str | None = None) -> dict:
         """
         Fetch mockup URLs from Printify after rendering delay.
         Some providers (hats, phone cases, stickers) take 30+ seconds.
-        Returns {front: url, back?: url} dict using Printify CDN URLs.
+        Downloads mockups, replaces white backgrounds, re-uploads to Supabase.
+        Returns {front: url, back?: url} dict.
         """
         _DELAYS = [8, 15, 25]
         try:
@@ -280,12 +312,16 @@ class PrintifyService:
                     front_url = src
 
             mockup_urls: dict[str, str] = {}
-            if front_url:
+            if front_url and design_id:
+                mockup_urls["front"] = self._rehost_mockup(front_url, design_id, product_type or "unknown", "front")
+            elif front_url:
                 mockup_urls["front"] = front_url
-            if back_url:
+            if back_url and design_id:
+                mockup_urls["back"] = self._rehost_mockup(back_url, design_id, product_type or "unknown", "back")
+            elif back_url:
                 mockup_urls["back"] = back_url
 
-            logger.info("printify.generate_mockups product_id=%s positions=%s attempts=%d", printify_product_id, list(mockup_urls), attempt + 1)
+            logger.info("printify.generate_mockups product_id=%s positions=%s attempts=%d rehosted=%s", printify_product_id, list(mockup_urls), attempt + 1, bool(design_id))
             return mockup_urls
         except Exception as e:
             logger.error("printify.generate_mockups failed product_id=%s error=%s", printify_product_id, e)
@@ -350,5 +386,5 @@ def delete_product(printify_product_id: str) -> None:
     _get().delete_product(printify_product_id)
 
 
-def generate_mockups(printify_product_id: str) -> dict:
-    return _get().generate_mockups(printify_product_id)
+def generate_mockups(printify_product_id: str, design_id: str | None = None, product_type: str | None = None) -> dict:
+    return _get().generate_mockups(printify_product_id, design_id=design_id, product_type=product_type)
