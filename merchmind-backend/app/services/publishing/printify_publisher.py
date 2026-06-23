@@ -49,6 +49,14 @@ _FALLBACK_BASE_COSTS = {
     "sticker": 2.50,
 }
 
+_SCALE_MAP = {
+    "tshirt": 1.0,
+    "mug": 1.0,
+    "hat": 0.9,
+    "phone_case": 1.0,
+    "sticker": 1.0,
+}
+
 _DUAL_PRINT_SURCHARGE = {
     "tshirt": 2.50,
     "hat": 3.00,
@@ -165,10 +173,12 @@ class PrintifyService:
         if product_type == "tshirt" and archetype in ("text_only", "typographic", "text_icon"):
             front_y = 0.35
 
+        front_scale = _SCALE_MAP.get(product_type, 1.0)
+
         placeholders = [
             {
                 "position": "front",
-                "images": [{"id": printify_image_id, "x": 0.5, "y": front_y, "scale": 1.0, "angle": 0}],
+                "images": [{"id": printify_image_id, "x": 0.5, "y": front_y, "scale": front_scale, "angle": 0}],
             }
         ]
 

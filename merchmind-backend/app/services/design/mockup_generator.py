@@ -27,13 +27,13 @@ _TEMPLATES = {
     "sticker": {
         "size": (600, 600),
         "bg_color": (240, 240, 240),
-        "design_area": (100, 100, 500, 500),
+        "design_area": (50, 50, 550, 550),
         "label": "Sticker",
     },
     "phone_case": {
         "size": (500, 900),
         "bg_color": (30, 30, 30),
-        "design_area": (70, 120, 430, 700),
+        "design_area": (65, 100, 435, 780),
         "corner_radius": 40,
         "label": "Phone Case",
     },
@@ -55,6 +55,27 @@ def _load_font(size: int):
         return ImageFont.load_default()
 
 
+def _smart_crop_to_aspect(img: Image.Image, target_w: int, target_h: int) -> Image.Image:
+    """Center-crop an image to match the target aspect ratio, then resize."""
+    src_w, src_h = img.size
+    target_ratio = target_w / target_h
+    src_ratio = src_w / src_h
+
+    if abs(src_ratio - target_ratio) < 0.05:
+        return img.resize((target_w, target_h), Image.LANCZOS)
+
+    if src_ratio > target_ratio:
+        new_w = int(src_h * target_ratio)
+        left = (src_w - new_w) // 2
+        img = img.crop((left, 0, left + new_w, src_h))
+    else:
+        new_h = int(src_w / target_ratio)
+        top = (src_h - new_h) // 2
+        img = img.crop((0, top, src_w, top + new_h))
+
+    return img.resize((target_w, target_h), Image.LANCZOS)
+
+
 def generate_mockup(product_type: str, design_bytes: bytes, archetype: str | None = None) -> bytes | None:
     """Generate a mockup composite for a product type. Returns PNG bytes or None."""
     template = _TEMPLATES.get(product_type)
@@ -74,7 +95,7 @@ def generate_mockup(product_type: str, design_bytes: bytes, archetype: str | Non
             area = template["design_area"]
         area_w = area[2] - area[0]
         area_h = area[3] - area[1]
-        design_resized = design.resize((area_w, area_h), Image.LANCZOS)
+        design_resized = _smart_crop_to_aspect(design, area_w, area_h)
 
         canvas.paste(design_resized, (area[0], area[1]), design_resized)
 

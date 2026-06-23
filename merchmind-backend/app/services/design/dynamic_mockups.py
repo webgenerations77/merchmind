@@ -25,19 +25,16 @@ _TIMEOUT = 30
 # Populate these after browsing templates at dynamicmockups.com.
 # Each entry needs the mockup_uuid and the smart_object uuid for the design area.
 _TEMPLATE_MAP: dict[str, dict] = {
-    # "tshirt": {
-    #     "mockup_uuid": "...",
-    #     "smart_object_uuid": "...",
-    #     "label": "tshirt_front",
-    # },
-    # "mug": {
-    #     "mockup_uuid": "...",
-    #     "smart_object_uuid": "...",
-    #     "label": "mug_front",
-    # },
-    # "hat": { ... },
-    # "phone_case": { ... },
-    # "sticker": { ... },
+    "phone_case": {
+        "mockup_uuid": "6876816e-333f-4857-b542-38022b6be7a0",
+        "smart_object_uuid": "4bec3f0b-8922-48f5-a8c2-f1716bb8cc87",
+        "label": "phone_case_front",
+    },
+    "hat": {
+        "mockup_uuid": "59c7946f-e4af-4734-9b4b-0602c1dfba7b",
+        "smart_object_uuid": "635a7244-495c-4018-a073-d4257abe69f3",
+        "label": "hat_front",
+    },
 }
 
 
@@ -81,7 +78,7 @@ class DynamicMockupsService:
                         "smart_objects": [
                             {
                                 "uuid": template["smart_object_uuid"],
-                                "asset": {"url": design_url},
+                                "asset": {"url": design_url, "fit": "cover"},
                             }
                         ],
                     },

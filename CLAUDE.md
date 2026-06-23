@@ -204,14 +204,60 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 
 9. **Quality scorer fix** — DONE. Quality scorer was degrading all image designs to text_only (vision API errors → score 0 → regen crash → force text_only). Fixed: image designs kept even if quality is low; scorer fallback auto-passes instead of failing. Production batch confirmed: 9 illustration + 8 hybrid + 8 text_only out of 25 designs.
 
-10. **Dynamic Mockups integration** — IN PROGRESS. Service built (`dynamic_mockups.py`), wired into all 3 generators. Mockup chain: Printify → Dynamic Mockups → Pillow fallback. Needs: sign up at dynamicmockups.com, set `DYNAMIC_MOCKUPS_API_KEY` env var on Railway, populate `_TEMPLATE_MAP` with template UUIDs per product type. Placeit has no API — was replaced with Dynamic Mockups.
+10. **Dynamic Mockups integration** — DONE. Service built (`dynamic_mockups.py`), wired into all 3 generators. Mockup chain: Printify → Dynamic Mockups → Pillow fallback. `DYNAMIC_MOCKUPS_API_KEY` env var set on Railway. Template map populated with UUIDs per product type.
 
-11. **Shopify theme update from STC HQ** — TODO. Update `shopify-theme/` to match Spinach the Cow corporate site at `https://webgenerations77.github.io/stchq/`. Back up current theme first.
+11. **Shopify theme update from STC HQ** — DONE. Updated `shopify-theme/` to match Spinach the Cow corporate site.
 
-12. **Hat and sticker mockups** — TODO. Removed Pillow fallback mockups for hat and sticker (looked fake). These need photorealistic rendering via Dynamic Mockups. Until then, products show the raw design image.
+12. **Hat and sticker mockups** — DONE. Hat mockups render via Dynamic Mockups MockAnything AI (Atlantis Headwear trucker cap template). Sticker has no matching product in Dynamic Mockups catalog — uses Pillow fallback (flat design-on-white, appropriate for stickers).
 
-13. **API balances on Usage page** — TODO. Add current API credit balances (Anthropic, Replicate, OpenAI, Printify) to the dashboard API Usage page so Drew can monitor spend.
+13. **API balances on Usage page** — DONE. Balance cards on API Usage page show monthly and all-time spend per provider (from ApiUsageLog tracking), connection status, and console links. No provider exposes a real-time credit balance API, so spend is tracked internally.
 
-14. **Vercel redeploy dashboard** — TODO. `thecindycooley@gmail.com` added as authorized user in code but needs `vercel --prod` from `merchmind-dashboard/` to go live. Also still needs `VITE_FIREBASE_API_KEY` env var.
+14. **Vercel redeploy dashboard** — DONE. All env vars set (`VITE_API_BASE_URL`, `VITE_API_KEY`, `VITE_FIREBASE_API_KEY`). Deployed to production at `merchmind-dashboard.vercel.app`. Cindy added as authorized user. Deploy from repo root (`vercel --prod` from `MerchMind/`, not from `merchmind-dashboard/`).
 
 15. **Re-enable Sunday batch** — TODO. Uncomment `sunday-batch` in `celery_app.py` beat_schedule when ready to go live. Currently paused to avoid unreviewed runs.
+
+## Design Quality Improvements (Priority Order)
+
+### Problem: Design idea doesn't match what's on the product
+The `concept_name` (set from `trend.raw_signal`) is what the user sees as the "Design Idea" in the dashboard. But `build_image_prompt()` in `prompt_builder.py` sends this to Claude to generate a *new* image prompt, which Claude may interpret creatively — producing an image that diverges from the original concept. The concept_name and the generated artwork need to stay tightly coupled.
+
+**Files:** `app/services/design/prompt_builder.py` (build_image_prompt), `app/tasks/batch_pipeline.py` (step 4c)
+
+- [x] **A. Constrain Claude's prompt generation** — DONE. Added explicit fidelity instruction to `_SYSTEM` prompt: "The generated image MUST visually represent the exact concept name provided. Do not reinterpret, abstract, or deviate from the literal subject."
+- [x] **B. Validate prompt-to-concept alignment** — DONE. `_validate_prompt_alignment()` extracts key subject words from concept name and checks they appear in the generated prompt. Falls back to template on drift with a warning log.
+- [x] **C. Surface the image prompt in the dashboard** — DONE. Image prompt shown in Review detail page as a collapsible section below AI reasoning, so Drew can compare what was sent to the image generator vs the concept name.
+
+### Problem: Designs are too small on mockups
+The Printify placement uses `scale: 1.0` for all products (`printify_publisher.py:171`), and the Pillow mockup generator has fixed `design_area` rectangles that may not fill the print area properly. Images generated at 1024x1024 may also not cover the full print area on some products.
+
+**Files:** `app/services/publishing/printify_publisher.py` (create_product), `app/services/design/mockup_generator.py` (_TEMPLATES), `app/services/design/dynamic_mockups.py`
+
+- [x] **D. Tune Printify scale per product type** — DONE. Added `_SCALE_MAP` dict per product type. Hat uses 0.9 scale; others remain 1.0. Easy to tune per product as mockup feedback comes in.
+- [x] **E. Expand Pillow mockup design areas** — DONE. Sticker area expanded from (100,100,500,500) to (50,50,550,550). Phone case area expanded from (70,120,430,700) to (65,100,435,780) to fill more of the product canvas.
+- [x] **F. Generate larger source images** — DONE. DALL-E fallback now uses `_DALLE_SIZE_MAP` to generate at native aspect ratios (9:16 → 1024x1536 for phone cases). Flux Schnell already handled aspect ratios via the API parameter.
+- [x] **G. Dynamic Mockups smart object sizing** — DONE. Added `fit: "cover"` to the smart object asset config so designs fill the smart object area completely instead of potentially letterboxing.
+
+### Problem: Imaging platform limitations not accounted for
+Flux Schnell and gpt-image-1 have different strengths and weaknesses that should inform which designs go to which provider.
+
+**Files:** `app/services/design/image_generator.py`, `app/services/design/archetype_classifier.py`
+
+- [x] **H. Document platform capabilities** — DONE. Documented in CLAUDE.md Design Pipeline Notes section. Flux Schnell: fast, cheap ($0.003), good at flat/vector art. gpt-image-1: 10x more expensive, better at complex prompts. Neither renders readable text — text composited via Pillow.
+- [x] **I. Remove "no text" from prompts that need text compositing** — DONE. Added `_STYLE_LOCK_TEXT_OVERLAY` variant that replaces "No text, no letters, no words" with "No baked-in text — text will be composited separately" and instructs "leave space in the lower third for text overlay." Used for hybrid/text_icon archetypes. Also added text overlay note to Claude context explaining Pillow compositing.
+- [ ] **J. Consider Flux Pro for quality-critical designs** — Flux Pro (~$0.01/image) offers more inference steps and better detail. Could be used selectively for designs scoring high on trend score or for primary product types.
+
+### Problem: Product descriptions don't match actual product types
+When a design is approved and published, `shopify_description` is generated once at design creation (step 4i in batch_pipeline.py) based on the assigned `product_types` list. But the description is generic — it doesn't differentiate between a t-shirt listing and a mug listing on Shopify.
+
+**Files:** `app/services/design/shopify_copy_generator.py`, `app/services/publishing/printify_publisher.py` (create_product)
+
+- [x] **K. Generate per-product descriptions** — DONE. `get_product_description()` adapts the base shopify description per product type. Prepends product-specific appeal line and appends material/care details from `_PRODUCT_DETAILS` dict. Wired into batch pipeline at Printify product creation.
+- [x] **L. Include product-specific details in Printify title** — DONE. Title already uses `"{concept_name} — {product_label}"`. Description now includes material and care instructions per product type via `get_product_description()`.
+
+### Problem: Same design used across all product types without adaptation
+Per CLAUDE.md: "Same image across all product types. Only collections allow variance." But this means a design optimized for t-shirt composition (chest print, 1:1) gets used on a phone case (vertical, 9:16) or hat (small emblem) without resizing or reformatting.
+
+**Files:** `app/tasks/batch_pipeline.py` (step 4c-4d), `app/services/design/prompt_builder.py`
+
+- [ ] **M. Generate format-adapted variants for each product type** — Currently the image prompt is built for the `primary_product` type only, and that one image is reused across all products. Consider generating product-specific image variants (at least for drastically different formats like phone_case 9:16 vs hat emblem). The `preview_all_product_prompts()` function already exists but isn't used in the pipeline. Would multiply API costs ($0.003-$0.03 per variant).
+- [x] **N. Smart cropping/resizing per product** — DONE. Added `_smart_crop_to_aspect()` in mockup_generator.py. Center-crops 1:1 source images to match each product's design area aspect ratio before resizing. Phone case (vertical) gets a vertical center crop, hat (landscape) gets a landscape center crop. Replaces the previous stretch-to-fit behavior in Pillow mockups.

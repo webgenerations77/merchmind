@@ -38,8 +38,16 @@ class GeneratedImage:
     prompt: str
 
 
+_DALLE_SIZE_MAP = {
+    "1:1": "1024x1024",
+    "9:16": "1024x1536",
+    "16:9": "1536x1024",
+}
+
+
 class DALLe3Service:
-    def generate(self, prompt: str) -> bytes:
+    def generate(self, prompt: str, aspect_ratio: str = "1:1") -> bytes:
+        size = _DALLE_SIZE_MAP.get(aspect_ratio, "1024x1024")
         for attempt in range(_MAX_RETRIES):
             try:
                 openai_limiter.consume()
@@ -47,7 +55,7 @@ class DALLe3Service:
                 response = client.images.generate(
                     model="gpt-image-1",
                     prompt=prompt,
-                    size="1024x1024",
+                    size=size,
                     quality="low",
                     n=1,
                 )
@@ -190,10 +198,7 @@ def generate_image(prompt: str, api: str, aspect_ratio: str = "1:1") -> tuple[by
     last_error: Exception = RuntimeError("No providers")
     for name, provider in providers:
         try:
-            if name == "flux_schnell":
-                return provider.generate(prompt, aspect_ratio=aspect_ratio), name
-            else:
-                return provider.generate(prompt), name
+            return provider.generate(prompt, aspect_ratio=aspect_ratio), name
         except ContentPolicyRejectionError:
             raise
         except Exception as e:

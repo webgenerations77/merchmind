@@ -294,24 +294,23 @@ def test_image_generator_content_policy_propagates():
 
     svc = DALLe3Service()
 
-    async def _raise(*a, **kw):
-        # Build a real httpx.Response so BadRequestError doesn't fail to construct
-        req = httpx.Request("POST", "https://api.openai.com/v1/images/generations")
-        resp = httpx.Response(
-            400,
-            json={"error": {"type": "content_policy_violation", "message": "content_policy_violation"}},
-            request=req,
-        )
-        raise OpenAIBadRequestError(
-            message="content_policy_violation",
-            response=resp,
-            body={"error": {"type": "content_policy_violation"}},
-        )
+    req = httpx.Request("POST", "https://api.openai.com/v1/images/generations")
+    resp = httpx.Response(
+        400,
+        json={"error": {"type": "content_policy_violation", "message": "content_policy_violation"}},
+        request=req,
+    )
+    error = OpenAIBadRequestError(
+        message="content_policy_violation",
+        response=resp,
+        body={"error": {"type": "content_policy_violation"}},
+    )
 
-    import asyncio
-    with patch.object(svc._client.images, "generate", side_effect=_raise):
+    mock_client = MagicMock()
+    mock_client.images.generate.side_effect = error
+    with patch("app.services.design.image_generator.openai.OpenAI", return_value=mock_client):
         with pytest.raises(ContentPolicyRejectionError):
-            asyncio.run(svc.generate("bad prompt"))
+            svc.generate("bad prompt")
 
 
 # ─── Health Router ────────────────────────────────────────────────────────────

@@ -650,6 +650,13 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
 
           <AiReasoningSection design={design} products={products} />
 
+          {design.image_prompt && (
+            <div className="p-3 bg-bg-secondary rounded-lg border border-border">
+              <p className="text-xs text-text-tertiary mb-1">Image Prompt</p>
+              <p className="text-sm text-text-secondary whitespace-pre-line leading-relaxed">{design.image_prompt}</p>
+            </div>
+          )}
+
           {design.shopify_title && (
             <div className="p-3 bg-bg-secondary rounded-lg border border-border">
               <p className="text-xs text-text-tertiary mb-1">Shopify Title</p>

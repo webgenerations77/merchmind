@@ -630,16 +630,20 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
         if image_url:
             from app.services.publishing.printify_publisher import create_product as printify_create, _get as _get_printify
             from app.services.design.text_preview import _LIGHT_PRODUCT_TYPES
+            from app.services.design.shopify_copy_generator import get_product_description
             for product in db.query(Product).filter(Product.design_id == design.id).all():
                 try:
                     product_label = product.product_type.replace("_", " ").title()
                     base_name = design.concept_name or design.shopify_title or "Design"
                     product_back_logo = back_logo_url if (back_logo_enabled and product.product_type in back_logo_products) else None
                     use_image = light_variant_url if (light_variant_url and product.product_type in _LIGHT_PRODUCT_TYPES) else image_url
+                    product_desc = get_product_description(
+                        design.shopify_description or "", product.product_type, design.concept_name,
+                    )
                     printify_id = printify_create(
                         product_type=product.product_type,
                         title=f"{base_name} — {product_label}",
-                        description=design.shopify_description or "",
+                        description=product_desc,
                         image_url=use_image,
                         retail_price=float(product.retail_price),
                         back_logo_url=product_back_logo,

@@ -19,6 +19,16 @@ _STYLE_LOCK = (
     "No gradients bleeding into background, no subtle textures on background, pure white background only."
 )
 
+_STYLE_LOCK_TEXT_OVERLAY = (
+    "Professional merchandise artwork style. Isolated subject on a plain solid white background (#FFFFFF). "
+    "Centered composition with clean edges. Leave space at the bottom third for text overlay. "
+    "High contrast, vibrant saturated colors. No baked-in text, no letters, no words — text will be composited separately. "
+    "No watermarks, no signatures. "
+    "The design element should be clearly separated from the background with crisp edges. "
+    "Print-ready quality at 300 DPI, sharp details, professional commercial design. "
+    "No gradients bleeding into background, no subtle textures on background, pure white background only."
+)
+
 _PRODUCT_BACKGROUND_CONTEXT = {
     "tshirt": {"bg": "dark", "text_color": "white or light colors", "reason": "printed on dark fabric"},
     "hat": {"bg": "dark", "text_color": "white or light colors", "reason": "embroidered/printed on dark fabric"},
@@ -117,6 +127,10 @@ _SYSTEM = (
     "Always specify: the exact subject, art style (flat design, vector, graphic art), "
     "color palette (name 3-5 specific colors), composition, "
     "and rendering quality (sharp, clean edges, print-ready). "
+    "CRITICAL: The generated image MUST visually represent the exact concept name provided. "
+    "Do not reinterpret, abstract, or deviate from the literal subject. "
+    "If the concept is 'Mountain Sunrise', the image must depict a mountain with a sunrise — "
+    "not ocean waves, not a forest, not an abstract pattern. Stay faithful to the concept. "
     "IMPORTANT: Tailor composition and format to the specific product type. "
     "A phone case needs vertical format with central focus; "
     "a hat needs a compact emblem; a sticker needs a die-cut shape with high contrast, "
@@ -124,6 +138,28 @@ _SYSTEM = (
     "Avoid: photorealism, 3D renders, complex scenes, busy backgrounds, gradients. "
     "Reply with only the prompt text, no extra commentary."
 )
+
+
+def _extract_subject_keywords(concept_name: str) -> list[str]:
+    """Extract key subject words from a concept name for alignment validation."""
+    stop_words = {
+        "the", "a", "an", "and", "or", "of", "in", "on", "at", "to", "for",
+        "is", "it", "be", "as", "by", "with", "from", "this", "that", "its",
+        "are", "was", "were", "been", "has", "had", "do", "does", "did",
+        "but", "not", "no", "so", "if", "up", "out", "about", "into",
+        "day", "week", "month", "year", "new", "best", "top", "big",
+    }
+    words = re.findall(r"[a-zA-Z]{3,}", concept_name.lower())
+    return [w for w in words if w not in stop_words]
+
+
+def _validate_prompt_alignment(prompt: str, concept_name: str) -> bool:
+    """Check that the generated prompt contains at least one key subject word from the concept."""
+    keywords = _extract_subject_keywords(concept_name)
+    if not keywords:
+        return True
+    prompt_lower = prompt.lower()
+    return any(kw in prompt_lower for kw in keywords)
 
 
 def get_product_format(product_type: str) -> dict:
@@ -158,6 +194,9 @@ def build_image_prompt(
     fmt = get_product_format(product_type)
     bg_ctx = get_product_background(product_type)
 
+    will_composite_text = archetype in ("hybrid", "text_icon")
+    style_lock = _STYLE_LOCK_TEXT_OVERLAY if will_composite_text else _STYLE_LOCK
+
     text_color_instruction = ""
     if archetype in ("hybrid", "text_icon", "typographic"):
         text_color_instruction = (
@@ -165,6 +204,14 @@ def build_image_prompt(
             f"- This product has a {bg_ctx['bg']} background ({bg_ctx['reason']})\n"
             f"- Any text or lettering elements must use {bg_ctx['text_color']}\n"
             f"- Do NOT use white text on light backgrounds or dark text on dark backgrounds\n"
+        )
+
+    text_overlay_note = ""
+    if will_composite_text:
+        text_overlay_note = (
+            "\nNOTE: Text will be composited onto this image separately via Pillow. "
+            "Do NOT bake any text into the image. Instead, leave clear space in the "
+            "lower third of the composition for a text overlay band.\n"
         )
 
     context = (
@@ -176,13 +223,15 @@ def build_image_prompt(
         f"PRODUCT FORMAT REQUIREMENTS:\n"
         f"- Composition: {fmt['composition']}\n"
         f"- Style keywords: {fmt['prompt_keywords']}\n"
-        f"{text_color_instruction}\n"
+        f"{text_color_instruction}"
+        f"{text_overlay_note}\n"
         f"Write an image generation prompt for this specific product format.\n"
         f"The design must be PURPOSE-BUILT for {product_type} — not a generic graphic repurposed.\n"
         f"Be specific about the subject, visual style, color palette, and composition.\n"
-        f"Must include these constraints: \"{_STYLE_LOCK}\"\n"
+        f"Must include these constraints: \"{style_lock}\"\n"
         f"Max 120 words."
     )
+    subject = concept_name or raw_signal
     try:
         text, _ = claude.sonnet(
             "image_prompt_generation",
@@ -192,7 +241,15 @@ def build_image_prompt(
         )
         prompt = text.strip()
         if "white background" not in prompt.lower():
-            prompt += f". {_STYLE_LOCK}"
+            prompt += f". {style_lock}"
+
+        if not _validate_prompt_alignment(prompt, subject):
+            logger.warning(
+                "prompt_builder: concept drift detected — concept='%s' not reflected in prompt='%s'. Using template fallback.",
+                subject[:60], prompt[:120],
+            )
+            prompt = template.format(subject=subject, style_lock=style_lock)
+
         logger.info(
             "prompt_builder: product_type=%s archetype=%s prompt_preview='%s'",
             product_type, archetype, prompt[:120],
@@ -200,8 +257,7 @@ def build_image_prompt(
         return prompt
     except Exception as e:
         logger.error(f"Prompt builder failed for '{raw_signal}': {e}")
-        subject = concept_name or raw_signal
-        return template.format(subject=subject, style_lock=_STYLE_LOCK)
+        return template.format(subject=subject, style_lock=style_lock)
 
 
 def preview_all_product_prompts(
