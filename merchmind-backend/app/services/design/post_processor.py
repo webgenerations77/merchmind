@@ -49,13 +49,31 @@ def remove_background(image_bytes: bytes) -> Image.Image:
     return Image.open(io.BytesIO(result)).convert("RGBA")
 
 
+def _autocrop(img: Image.Image, threshold: int = 10) -> Image.Image:
+    """Crop to content bounds by trimming transparent/near-transparent edges."""
+    if img.mode != "RGBA":
+        img = img.convert("RGBA")
+    alpha = img.split()[3]
+    bbox = alpha.point(lambda p: 255 if p > threshold else 0).getbbox()
+    if bbox:
+        return img.crop(bbox)
+    return img
+
+
 def normalize_canvas(img: Image.Image) -> Image.Image:
+    img = _autocrop(img)
+
     canvas = Image.new("RGBA", (_CANVAS_WIDTH, _CANVAS_HEIGHT), (0, 0, 0, 0))
     max_w = _CANVAS_WIDTH - (_BLEED_MARGIN * 2)
     max_h = _CANVAS_HEIGHT - (_BLEED_MARGIN * 2)
-    img.thumbnail((max_w, max_h), Image.LANCZOS)
-    x = (_CANVAS_WIDTH - img.width) // 2
-    y = (_CANVAS_HEIGHT - img.height) // 2
+
+    scale = min(max_w / img.width, max_h / img.height)
+    new_w = int(img.width * scale)
+    new_h = int(img.height * scale)
+    img = img.resize((new_w, new_h), Image.LANCZOS)
+
+    x = (_CANVAS_WIDTH - new_w) // 2
+    y = (_CANVAS_HEIGHT - new_h) // 2
     canvas.paste(img, (x, y), img)
     return canvas
 
