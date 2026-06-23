@@ -19,6 +19,7 @@ export interface DesignQueueItem {
   source?: 'batch' | 'collection' | 'drews_mind';
   primary_product_type?: string;
   primary_mockup_url?: string;
+  image_api_used?: string | null;
   is_featured: boolean;
   featured_at?: string | null;
   product_count: number;

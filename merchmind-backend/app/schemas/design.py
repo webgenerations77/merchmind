@@ -59,6 +59,7 @@ class DesignQueueItem(BaseModel):
     status: str
     collection_id: Optional[UUID] = None
     primary_product_type: Optional[str] = "tshirt"
+    image_api_used: Optional[str] = None
     is_featured: bool = False
     revisit_count: Optional[int] = 0
     claude_reasoning: Optional[str] = None

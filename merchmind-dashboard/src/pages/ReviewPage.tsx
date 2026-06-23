@@ -377,7 +377,7 @@ function DesignCard({ item, action, onClick, onToggleFeatured }: {
           </div>
         </div>
 
-        {/* TERTIARY: Quality score, product count, style tag */}
+        {/* TERTIARY: Quality score, product count, style tag, AI provider */}
         <div className="flex items-center gap-1.5 flex-wrap">
           <ConfidenceBadge score={item.quality_score} />
           {(item.product_count ?? 0) > 0 && (
@@ -388,6 +388,13 @@ function DesignCard({ item, action, onClick, onToggleFeatured }: {
           <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-bg-tertiary text-text-tertiary">
             {ARCHETYPE_LABELS[item.archetype] || item.archetype.replace(/_/g, ' ')}
           </span>
+          {item.image_api_used && (
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+              item.image_api_used === 'flux_schnell' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-sky-500/15 text-sky-400'
+            }`}>
+              {item.image_api_used === 'flux_schnell' ? 'Flux' : item.image_api_used === 'dalle3' ? 'DALL·E' : item.image_api_used}
+            </span>
+          )}
         </div>
       </div>
     </button>
