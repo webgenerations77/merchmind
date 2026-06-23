@@ -250,18 +250,23 @@ class PrintifyService:
 
     @staticmethod
     def _replace_white_bg(image_bytes: bytes, bg_color: tuple = (30, 30, 35)) -> bytes:
-        """Replace white/near-white background pixels with a dark color."""
-        img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        pixels = img.load()
-        w, h = img.size
-        threshold = 240
-        for y in range(h):
-            for x in range(w):
-                r, g, b = pixels[x, y]
-                if r >= threshold and g >= threshold and b >= threshold:
-                    pixels[x, y] = bg_color
+        """Replace white/near-white background with a dark color using smooth blending."""
+        from PIL import ImageChops, ImageFilter
+
+        img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
+        r, g, b, a = img.split()
+
+        gray_min = ImageChops.darker(ImageChops.darker(r, g), b)
+        mask = gray_min.point(lambda p: min(255, max(0, int((p - 190) * (255 / 65)))) if p >= 190 else 0)
+
+        mask = mask.filter(ImageFilter.MaxFilter(3))
+        mask = mask.filter(ImageFilter.GaussianBlur(radius=1.5))
+
+        bg = Image.new("RGBA", img.size, (*bg_color, 255))
+        result = Image.composite(bg, img, mask)
+
         buf = io.BytesIO()
-        img.save(buf, format="PNG", quality=95)
+        result.convert("RGB").save(buf, format="PNG", quality=95)
         return buf.getvalue()
 
     def _rehost_mockup(self, url: str, design_id: str, product_type: str, position: str) -> str:

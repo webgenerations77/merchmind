@@ -9,8 +9,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 logger = logging.getLogger(__name__)
 
-_CANVAS_W = 1200
-_CANVAS_H = 1200
+_CANVAS_W = 3000
+_CANVAS_H = 3000
 _BG_COLOR = (0, 0, 0, 0)
 _TEXT_COLOR = (255, 255, 255)
 _ACCENT_COLOR = (99, 102, 241)
@@ -71,20 +71,20 @@ def generate_text_preview(
     img = Image.new("RGBA", (_CANVAS_W, _CANVAS_H), _BG_COLOR)
     draw = ImageDraw.Draw(img)
 
-    primary_size = 72
+    primary_size = 180
     primary_font = _load_font(primary_size)
-    max_text_width = _CANVAS_W - 160
+    max_text_width = _CANVAS_W - 300
     lines = _wrap_text(primary_text.upper(), primary_font, max_text_width)
 
-    while len(lines) > 4 and primary_size > 36:
-        primary_size -= 4
+    while len(lines) > 4 and primary_size > 90:
+        primary_size -= 10
         primary_font = _load_font(primary_size)
         lines = _wrap_text(primary_text.upper(), primary_font, max_text_width)
 
     line_height = int(primary_size * 1.3)
     total_text_height = len(lines) * line_height
     if secondary_text:
-        total_text_height += 60
+        total_text_height += 140
 
     if position == "upper":
         y_start = _CANVAS_H // 6
@@ -98,15 +98,15 @@ def generate_text_preview(
         draw.text((x, y_start + i * line_height), line, fill=text_color, font=primary_font)
 
     if secondary_text:
-        secondary_font = _load_font(28)
+        secondary_font = _load_font(64)
         sec_lines = _wrap_text(secondary_text, secondary_font, max_text_width)
-        sec_y = y_start + len(lines) * line_height + 30
+        sec_y = y_start + len(lines) * line_height + 60
         for line in sec_lines[:2]:
             bbox = secondary_font.getbbox(line)
             text_w = bbox[2] - bbox[0]
             x = (_CANVAS_W - text_w) // 2
             draw.text((x, sec_y), line, fill=secondary_color, font=secondary_font)
-            sec_y += 36
+            sec_y += 80
 
     buf = io.BytesIO()
     img.save(buf, format="PNG")
