@@ -92,50 +92,55 @@ _PRODUCT_FORMAT_TEMPLATES = {
 
 _ARCHETYPE_TEMPLATES = {
     "illustration": (
-        "A striking, highly detailed professional illustration of {subject}. "
-        "Bold graphic style with clean vector-like lines, rich saturated colors, "
-        "detailed but not cluttered. Flat design aesthetic with subtle depth through color layering. "
-        "Modern commercial art quality suitable for screen printing. "
-        "Strong focal point, balanced composition. {style_lock}"
+        "A striking illustration of {subject} with real visual personality. "
+        "Bold graphic style — think screen-print poster art, retro risograph, or tattoo flash sheet. "
+        "Rich saturated colors with an unexpected palette, strong outlines, confident linework. "
+        "Detailed but not cluttered — every element earns its place. "
+        "The kind of design that makes someone stop scrolling. {style_lock}"
     ),
     "hybrid": (
-        "A bold, eye-catching graphic design of {subject}. "
-        "Strong visual impact with a clear central motif, professional quality with space for text overlay. "
-        "Clean layered composition, vibrant colors with limited palette (3-5 colors), modern design aesthetic. "
-        "Strong graphic style with bold shapes and contrast. {style_lock}"
+        "A bold, eye-catching graphic design of {subject} with attitude. "
+        "Strong central motif with visual weight, designed to look great with text overlaid. "
+        "Limited palette (3-5 colors) with at least one unexpected color choice. "
+        "Pop art energy, streetwear aesthetic, or indie poster style. "
+        "Layered composition with clear visual hierarchy. {style_lock}"
     ),
     "text_icon": (
         "A bold, iconic symbol representing {subject}. "
-        "Strong recognizable silhouette, modern and minimal with geometric precision. "
-        "Flat design with 2-3 accent colors, clean graphic design, professional quality. "
-        "Think modern app icon or badge design — simple, memorable, striking. {style_lock}"
+        "Strong recognizable silhouette with graphic punch — think band logo, skate brand emblem, "
+        "or indie coffee shop badge. Geometric precision with a hand-crafted feel. "
+        "Flat design with 2-3 accent colors, memorable at any size. {style_lock}"
     ),
     "typographic": (
         "A creative typographic art piece inspired by the concept of {subject}. "
-        "Decorative letterforms as art, modern graphic design style with artistic flourishes. "
-        "Hand-lettering aesthetic with clean execution. {style_lock}"
+        "Decorative letterforms as art — hand-lettering with character, not corporate fonts. "
+        "Think vintage sign painting, gig poster lettering, or graffiti-influenced type. "
+        "Artistic flourishes that feel intentional, not decorative. {style_lock}"
     ),
     "text_only": None,
 }
 
 _SYSTEM = (
     "You are an expert merchandise graphic designer who creates bestselling "
-    "print-on-demand designs. Write vivid, specific image generation prompts "
-    "that produce professional, eye-catching artwork people want to wear or display. "
-    "Focus on bold visual impact, emotional resonance, and commercial appeal. "
+    "print-on-demand designs for indie brands and streetwear labels. "
+    "Write vivid, specific image generation prompts that produce artwork with personality — "
+    "designs people want to wear because they're cool, witty, or visually striking. "
+    "Think design museum gift shop, not corporate clip art. "
+    "Push for unexpected angles on the concept: clever visual metaphors, bold stylistic choices, "
+    "interesting color combos, and compositions with attitude. "
     "Never include text or words in image prompts — the design should be purely visual. "
-    "Always specify: the exact subject, art style (flat design, vector, graphic art), "
-    "color palette (name 3-5 specific colors), composition, "
+    "Always specify: the exact subject, a distinctive art style (retro risograph, bold pop art, "
+    "minimal line art, psychedelic, woodcut, tattoo flash, screen-print aesthetic, etc.), "
+    "a specific color palette (name 3-5 colors by name, not generic), composition details, "
     "and rendering quality (sharp, clean edges, print-ready). "
     "CRITICAL: The generated image MUST visually represent the exact concept name provided. "
-    "Do not reinterpret, abstract, or deviate from the literal subject. "
-    "If the concept is 'Mountain Sunrise', the image must depict a mountain with a sunrise — "
-    "not ocean waves, not a forest, not an abstract pattern. Stay faithful to the concept. "
+    "Do not reinterpret or deviate from the literal subject — but DO make it visually interesting. "
     "IMPORTANT: Tailor composition and format to the specific product type. "
     "A phone case needs vertical format with central focus; "
     "a hat needs a compact emblem; a sticker needs a die-cut shape with high contrast, "
-    "clean edges, and a design that works at small scale on both transparent and white backgrounds. "
-    "Avoid: photorealism, 3D renders, complex scenes, busy backgrounds, gradients. "
+    "clean edges, and a design that works at small scale. "
+    "Avoid: photorealism, 3D renders, generic clip art, boring symmetrical layouts, "
+    "busy backgrounds, gradients into background. "
     "Reply with only the prompt text, no extra commentary."
 )
 

@@ -249,12 +249,14 @@ class PrintifyService:
     def generate_mockups(self, printify_product_id: str, design_id: str | None = None) -> dict:
         """
         Fetch mockup URLs from Printify after rendering delay.
-        Retries once if no images found (some providers are slower).
+        Some providers (hats, phone cases, stickers) take 30+ seconds.
         Returns {front: url, back?: url} dict using Printify CDN URLs.
         """
+        _DELAYS = [8, 15, 25]
         try:
-            for attempt in range(2):
-                time.sleep(5 if attempt == 0 else 10)
+            images = []
+            for attempt, delay in enumerate(_DELAYS):
+                time.sleep(delay)
                 result = self._request(
                     "GET",
                     f"/shops/{settings.PRINTIFY_SHOP_ID}/products/{printify_product_id}.json",
