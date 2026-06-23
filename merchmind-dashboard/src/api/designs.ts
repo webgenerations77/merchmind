@@ -83,6 +83,11 @@ export async function suggestRegenerate(designId: string, conversation: { role: 
   return data.data;
 }
 
+export async function updateShopifyCopy(id: string, updates: { shopify_title?: string; shopify_description?: string }): Promise<{ shopify_title: string; shopify_description: string }> {
+  const { data } = await apiClient.patch<ApiResponse<{ shopify_title: string; shopify_description: string }>>(`/designs/${id}/shopify-copy`, updates);
+  return data.data;
+}
+
 export async function clearChat(designId: string): Promise<void> {
   await apiClient.delete(`/designs/${designId}/chat`);
 }

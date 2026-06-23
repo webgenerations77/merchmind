@@ -223,10 +223,34 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                 logger.error(f"Saving score failed for '{signal.get('raw_signal', '')}': {e}")
                 _log_batch_error(batch, db, f"Score error: {e}")
 
-        # Limit queue to max_queue (or max_designs for testing), sorted by final_score descending
-        queued_trends.sort(key=lambda t: t.final_score, reverse=True)
+        # Limit queue with niche diversity — pick best from each niche first, then fill by score
         limit = min(max_queue, max_designs) if max_designs else max_queue
-        queued_trends = queued_trends[:limit]
+        queued_trends.sort(key=lambda t: t.final_score, reverse=True)
+
+        niche_buckets: dict[str, list] = {}
+        for t in queued_trends:
+            meta = t.source_metadata or {}
+            niche = meta.get("cluster") or meta.get("niche") or "general"
+            niche_buckets.setdefault(niche, []).append(t)
+
+        diverse_queue = []
+        used_ids = set()
+        for niche_name in sorted(niche_buckets.keys()):
+            if len(diverse_queue) >= limit:
+                break
+            best = niche_buckets[niche_name][0]
+            diverse_queue.append(best)
+            used_ids.add(best.id)
+
+        for t in queued_trends:
+            if len(diverse_queue) >= limit:
+                break
+            if t.id not in used_ids:
+                diverse_queue.append(t)
+                used_ids.add(t.id)
+
+        queued_trends = diverse_queue[:limit]
+        logger.info(f"Niche diversity: {len(niche_buckets)} niches, selected from: {list(niche_buckets.keys())}")
 
         # Mark excess as rejected
         for trend in db.query(Trend).filter(

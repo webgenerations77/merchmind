@@ -13,6 +13,7 @@ from app.models.design import Design
 from app.models.trend import Trend
 from app.models.feedback_log import FeedbackLog
 from app.models.api_usage_log import ApiUsageLog
+from pydantic import BaseModel
 from app.schemas.design import DesignOut, DesignQueueItem, DelayRequest, RegenerateRequest, ChatMessageIn, SuggestRegenerateRequest
 from app.routers.auth import verify_api_key
 
@@ -671,6 +672,30 @@ def fix_classifications(db: Session = Depends(get_db), _: str = Depends(verify_a
     ).update({Design.classification: "design_idea"}, synchronize_session=False)
     db.commit()
     return _envelope({"fixed": updated})
+
+
+class ShopifyCopyUpdate(BaseModel):
+    shopify_title: Optional[str] = None
+    shopify_description: Optional[str] = None
+
+
+@router.patch("/{design_id}/shopify-copy")
+def update_shopify_copy(
+    design_id: UUID,
+    body: ShopifyCopyUpdate,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key),
+):
+    design = db.query(Design).filter(Design.id == design_id, Design.is_deleted == False).first()
+    if not design:
+        raise HTTPException(404, f"Design {design_id} not found")
+    if body.shopify_title is not None:
+        design.shopify_title = body.shopify_title
+    if body.shopify_description is not None:
+        design.shopify_description = body.shopify_description
+    db.commit()
+    db.refresh(design)
+    return _envelope({"shopify_title": design.shopify_title, "shopify_description": design.shopify_description})
 
 
 @router.post("/{design_id}/update-text")

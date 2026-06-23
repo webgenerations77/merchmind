@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useReviewStore } from '../stores/reviewStore';
-import { getDesign, getReviewQueue } from '../api/designs';
+import { getDesign, getReviewQueue, updateShopifyCopy } from '../api/designs';
 import { listBatches, triggerBatch, cancelBatch, type BatchConfig } from '../api/batches';
 import BatchConfigModal from '../components/batches/BatchConfigModal';
 import { listProducts } from '../api/products';
@@ -575,6 +575,9 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
   const [isFeatured, setIsFeatured] = useState(design.is_featured);
   const [showSuggestDrawer, setShowSuggestDrawer] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [editTitle, setEditTitle] = useState(design.shopify_title || '');
+  const [editDesc, setEditDesc] = useState(design.shopify_description || '');
+  const [copySaving, setCopySaving] = useState(false);
 
   useEffect(() => {
     listProducts().then((all) => {
@@ -677,18 +680,43 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
             </div>
           )}
 
-          {design.shopify_title && (
-            <div className="p-3 bg-bg-secondary rounded-lg border border-border">
-              <p className="text-xs text-text-tertiary mb-1">Shopify Title</p>
-              <p className="text-sm text-text-primary">{design.shopify_title}</p>
-            </div>
-          )}
+          <div className="p-3 bg-bg-secondary rounded-lg border border-border">
+            <p className="text-xs text-text-tertiary mb-1">Shopify Title</p>
+            <input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              maxLength={60}
+              className="w-full px-2 py-1.5 rounded bg-bg-tertiary border border-border text-sm text-text-primary focus:outline-none focus:border-accent"
+            />
+            <p className="text-[10px] text-text-tertiary mt-1 text-right">{editTitle.length}/60</p>
+          </div>
 
-          {design.shopify_description && (
-            <div className="p-3 bg-bg-secondary rounded-lg border border-border">
-              <p className="text-xs text-text-tertiary mb-1">Shopify Description</p>
-              <p className="text-sm text-text-secondary whitespace-pre-line max-h-48 overflow-y-auto">{design.shopify_description}</p>
-            </div>
+          <div className="p-3 bg-bg-secondary rounded-lg border border-border">
+            <p className="text-xs text-text-tertiary mb-1">Shopify Description</p>
+            <textarea
+              value={editDesc}
+              onChange={(e) => setEditDesc(e.target.value)}
+              rows={4}
+              className="w-full px-2 py-1.5 rounded bg-bg-tertiary border border-border text-sm text-text-secondary focus:outline-none focus:border-accent resize-y"
+            />
+          </div>
+
+          {(editTitle !== (design.shopify_title || '') || editDesc !== (design.shopify_description || '')) && (
+            <button
+              onClick={async () => {
+                setCopySaving(true);
+                try {
+                  await updateShopifyCopy(design.id, { shopify_title: editTitle, shopify_description: editDesc });
+                  design.shopify_title = editTitle;
+                  design.shopify_description = editDesc;
+                } catch { /* ignore */ }
+                setCopySaving(false);
+              }}
+              disabled={copySaving}
+              className="w-full py-2 rounded-lg bg-accent/20 text-accent font-medium text-sm hover:bg-accent/30 disabled:opacity-50 transition-colors"
+            >
+              {copySaving ? 'Saving...' : 'Save Shopify Copy'}
+            </button>
           )}
 
           {design.shopify_tags && design.shopify_tags.length > 0 && (
