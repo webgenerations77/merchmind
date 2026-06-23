@@ -7,10 +7,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
+from sqlalchemy import func as sa_func
 from app.database import get_db
 from app.models.design import Design
 from app.models.trend import Trend
 from app.models.feedback_log import FeedbackLog
+from app.models.api_usage_log import ApiUsageLog
 from app.schemas.design import DesignOut, DesignQueueItem, DelayRequest, RegenerateRequest, ChatMessageIn, SuggestRegenerateRequest
 from app.routers.auth import verify_api_key
 
@@ -47,6 +49,15 @@ def get_review_queue(
         .all()
     )
 
+    design_ids = [d.id for d in designs]
+    cost_rows = (
+        db.query(ApiUsageLog.design_id, sa_func.sum(ApiUsageLog.estimated_cost))
+        .filter(ApiUsageLog.design_id.in_(design_ids))
+        .group_by(ApiUsageLog.design_id)
+        .all()
+    ) if design_ids else []
+    cost_map = {str(row[0]): float(row[1]) for row in cost_rows}
+
     result = []
     for d in designs:
         item = DesignQueueItem.model_validate(d)
@@ -63,6 +74,7 @@ def get_review_queue(
         if primary_product and primary_product.mockup_urls.get("front"):
             data["primary_mockup_url"] = primary_product.mockup_urls["front"]
         data["product_count"] = len(d.products)
+        data["ai_cost"] = round(cost_map.get(str(d.id), 0), 4)
         if d.collection_id:
             data["source"] = "collection"
         elif d.trend_id:

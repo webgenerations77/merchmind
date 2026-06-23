@@ -403,6 +403,11 @@ function DesignCard({ item, action, onClick, onToggleFeatured }: {
               {item.image_api_used === 'flux_schnell' ? 'Flux' : item.image_api_used === 'dalle3' ? 'DALL·E' : item.image_api_used}
             </span>
           )}
+          {(item.ai_cost ?? 0) > 0 && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-bg-tertiary text-text-tertiary">
+              ${item.ai_cost!.toFixed(3)}
+            </span>
+          )}
         </div>
       </div>
     </button>

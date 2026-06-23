@@ -20,6 +20,7 @@ export interface DesignQueueItem {
   primary_product_type?: string;
   primary_mockup_url?: string;
   image_api_used?: string | null;
+  ai_cost?: number;
   is_featured: boolean;
   featured_at?: string | null;
   product_count: number;
