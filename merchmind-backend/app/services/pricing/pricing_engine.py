@@ -11,6 +11,8 @@ _MARGIN_WARNING_THRESHOLD = Decimal("0.30")  # 30%
 
 DEFAULT_BASE_MARKUP = {
     "tshirt": Decimal("2.5"),
+    "hoodie": Decimal("2.2"),
+    "long_sleeve": Decimal("2.4"),
     "mug": Decimal("2.8"),
     "hat": Decimal("2.5"),
     "phone_case": Decimal("2.5"),
@@ -19,6 +21,8 @@ DEFAULT_BASE_MARKUP = {
 
 DEFAULT_FLOOR_PRICES = {
     "tshirt": Decimal("24.99"),
+    "hoodie": Decimal("39.99"),
+    "long_sleeve": Decimal("29.99"),
     "mug": Decimal("18.99"),
     "hat": Decimal("26.99"),
     "phone_case": Decimal("22.99"),
