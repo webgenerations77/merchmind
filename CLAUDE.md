@@ -92,7 +92,9 @@ npm run preview        # Preview production build
 - The Supabase client and Firebase are initialized lazily (on first call, not at import). Maintain this pattern to avoid startup crashes when credentials are missing.
 - Config lives in `app/config.py` as a Pydantic `Settings` class reading from `.env`.
 
-**Batch pipeline** (`app/tasks/batch_pipeline.py`): The core orchestrator that runs weekly (Sunday 10pm UTC via Celery Beat). Design generation runs **inline** (not as Celery subtasks) within the batch task. Steps: scrape trends → score with Claude → classify archetype → generate image (Flux Schnell/DALL-E) → upload to Supabase → create products with pricing → generate Printify mockups (tshirt, mug, phone_case) → generate marketing assets → emit progress via Redis pub/sub. Supports `max_designs` parameter for testing (`POST /batches/trigger?max_designs=2`).
+**Batch pipeline** (`app/tasks/batch_pipeline.py`): The core orchestrator that runs weekly (Sunday 10pm UTC via Celery Beat). Design generation runs **inline** (not as Celery subtasks) within the batch task. Steps: scrape trends → score with Claude → classify archetype → generate image (Flux Schnell/DALL-E/Ideogram) → upload to Supabase → create products with pricing → generate Printify mockups (tshirt, hoodie, long_sleeve) → generate marketing assets → emit progress via Redis pub/sub. Supports `max_designs` and `trend_sources` parameters for testing (`POST /batches/trigger?max_designs=4`, body `{"trend_sources": ["seasonal"]}`).
+
+**Scraper timeouts:** Each scraper call (Google Trends trending, each niche cluster's rising queries, each Reddit/Twitter cluster call) is wrapped in a `ThreadPoolExecutor` with a **60-second timeout**. Timed-out calls log a warning and return empty results — the batch continues with whatever signals were collected. This prevents pytrends rate-limit hangs from blocking the whole batch. If `total_ideas` stays at 0 for more than ~5 minutes, a scraper is hung; cancel and re-trigger with `trend_sources=["seasonal"]` (pure local date math, zero network calls).
 
 **Service namespaces under `app/services/`:**
 - `intelligence/` — trend scraping and scoring (Reddit, Twitter, Google Trends, seasonal calendar)
@@ -159,6 +161,8 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 - **Blueprint IDs** (verified 2026-06-20): tshirt=5, hoodie=77, long_sleeve=304, mug=68, hat=1447, phone_case=269, sticker=400, poster=282.
 - **COGS fallback:** When Printify API is unavailable for cost lookups, `get_base_cost()` returns industry-standard costs from `_FALLBACK_BASE_COSTS` (tshirt $8.50, hoodie $18.00, long_sleeve $12.00, mug $6.00, hat $10.00, phone_case $8.00, sticker $2.50).
 - **Product types (current):** Apparel only while dialing in design quality — tshirt, hoodie, long_sleeve. Other types (mug, hat, phone_case, sticker) still exist in code but aren't assigned to new designs. `assign_product_bundle` in `quality_scorer.py` returns the fixed apparel set.
+- **Pricing engine gotcha:** `calculate_price()` in `pricing_engine.py` merges `DEFAULT_BASE_MARKUP`/`DEFAULT_FLOOR_PRICES` with the custom values from `AppSettings`. This means new product types (hoodie, long_sleeve) work correctly even when the DB `AppSettings.base_markup` was saved before those types were added. Do NOT change this back to `base_markup or DEFAULT_BASE_MARKUP` — that pattern silently drops default keys whenever any custom key exists.
+- **Migration 022 note:** `ALTER TYPE ADD VALUE` for `design_archetype` (`image_with_text`) and `image_api` (`ideogram`) must run outside a PostgreSQL transaction block. Migration 022 issues explicit `COMMIT`/`BEGIN` around the ALTER statements. The same additions are also in `_apply_critical_schema_fallback()` in `main.py` as a safety net if Alembic fails silently.
 
 ## Weekly Schedule (Celery Beat)
 
@@ -201,7 +205,7 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 
 7. **Remove diagnostic endpoints** — DONE. Removed `/health/reset-data`, `/health/purge-queue`, `/health/test-image-gen`, `/health/test-printify-mockup`, `/health/run-migration`, `/health/env-check`. Kept `/health` (liveness) and `/health/integrations` (deep check).
 
-8. **Text compositor** — DONE. `text_compositor.py` composites slogans onto hybrid/text_icon design images with gradient band + outlined text. Migration 008 persists `primary_text`, `secondary_text`, `tagline` on designs. 3-way archetype rotation ensures balanced mix: image-only (illustration), text (text_only/typographic), image+text (hybrid/text_icon). Batch cancel endpoint at `POST /batches/{id}/cancel?purge=true`.
+8. **Text compositor** — DONE. `text_compositor.py` composites slogans onto hybrid/text_icon design images with gradient band + outlined text. Migration 008 persists `primary_text`, `secondary_text`, `tagline` on designs. **4-way archetype bias rotation** (`image_only → text → image_text → image_with_text`) ensures one of each type per 4-design cycle. Batch cancel endpoint at `POST /batches/{id}/cancel?purge=true`.
 
 9. **Quality scorer fix** — DONE. Quality scorer was degrading all image designs to text_only (vision API errors → score 0 → regen crash → force text_only). Fixed: image designs kept even if quality is low; scorer fallback auto-passes instead of failing. Production batch confirmed: 9 illustration + 8 hybrid + 8 text_only out of 25 designs.
 
@@ -215,7 +219,7 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 
 14. **Vercel redeploy dashboard** — DONE. All env vars set (`VITE_API_BASE_URL`, `VITE_API_KEY`, `VITE_FIREBASE_API_KEY`). Deployed to production at `merchmind-dashboard.vercel.app`. Cindy added as authorized user. Deploy from repo root (`vercel --prod` from `MerchMind/`, not from `merchmind-dashboard/`).
 
-15. **Re-enable Sunday batch** — TODO. Uncomment `sunday-batch` in `celery_app.py` beat_schedule when ready to go live. Currently paused to avoid unreviewed runs.
+15. **Re-enable Sunday batch** — TODO. Uncomment `sunday-batch` in `celery_app.py` beat_schedule when ready to go live. Currently paused to avoid unreviewed runs. **Pre-requisite:** complete the manual 4-design verification batch (one of each archetype type: illustration, text, hybrid/text_icon, image_with_text via Ideogram) and confirm fill ratios and text legibility before enabling automation.
 
 ## Design Quality Improvements (Priority Order)
 
