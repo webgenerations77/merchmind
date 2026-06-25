@@ -65,6 +65,12 @@ def classify_archetype(raw_signal: str, source: str, niche: str = "", bias: str 
             "You MUST choose either 'text_only' or 'typographic'. "
             "These designs use text/slogans as the primary visual element."
         )
+    elif bias == "image_with_text":
+        bias_ctx = (
+            "\nIMPORTANT: This design slot is reserved for an integrated image-with-text design via Ideogram. "
+            "You MUST choose 'image_with_text'. "
+            "Choose a concept where a bold illustrated element paired with 1-4 evocative words makes the strongest design."
+        )
     prompt = (
         f"Trend topic: \"{raw_signal}\"\n"
         f"Source: {source}{niche_ctx}{bias_ctx}\n\n"
