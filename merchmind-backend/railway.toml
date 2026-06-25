@@ -4,7 +4,7 @@ dockerfilePath = "Dockerfile"
 
 [[services]]
 name = "web"
-startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+startCommand = "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
 healthcheckPath = "/health"
 healthcheckTimeout = 30
 
