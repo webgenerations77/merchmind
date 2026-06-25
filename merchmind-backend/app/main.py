@@ -111,6 +111,11 @@ def _apply_critical_schema_fallback():
     db = SessionLocal()
     try:
         conn = db.connection()
+        # Enum additions must run outside a transaction on some PostgreSQL versions.
+        conn.execute(sa_text("COMMIT"))
+        conn.execute(sa_text("ALTER TYPE design_archetype ADD VALUE IF NOT EXISTS 'image_with_text'"))
+        conn.execute(sa_text("ALTER TYPE image_api ADD VALUE IF NOT EXISTS 'ideogram'"))
+        conn.execute(sa_text("BEGIN"))
         conn.execute(sa_text(
             "DO $$ BEGIN "
             "  CREATE TYPE drop_status AS ENUM ('scheduled','in_progress','published','failed'); "

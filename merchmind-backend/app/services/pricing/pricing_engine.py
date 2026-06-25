@@ -49,8 +49,13 @@ def calculate_price(
 
     Returns dict with pricing breakdown and margin_flag.
     """
-    markup_map = {k: Decimal(str(v)) for k, v in (base_markup or DEFAULT_BASE_MARKUP).items()}
-    floor_map = {k: Decimal(str(v)) for k, v in (floor_prices or DEFAULT_FLOOR_PRICES).items()}
+    # Merge: defaults provide the base, custom settings override per-key.
+    # This ensures new product types (hoodie, long_sleeve) work even if AppSettings
+    # was saved before they were added.
+    merged_markup = {**DEFAULT_BASE_MARKUP, **(base_markup or {})}
+    merged_floor = {**DEFAULT_FLOOR_PRICES, **(floor_prices or {})}
+    markup_map = {k: Decimal(str(v)) for k, v in merged_markup.items()}
+    floor_map = {k: Decimal(str(v)) for k, v in merged_floor.items()}
 
     if product_type not in markup_map:
         raise ValueError(f"Unknown product type for pricing: '{product_type}'")
