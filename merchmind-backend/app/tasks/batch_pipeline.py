@@ -335,12 +335,14 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                     pipeline_cfg["product_focus"] = product_focus
                 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
                 _DESIGN_TIMEOUT = 600  # 10 minutes max per design
-                with ThreadPoolExecutor(max_workers=1) as _ex:
-                    _fut = _ex.submit(_generate_design_for_trend, str(trend.id), str(batch.id), pipeline_cfg)
-                    try:
-                        _fut.result(timeout=_DESIGN_TIMEOUT)
-                    except FuturesTimeout:
-                        raise RuntimeError(f"Design generation timed out after {_DESIGN_TIMEOUT}s for trend {trend.id}")
+                _tid, _bid, _cfg = str(trend.id), str(batch.id), pipeline_cfg
+                _ex = ThreadPoolExecutor(max_workers=1)
+                _fut = _ex.submit(lambda: _generate_design_for_trend(_tid, _bid, _cfg))
+                _ex.shutdown(wait=False)  # Don't block on shutdown — thread runs to completion in background
+                try:
+                    _fut.result(timeout=_DESIGN_TIMEOUT)
+                except FuturesTimeout:
+                    raise RuntimeError(f"Design generation timed out after {_DESIGN_TIMEOUT}s for trend {trend.id}")
                 approved_count += 1
 
                 # Update item on success — pull design_id + product types from DB
