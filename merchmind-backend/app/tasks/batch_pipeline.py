@@ -122,12 +122,27 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
         _emit_progress(bid, 2, 8, f"Scraping trend sources: {', '.join(enabled_sources)}")
         raw_signals = []
 
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+        _SCRAPER_TIMEOUT = 60  # seconds per scraper call
+
+        def _run_with_timeout(fn, *args, label="scraper"):
+            with ThreadPoolExecutor(max_workers=1) as ex:
+                future = ex.submit(fn, *args)
+                try:
+                    return future.result(timeout=_SCRAPER_TIMEOUT)
+                except FuturesTimeout:
+                    logger.warning("%s timed out after %ds — skipping", label, _SCRAPER_TIMEOUT)
+                    return []
+
         # Google Trends
         if "google_trends" in enabled_sources:
             try:
-                raw_signals.extend(google_trends.fetch_us_trending())
+                raw_signals.extend(_run_with_timeout(google_trends.fetch_us_trending, label="google_trends.trending"))
                 for cluster in active_clusters:
-                    raw_signals.extend(google_trends.fetch_rising_queries(cluster.keywords, cluster.name))
+                    raw_signals.extend(_run_with_timeout(
+                        google_trends.fetch_rising_queries, cluster.keywords, cluster.name,
+                        label=f"google_trends.rising[{cluster.name}]",
+                    ))
             except Exception as e:
                 _log_batch_error(batch, db, f"Google Trends scraper failed: {e}")
 
@@ -135,16 +150,22 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
         if "reddit" in enabled_sources:
             try:
                 for cluster in active_clusters:
-                    raw_signals.extend(reddit_scraper.fetch_subreddit_signals(cluster.subreddits, cluster.name))
+                    raw_signals.extend(_run_with_timeout(
+                        reddit_scraper.fetch_subreddit_signals, cluster.subreddits, cluster.name,
+                        label=f"reddit[{cluster.name}]",
+                    ))
             except Exception as e:
                 _log_batch_error(batch, db, f"Reddit scraper failed: {e}")
 
         # Twitter
         if "twitter" in enabled_sources:
             try:
-                raw_signals.extend(twitter_scraper.fetch_us_trends())
+                raw_signals.extend(_run_with_timeout(twitter_scraper.fetch_us_trends, label="twitter.trending"))
                 for cluster in active_clusters:
-                    raw_signals.extend(twitter_scraper.fetch_keyword_tweets(cluster.keywords, cluster.name))
+                    raw_signals.extend(_run_with_timeout(
+                        twitter_scraper.fetch_keyword_tweets, cluster.keywords, cluster.name,
+                        label=f"twitter[{cluster.name}]",
+                    ))
             except Exception as e:
                 _log_batch_error(batch, db, f"Twitter scraper failed: {e}")
 
