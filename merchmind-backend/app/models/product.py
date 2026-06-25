@@ -14,6 +14,7 @@ class Product(Base):
     product_type = Column(
         SAEnum(
             "tshirt", "mug", "hat", "phone_case", "sticker", "poster",
+            "hoodie", "long_sleeve",
             name="product_type",
         ),
         nullable=False,

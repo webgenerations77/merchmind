@@ -47,7 +47,17 @@ def generate_idea_design(self, idea_id: str):
         back_logo_products = settings_row.back_logo_products if settings_row else ["tshirt", "hat"]
 
         forced_archetype = idea.preferences.get("archetype")
-        archetype = forced_archetype if forced_archetype in ("text_only", "illustration", "hybrid", "typographic", "text_icon") else classify_archetype(idea.input_text, "custom")
+        valid_archetypes = ("text_only", "illustration", "hybrid", "typographic", "text_icon", "image_with_text")
+        iwt_meta = {}
+        if forced_archetype in valid_archetypes:
+            archetype = forced_archetype
+        else:
+            classify_result = classify_archetype(idea.input_text, "custom")
+            if isinstance(classify_result, dict):
+                archetype = classify_result["archetype"]
+                iwt_meta = classify_result
+            else:
+                archetype = classify_result
         image_api = select_image_api(archetype)
 
         design = Design(
@@ -58,6 +68,8 @@ def generate_idea_design(self, idea_id: str):
             image_api_used=image_api,
             status="generating",
         )
+        if iwt_meta:
+            design.primary_text = iwt_meta.get("text_content", "")
         db.add(design)
         db.commit()
         db.refresh(design)
@@ -65,32 +77,61 @@ def generate_idea_design(self, idea_id: str):
 
         primary_product = default_primary_product_type(archetype)
         fmt = get_product_format(primary_product)
-        image_prompt = build_image_prompt(idea.input_text, archetype, "", idea.input_text[:100], product_type=primary_product)
-        design.image_prompt = image_prompt
-        db.commit()
-
         processed_url = None
-        if image_api and image_prompt:
+
+        if archetype == "image_with_text":
+            from app.services.design.ideogram_service import generate_and_store
+            iwt_image_desc = iwt_meta.get("image_description", idea.input_text)
+            iwt_text = iwt_meta.get("text_content", idea.input_text[:30])
             try:
-                raw_bytes, api_used = generate_image(image_prompt, image_api, aspect_ratio=fmt["aspect_ratio"])
-                design.image_api_used = api_used
-                raw_path = storage.design_raw_path(design_id)
-                storage.upload(raw_path, raw_bytes)
-                design.raw_image_url = storage.upload(raw_path, raw_bytes)
-
-                from app.services.design.bg_remover import remove_white_background
-                clean_bytes = remove_white_background(raw_bytes)
-                proc_path = storage.design_processed_path(design_id)
-                processed_url = storage.upload(proc_path, clean_bytes)
-
+                raw_url, processed_url, ideogram_prompt = generate_and_store(
+                    design_id, iwt_image_desc, iwt_text, product_type=primary_product,
+                )
+                design.raw_image_url = raw_url
                 design.processed_image_url = processed_url
+                design.image_prompt = ideogram_prompt
+                design.image_api_used = "ideogram"
                 db.commit()
             except Exception as e:
-                logger.warning("Image gen failed for idea %s: %s", idea_id, e)
-                archetype = "text_only"
-                design.archetype = archetype
+                logger.error("Ideogram gen failed for idea %s: %s", idea_id, e)
+                design.status = "generation_failed"
+                design.font_reasoning = str(e)[:500]
+                db.commit()
+                raise
+        else:
+            image_prompt = build_image_prompt(idea.input_text, archetype, "", idea.input_text[:100], product_type=primary_product)
+            design.image_prompt = image_prompt
+            db.commit()
 
-        text_content = generate_text_content(idea.input_text, archetype, "")
+            if image_api and image_prompt:
+                try:
+                    raw_bytes, api_used = generate_image(image_prompt, image_api, aspect_ratio=fmt["aspect_ratio"])
+                    design.image_api_used = api_used
+                    raw_path = storage.design_raw_path(design_id)
+                    storage.upload(raw_path, raw_bytes)
+                    design.raw_image_url = storage.upload(raw_path, raw_bytes)
+
+                    from app.services.design.bg_remover import remove_white_background
+                    clean_bytes = remove_white_background(raw_bytes)
+                    proc_path = storage.design_processed_path(design_id)
+                    processed_url = storage.upload(proc_path, clean_bytes)
+
+                    design.processed_image_url = processed_url
+                    db.commit()
+                except Exception as e:
+                    logger.warning("Image gen failed for idea %s: %s", idea_id, e)
+                    archetype = "text_only"
+                    design.archetype = archetype
+
+        if archetype == "image_with_text":
+            text_content = {
+                "primary_text": iwt_meta.get("text_content", idea.input_text[:30]),
+                "secondary_text": None,
+                "tagline": None,
+                "text_concept_scoring": None,
+            }
+        else:
+            text_content = generate_text_content(idea.input_text, archetype, "")
         font_result = select_font_pair(idea.input_text, archetype, "", text_content.get("primary_text", ""))
         design.font_pair = font_result["font_pair"]
         design.font_reasoning = font_result["reasoning"]

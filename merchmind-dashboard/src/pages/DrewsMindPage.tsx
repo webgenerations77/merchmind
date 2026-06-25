@@ -12,6 +12,7 @@ const ARCHETYPE_OPTIONS = [
   { value: 'illustration', label: 'Illustration — detailed graphic' },
   { value: 'hybrid', label: 'Hybrid — graphic + text space' },
   { value: 'text_icon', label: 'Text + Icon — bold symbol' },
+  { value: 'image_with_text', label: 'Image + Text — Ideogram integrated' },
   { value: 'typographic', label: 'Typographic — letters as art' },
   { value: 'text_only', label: 'Text Only — slogan/phrase' },
 ];

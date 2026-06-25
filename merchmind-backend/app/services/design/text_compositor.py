@@ -1,6 +1,12 @@
 """
 Composites text slogans onto AI-generated design images.
 Used for hybrid and text_icon archetypes that pair an image with a phrase.
+
+DESIGN TYPE AUDIT (Section 1):
+  Archetypes handled: hybrid, text_icon (via should_composite check)
+  NOT touched in this session — image+text path is a separate session.
+  Inputs: image bytes + primary/secondary text + archetype + color palette
+  Output: composited PNG with gradient band + outlined text in lower portion
 """
 import io
 import logging

@@ -132,6 +132,7 @@ const ARCHETYPE_LABELS: Record<string, string> = {
   illustration: 'Illustration',
   hybrid: 'Hybrid',
   text_icon: 'Text + Icon',
+  image_with_text: 'Image + Text',
   typographic: 'Typography',
   text_only: 'Text',
 };
@@ -398,9 +399,11 @@ function DesignCard({ item, action, onClick, onToggleFeatured }: {
           </span>
           {item.image_api_used && (
             <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-              item.image_api_used === 'flux_schnell' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-sky-500/15 text-sky-400'
+              item.image_api_used === 'flux_schnell' ? 'bg-emerald-500/15 text-emerald-400' :
+              item.image_api_used === 'ideogram' ? 'bg-violet-500/15 text-violet-400' :
+              'bg-sky-500/15 text-sky-400'
             }`}>
-              {item.image_api_used === 'flux_schnell' ? 'Flux' : item.image_api_used === 'dalle3' ? 'DALL·E' : item.image_api_used}
+              {item.image_api_used === 'flux_schnell' ? 'Flux' : item.image_api_used === 'dalle3' ? 'DALL·E' : item.image_api_used === 'ideogram' ? 'Ideogram' : item.image_api_used}
             </span>
           )}
           {(item.ai_cost ?? 0) > 0 && (
@@ -672,6 +675,18 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
           )}
 
           <AiReasoningSection design={design} products={products} />
+
+          {(design.primary_text || design.secondary_text) && (
+            <div className="p-3 bg-bg-secondary rounded-lg border border-border">
+              <p className="text-xs text-text-tertiary mb-2">Design Text</p>
+              {design.primary_text && (
+                <p className="text-sm text-text-primary font-semibold">&ldquo;{design.primary_text}&rdquo;</p>
+              )}
+              {design.secondary_text && (
+                <p className="text-xs text-text-secondary mt-1">{design.secondary_text}</p>
+              )}
+            </div>
+          )}
 
           {design.image_prompt && (
             <div className="p-3 bg-bg-secondary rounded-lg border border-border">

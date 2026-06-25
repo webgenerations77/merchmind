@@ -13,14 +13,28 @@ logger = logging.getLogger(__name__)
 _TEMPLATES = {
     "tshirt": {
         "size": (800, 1000),
-        "bg_color": (30, 30, 30),
+        "bg_color": (255, 255, 255),
         "design_area": (200, 200, 600, 600),
         "design_area_text": (200, 140, 600, 480),
         "label": "T-Shirt",
     },
+    "hoodie": {
+        "size": (800, 1000),
+        "bg_color": (255, 255, 255),
+        "design_area": (210, 250, 590, 580),
+        "design_area_text": (210, 190, 590, 480),
+        "label": "Hoodie",
+    },
+    "long_sleeve": {
+        "size": (800, 1000),
+        "bg_color": (255, 255, 255),
+        "design_area": (200, 200, 600, 600),
+        "design_area_text": (200, 140, 600, 480),
+        "label": "Long Sleeve",
+    },
     "mug": {
         "size": (900, 700),
-        "bg_color": (240, 235, 228),
+        "bg_color": (255, 255, 255),
         "design_area": (200, 130, 620, 440),
         "label": "Mug",
     },
@@ -32,14 +46,14 @@ _TEMPLATES = {
     },
     "phone_case": {
         "size": (550, 1000),
-        "bg_color": (35, 35, 40),
+        "bg_color": (255, 255, 255),
         "design_area": (80, 120, 470, 780),
         "corner_radius": 40,
         "label": "Phone Case",
     },
     "hat": {
         "size": (800, 700),
-        "bg_color": (35, 35, 40),
+        "bg_color": (255, 255, 255),
         "design_area": (250, 160, 550, 380),
         "label": "Hat",
     },
@@ -178,7 +192,7 @@ def _draw_sticker(canvas: Image.Image, draw: ImageDraw.Draw, design: Image.Image
     draw.rounded_rectangle(sticker_bbox, radius=20, outline=(220, 220, 220), width=2)
 
     surface_hint = _load_font(11)
-    draw.text((canvas.size[0] // 2 - 60, canvas.size[1] - 40), "vinyl · waterproof · UV-safe", fill=(180, 180, 180), font=surface_hint)
+    draw.text((canvas.size[0] // 2 - 60, canvas.size[1] - 40), "vinyl · waterproof · UV-safe", fill=(120, 120, 120), font=surface_hint)
 
 
 def _draw_hat(canvas: Image.Image, draw: ImageDraw.Draw, design: Image.Image, area: tuple):
@@ -248,6 +262,35 @@ def generate_mockup(product_type: str, design_bytes: bytes, archetype: str | Non
             draw.line([(200, 200), (100, 300), (100, 400), (200, 350)], fill=collar_color, width=2)
             draw.line([(600, 200), (700, 300), (700, 400), (600, 350)], fill=collar_color, width=2)
             draw.rounded_rectangle([150, 180, 650, 900], radius=20, outline=collar_color, width=2)
+        elif product_type == "hoodie":
+            area_w = area[2] - area[0]
+            area_h = area[3] - area[1]
+            design_resized = _smart_crop_to_aspect(design, area_w, area_h)
+            canvas.paste(design_resized, (area[0], area[1]), design_resized)
+
+            outline = (50, 50, 50)
+            draw.rounded_rectangle([140, 180, 660, 920], radius=20, outline=outline, width=2)
+            draw.arc([310, 10, 490, 140], start=200, end=340, fill=outline, width=3)
+            draw.line([(200, 200), (80, 320), (80, 500), (140, 450)], fill=outline, width=2)
+            draw.line([(600, 200), (720, 320), (720, 500), (660, 450)], fill=outline, width=2)
+            # Hood
+            draw.arc([250, -30, 550, 180], start=200, end=340, fill=outline, width=2)
+            # Kangaroo pocket
+            draw.rounded_rectangle([260, 650, 540, 760], radius=15, outline=outline, width=2)
+        elif product_type == "long_sleeve":
+            area_w = area[2] - area[0]
+            area_h = area[3] - area[1]
+            design_resized = _smart_crop_to_aspect(design, area_w, area_h)
+            canvas.paste(design_resized, (area[0], area[1]), design_resized)
+
+            outline = (50, 50, 50)
+            draw.arc([300, 15, 500, 120], start=200, end=340, fill=outline, width=3)
+            draw.line([(200, 200), (60, 340), (60, 700), (140, 680)], fill=outline, width=2)
+            draw.line([(600, 200), (740, 340), (740, 700), (660, 680)], fill=outline, width=2)
+            draw.rounded_rectangle([150, 180, 650, 900], radius=20, outline=outline, width=2)
+            # Cuffs
+            draw.rectangle([55, 680, 145, 710], outline=outline, width=2)
+            draw.rectangle([655, 680, 745, 710], outline=outline, width=2)
         else:
             area_w = area[2] - area[0]
             area_h = area[3] - area[1]

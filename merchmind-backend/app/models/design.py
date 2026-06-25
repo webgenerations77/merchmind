@@ -17,12 +17,14 @@ class Design(Base):
     archetype = Column(
         SAEnum(
             "text_only", "illustration", "hybrid", "typographic", "text_icon",
+            "image_with_text",
             name="design_archetype",
         ),
         nullable=False,
     )
     image_api_used = Column(
-        SAEnum("dalle3", "stable_diffusion", "flux_schnell", name="image_api"),
+        SAEnum("dalle3", "stable_diffusion", "flux_schnell", "ideogram",
+               name="image_api"),
         nullable=True,
     )
     image_prompt = Column(Text, nullable=True)

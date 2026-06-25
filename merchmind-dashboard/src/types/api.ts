@@ -42,6 +42,9 @@ export interface DesignOut {
   font_pair: string | null;
   font_reasoning: string | null;
   color_palette: string[] | null;
+  primary_text: string | null;
+  secondary_text: string | null;
+  tagline: string | null;
   text_concept_scoring: {
     candidates: {
       text: string;

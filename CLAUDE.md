@@ -149,15 +149,16 @@ Backend deploys to Railway (`railway.toml`) with three services: web (uvicorn), 
 
 ## Design Pipeline Notes
 
-- **Archetype classifier** (`app/services/design/archetype_classifier.py`): Balanced for a natural mix of visual and text designs. Falls back to `text_icon` (not `text_only`) on error. Archetypes: `illustration`, `hybrid`, `text_icon`, `typographic`, `text_only`.
-- **Image generation** (`app/services/design/image_generator.py`): Primary: Flux Schnell (Replicate, ~$0.003/image). Fallback: gpt-image-1 (OpenAI, ~$0.03/image with `quality="low"`). All visual archetypes route to `flux_schnell` by default. Uses **sync** clients (not async) for Celery compatibility. DB enum `image_api` includes: `dalle3`, `stable_diffusion`, `flux_schnell`.
+- **Archetype classifier** (`app/services/design/archetype_classifier.py`): Balanced for a natural mix of visual and text designs. Falls back to `text_icon` (not `text_only`) on error. Archetypes: `illustration`, `hybrid`, `text_icon`, `image_with_text`, `typographic`, `text_only`. For `image_with_text`, the classifier returns a dict with `{archetype, image_description, text_content, layout_suggestion}` instead of a plain string.
+- **Image generation** (`app/services/design/image_generator.py`): Primary: Flux Schnell (Replicate, ~$0.003/image). Fallback: gpt-image-1 (OpenAI, ~$0.03/image with `quality="low"`). All visual archetypes route to `flux_schnell` by default. `image_with_text` routes to Ideogram (`ideogram_service.py`). Uses **sync** clients (not async) for Celery compatibility. DB enum `image_api` includes: `dalle3`, `stable_diffusion`, `flux_schnell`, `ideogram`.
+- **Ideogram service** (`app/services/design/ideogram_service.py`): Generates images with integrated styled typography via Ideogram V_2 API (~$0.08/image). Used exclusively for the `image_with_text` archetype. Prompts wrap text in quotes for Ideogram's text-in-image rendering. Background removal runs post-generation. Does NOT use DALL-E or Flux, and does NOT run the text compositor (Ideogram handles both image and text in one call). Requires `IDEOGRAM_API_KEY` env var. On failure, sets design status to `generation_failed` without auto-retry.
 - **Text preview** (`app/services/design/text_preview.py`): Renders primary/secondary text with font pair label on a dark canvas using Pillow + DejaVu fonts. Uploaded to Supabase as the `processed_image_url`.
 - **Post-processing:** rembg background removal re-enabled using lightweight `u2netp` model (~4MB). Pre-downloaded in Dockerfile. Falls back to raw image if removal fails.
 - **Printify mockups:** During batch generation, Printify draft products are created for ALL product types. Mockup images (front + back) fetched after 5s delay and stored in `product.mockup_urls` using Printify CDN URLs. Non-blocking — failures don't affect design completion.
 - **Printify publish:** Approve endpoint (`PATCH /designs/{id}/approve?publish=true`) publishes all products to Shopify via Printify's publish API. Products titled with product type (e.g. "Design Name — Mug").
-- **Blueprint IDs** (verified 2026-06-20): tshirt=5, mug=68, hat=1447, phone_case=269, sticker=400, poster=282.
-- **COGS fallback:** When Printify API is unavailable for cost lookups, `get_base_cost()` returns industry-standard costs from `_FALLBACK_BASE_COSTS` (tshirt $8.50, mug $6.00, hat $10.00, phone_case $8.00, sticker $2.50, poster $12.00).
-- **Product limit:** Max 4 product types per design (`assign_product_bundle` in `quality_scorer.py`).
+- **Blueprint IDs** (verified 2026-06-20): tshirt=5, hoodie=77, long_sleeve=304, mug=68, hat=1447, phone_case=269, sticker=400, poster=282.
+- **COGS fallback:** When Printify API is unavailable for cost lookups, `get_base_cost()` returns industry-standard costs from `_FALLBACK_BASE_COSTS` (tshirt $8.50, hoodie $18.00, long_sleeve $12.00, mug $6.00, hat $10.00, phone_case $8.00, sticker $2.50).
+- **Product types (current):** Apparel only while dialing in design quality — tshirt, hoodie, long_sleeve. Other types (mug, hat, phone_case, sticker) still exist in code but aren't assigned to new designs. `assign_product_bundle` in `quality_scorer.py` returns the fixed apparel set.
 
 ## Weekly Schedule (Celery Beat)
 

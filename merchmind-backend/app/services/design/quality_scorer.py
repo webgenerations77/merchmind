@@ -114,21 +114,7 @@ def select_primary_product_type(
 
 def assign_product_bundle(archetype: str, quality_breakdown: dict, max_products: int = 3, is_collection: bool = False) -> list[str]:
     """
-    Assign product types based on archetype.
-    Design ideas: max 3 products (tshirt + 2 best-fit types).
-    Collections: up to max_products (all 5 types).
-    Always includes tshirt first.
+    Assign product types — apparel only while we dial in design quality.
+    Always: tshirt, hoodie, long_sleeve.
     """
-    if is_collection:
-        return ["tshirt", "mug", "hat", "phone_case", "sticker"][:max_products]
-
-    if archetype == "illustration":
-        return ["tshirt", "mug", "sticker"][:max_products]
-    elif archetype in ("text_only", "typographic"):
-        return ["tshirt", "mug", "hat"][:max_products]
-    elif archetype == "text_icon":
-        return ["tshirt", "mug", "hat"][:max_products]
-    elif archetype == "hybrid":
-        return ["tshirt", "mug", "phone_case"][:max_products]
-    else:
-        return ["tshirt", "mug", "sticker"][:max_products]
+    return ["tshirt", "hoodie", "long_sleeve"][:max_products]

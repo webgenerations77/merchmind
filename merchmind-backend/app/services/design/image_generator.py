@@ -2,6 +2,13 @@
 Image generation via Flux Schnell (Replicate) and GPT Image (OpenAI).
 Uses sync clients for compatibility with Celery worker tasks.
 Flux Schnell is primary (~$0.003/image), DALL-E is fallback (~$0.03/image).
+
+DESIGN TYPE AUDIT (Section 1):
+  Called for visual archetypes: illustration, hybrid, text_icon
+  NOT called for: text_only, typographic (select_image_api returns None)
+  Flux Schnell appends quality suffix to prompt in _create_prediction()
+  DALL-E uses gpt-image-1 with quality=low, native aspect ratio support
+  Compositional constraints for illustration are injected by prompt_builder
 """
 import base64
 import logging

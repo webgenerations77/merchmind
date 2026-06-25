@@ -10,11 +10,8 @@ const TREND_SOURCES = [
 
 const PRODUCT_TYPES = [
   { key: 'tshirt', label: 'T-Shirt' },
-  { key: 'mug', label: 'Mug' },
-  { key: 'hat', label: 'Hat' },
-  { key: 'phone_case', label: 'Phone Case' },
-  { key: 'sticker', label: 'Sticker' },
-  { key: 'poster', label: 'Poster' },
+  { key: 'hoodie', label: 'Hoodie' },
+  { key: 'long_sleeve', label: 'Long Sleeve' },
 ];
 
 const EST_COST_PER_DESIGN = 0.015;

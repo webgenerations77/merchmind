@@ -3,7 +3,7 @@ import { listCollections, createCollection, deleteCollection, generateCollection
 import type { CollectionOut } from '../types/api';
 import { toTitleCase } from '../utils/formatters';
 
-const ARCHETYPE_OPTIONS = ['', 'illustration', 'hybrid', 'text_icon', 'typographic', 'text_only'];
+const ARCHETYPE_OPTIONS = ['', 'illustration', 'hybrid', 'text_icon', 'image_with_text', 'typographic', 'text_only'];
 
 export default function CollectionsPage() {
   const [collections, setCollections] = useState<CollectionOut[]>([]);

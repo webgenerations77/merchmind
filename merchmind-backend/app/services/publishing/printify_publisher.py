@@ -29,6 +29,8 @@ _MAX_RETRIES = 3
 
 _BLUEPRINT_MAP = {
     "tshirt": 5,
+    "hoodie": 77,
+    "long_sleeve": 304,
     "mug": 68,
     "hat": 1447,
     "phone_case": 269,
@@ -37,6 +39,8 @@ _BLUEPRINT_MAP = {
 
 _PROVIDER_MAP = {
     "tshirt": 99,
+    "hoodie": 99,
+    "long_sleeve": 99,
     "mug": 1,
     "hat": 410,
     "phone_case": 1,
@@ -45,6 +49,8 @@ _PROVIDER_MAP = {
 
 _FALLBACK_BASE_COSTS = {
     "tshirt": 8.50,
+    "hoodie": 18.00,
+    "long_sleeve": 12.00,
     "mug": 6.00,
     "hat": 10.00,
     "phone_case": 8.00,
@@ -53,6 +59,8 @@ _FALLBACK_BASE_COSTS = {
 
 _SCALE_MAP = {
     "tshirt": 1.0,
+    "hoodie": 1.0,
+    "long_sleeve": 1.0,
     "mug": 1.0,
     "hat": 0.9,
     "phone_case": 1.0,
@@ -61,6 +69,8 @@ _SCALE_MAP = {
 
 _DUAL_PRINT_SURCHARGE = {
     "tshirt": 2.50,
+    "hoodie": 3.50,
+    "long_sleeve": 3.00,
     "hat": 3.00,
 }
 

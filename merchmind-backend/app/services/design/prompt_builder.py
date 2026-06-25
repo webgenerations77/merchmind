@@ -1,7 +1,15 @@
 """
 Builds style-locked image generation prompts using Claude Sonnet.
-All prompts enforce flat design, white background, no text, screen-print safe.
+All prompts enforce white background, no text, screen-print safe.
 Product-type-specific format templates ensure compositional suitability per product.
+
+DESIGN TYPE AUDIT (Section 1):
+  Archetypes handled: illustration, hybrid, text_icon, typographic (text_only returns None)
+  build_image_prompt() sends concept+product context to Claude Sonnet, returns the prompt
+  For illustration: compositional constraints (breathing room, fill ratio) are appended
+  For hybrid/text_icon: text overlay note is included, no compositional fill constraints
+  _PRODUCT_BACKGROUND_CONTEXT provides per-product text color guidance
+  _PRODUCT_FORMAT_TEMPLATES provides per-product aspect ratio and composition guidance
 """
 import json
 import logging
@@ -31,6 +39,8 @@ _STYLE_LOCK_TEXT_OVERLAY = (
 
 _PRODUCT_BACKGROUND_CONTEXT = {
     "tshirt": {"bg": "dark", "text_color": "white or light colors", "reason": "printed on dark fabric"},
+    "hoodie": {"bg": "dark", "text_color": "white or light colors", "reason": "printed on dark fabric"},
+    "long_sleeve": {"bg": "dark", "text_color": "white or light colors", "reason": "printed on dark fabric"},
     "hat": {"bg": "dark", "text_color": "white or light colors", "reason": "embroidered/printed on dark fabric"},
     "mug": {"bg": "light", "text_color": "dark (near-black or deep saturated color)", "reason": "printed on white ceramic"},
     "phone_case": {"bg": "light", "text_color": "dark (near-black or deep saturated color)", "reason": "printed on light case surface"},
@@ -47,6 +57,26 @@ _PRODUCT_FORMAT_TEMPLATES = {
             "Bold, readable from arm's length."
         ),
         "prompt_keywords": "t-shirt print design, chest graphic, screen-print ready",
+    },
+    "hoodie": {
+        "aspect_ratio": "1:1",
+        "composition": (
+            "Centered chest-print composition for a hoodie front. "
+            "Design occupies roughly 50-60% of the canvas — slightly smaller than a tee "
+            "to account for the hoodie's thicker fabric and kangaroo pocket below. "
+            "Bold, high-contrast artwork that reads well on heavy fleece."
+        ),
+        "prompt_keywords": "hoodie print design, chest graphic, streetwear art, screen-print ready",
+    },
+    "long_sleeve": {
+        "aspect_ratio": "1:1",
+        "composition": (
+            "Centered chest-print composition with generous whitespace on all sides. "
+            "Design occupies roughly 60-70% of the canvas vertically. "
+            "Strong focal point designed for screen printing on fabric. "
+            "Bold, readable from arm's length."
+        ),
+        "prompt_keywords": "long sleeve shirt print design, chest graphic, screen-print ready",
     },
     "mug": {
         "aspect_ratio": "1:1",
@@ -88,6 +118,25 @@ _PRODUCT_FORMAT_TEMPLATES = {
         ),
         "prompt_keywords": "die-cut sticker design, vinyl sticker art, laptop sticker, self-contained graphic",
     },
+}
+
+_IMAGE_ONLY_COMPOSITION = (
+    "Centered graphic design on a white background. "
+    "The main subject occupies approximately 65-75% of the frame, "
+    "surrounded by generous white space on all sides. Not full-bleed. "
+    "Designed as a chest print graphic for merchandise. "
+    "Clean edges, suitable for background removal."
+)
+
+_IMAGE_ONLY_PRODUCT_NOTES = {
+    "tshirt": "Chest print format. Subject centered in upper 60% of frame.",
+    "hoodie": "Chest print format. Subject centered in upper 60% of frame.",
+    "long_sleeve": "Chest print format. Subject centered in upper 60% of frame.",
+    "hat": "Chest print format. Subject centered in upper 60% of frame.",
+    "mug": "Horizontal wrap format. Subject centered, wider than tall.",
+    "sticker": "High contrast. Works at small scale. Bold, not intricate. Clean silhouette.",
+    "phone_case": "Vertical format. Bold centered graphic with clear focal point. Breathing room at top and bottom edges.",
+    "poster": "Full canvas composition. The design may use the full frame — this is the only product type where full-bleed is acceptable.",
 }
 
 _ARCHETYPE_TEMPLATES = {
@@ -189,7 +238,7 @@ def build_image_prompt(
     Returns None for text_only (no image generation needed).
     The product_type determines compositional guidance (format, aspect ratio, keywords).
     """
-    if archetype == "text_only":
+    if archetype in ("text_only", "image_with_text"):
         return None
 
     template = _ARCHETYPE_TEMPLATES.get(archetype, _ARCHETYPE_TEMPLATES["illustration"])
@@ -255,6 +304,10 @@ def build_image_prompt(
             )
             prompt = template.format(subject=subject, style_lock=style_lock)
 
+        if archetype == "illustration":
+            product_note = _IMAGE_ONLY_PRODUCT_NOTES.get(product_type, _IMAGE_ONLY_PRODUCT_NOTES["tshirt"])
+            prompt = f"{prompt} {_IMAGE_ONLY_COMPOSITION} {product_note}"
+
         logger.info(
             "prompt_builder: product_type=%s archetype=%s prompt_preview='%s'",
             product_type, archetype, prompt[:120],
@@ -262,7 +315,11 @@ def build_image_prompt(
         return prompt
     except Exception as e:
         logger.error(f"Prompt builder failed for '{raw_signal}': {e}")
-        return template.format(subject=subject, style_lock=style_lock)
+        fallback = template.format(subject=subject, style_lock=style_lock)
+        if archetype == "illustration":
+            product_note = _IMAGE_ONLY_PRODUCT_NOTES.get(product_type, _IMAGE_ONLY_PRODUCT_NOTES["tshirt"])
+            fallback = f"{fallback} {_IMAGE_ONLY_COMPOSITION} {product_note}"
+        return fallback
 
 
 def preview_all_product_prompts(
@@ -276,7 +333,7 @@ def preview_all_product_prompts(
     Returns {product_type: {prompt, aspect_ratio, composition, keywords, background}}.
     Used for reviewing format-specific prompts before a batch run.
     """
-    all_types = ["tshirt", "mug", "phone_case", "hat", "sticker"]
+    all_types = ["tshirt", "hoodie", "long_sleeve"]
     results = {}
     for pt in all_types:
         fmt = get_product_format(pt)

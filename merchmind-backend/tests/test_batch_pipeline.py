@@ -47,6 +47,24 @@ class TestArchetypeClassifier:
     def test_select_image_api_for_hybrid(self):
         assert select_image_api("hybrid") == "flux_schnell"
 
+    def test_select_image_api_for_image_with_text(self):
+        assert select_image_api("image_with_text") == "ideogram"
+
+    @patch("app.services.design.archetype_classifier.claude")
+    def test_image_with_text_returns_dict(self, mock_claude):
+        mock_claude.haiku.return_value = (
+            '{"archetype": "image_with_text", "reason": "visual+text", '
+            '"image_description": "a sunset over mountains", '
+            '"text_content": "Yet", "layout_suggestion": "integrated"}',
+            MagicMock(),
+        )
+        result = classify_archetype("yet another sunset", "reddit")
+        assert isinstance(result, dict)
+        assert result["archetype"] == "image_with_text"
+        assert result["image_description"] == "a sunset over mountains"
+        assert result["text_content"] == "Yet"
+        assert result["layout_suggestion"] == "integrated"
+
 
 class TestProductBundleAssignment:
     def test_design_idea_gets_max_three_types(self):
@@ -54,19 +72,17 @@ class TestProductBundleAssignment:
         assert "tshirt" in result
         assert len(result) <= 3
 
-    def test_text_only_gets_three_products(self):
+    def test_apparel_only_bundle(self):
         result = assign_product_bundle("text_only", {})
-        assert len(result) == 3
-        assert "tshirt" in result
-        assert "mug" in result
+        assert result == ["tshirt", "hoodie", "long_sleeve"]
 
-    def test_collection_gets_all_products(self):
-        result = assign_product_bundle("illustration", {}, max_products=5, is_collection=True)
-        assert len(result) == 5
+    def test_max_products_respected(self):
+        result = assign_product_bundle("illustration", {}, max_products=2)
+        assert len(result) == 2
         assert "tshirt" in result
 
     def test_all_archetypes_include_tshirt(self):
-        for arch in ["illustration", "hybrid", "text_only", "typographic", "text_icon"]:
+        for arch in ["illustration", "hybrid", "text_only", "typographic", "text_icon", "image_with_text"]:
             result = assign_product_bundle(arch, {})
             assert "tshirt" in result, f"{arch} missing tshirt"
             assert len(result) <= 3, f"{arch} has more than 3 products"

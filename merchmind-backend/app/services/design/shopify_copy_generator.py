@@ -20,6 +20,16 @@ _PRODUCT_DETAILS = {
         "care": "Machine wash cold, tumble dry low",
         "appeal": "Comfortable everyday wear with a design that speaks for itself",
     },
+    "hoodie": {
+        "material": "heavy blend cotton-polyester fleece",
+        "care": "Machine wash cold, tumble dry low, do not iron decoration",
+        "appeal": "Stay cozy and stylish with a hoodie that makes a statement",
+    },
+    "long_sleeve": {
+        "material": "soft ringspun cotton, preshrunk",
+        "care": "Machine wash cold, tumble dry low",
+        "appeal": "Layer up with a long sleeve that brings your personality to every season",
+    },
     "mug": {
         "material": "durable white ceramic, 11oz",
         "care": "Dishwasher and microwave safe",

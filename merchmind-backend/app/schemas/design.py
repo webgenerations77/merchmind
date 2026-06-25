@@ -20,6 +20,9 @@ class DesignOut(BaseModel):
     font_pair: Optional[str]
     font_reasoning: Optional[str]
     color_palette: Optional[list]
+    primary_text: Optional[str] = None
+    secondary_text: Optional[str] = None
+    tagline: Optional[str] = None
     text_concept_scoring: Optional[dict] = None
     design_style: Optional[str]
     quality_score: int

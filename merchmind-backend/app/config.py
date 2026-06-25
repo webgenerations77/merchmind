@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     # Dynamic Mockups
     DYNAMIC_MOCKUPS_API_KEY: str = ""
 
+    # Ideogram
+    IDEOGRAM_API_KEY: str = ""
+
     # Expo Push
     EXPO_ACCESS_TOKEN: str = ""
 

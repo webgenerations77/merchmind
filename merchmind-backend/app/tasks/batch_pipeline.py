@@ -1,7 +1,14 @@
 """
-Main Sunday batch orchestrator — 10-step pipeline.
-Each design generation runs as an isolated Celery subtask.
+Main Sunday batch orchestrator — 8-step pipeline.
+Each design generation runs inline within the batch task.
 Emits progress events via Redis pub/sub for SSE streaming.
+
+DESIGN TYPE AUDIT (Section 1):
+  Pipeline branches on archetype at step 4:
+  - text_only/typographic: skip image gen, render via text_preview.py (4500x5400)
+  - illustration: generate image, rembg bg removal, normalize to 4500x5400 canvas
+  - hybrid/text_icon: generate image, Pillow bg removal, composite text overlay
+  Bias rotation cycles: image_only → text → image_text (balanced archetype distribution)
 """
 import json
 import logging
@@ -399,7 +406,15 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
 
         # 4a: Classify archetype (bias alternates for balanced distribution)
         archetype_bias = pipeline_settings.get("archetype_bias")
-        archetype = classify_archetype(trend.raw_signal, trend.source, niche_name, bias=archetype_bias)
+        classify_result = classify_archetype(trend.raw_signal, trend.source, niche_name, bias=archetype_bias)
+
+        # classify_archetype returns a dict for image_with_text, string otherwise
+        iwt_meta = {}
+        if isinstance(classify_result, dict):
+            archetype = classify_result["archetype"]
+            iwt_meta = classify_result
+        else:
+            archetype = classify_result
         logger.info(f"design_task[{trend_id[:8]}] archetype={archetype} bias={archetype_bias}")
 
         # 4b: Select image API
@@ -414,73 +429,118 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
             image_api_used=image_api,
             status="generating",
         )
+        if iwt_meta:
+            design.primary_text = iwt_meta.get("text_content", "")
         db.add(design)
         db.commit()
         db.refresh(design)
         design_id = str(design.id)
         logger.info(f"design_task[{trend_id[:8]}] design created id={design_id[:8]}")
 
-        # 4c: Build image prompt (with preference learning + product format)
+        # 4c / 4d: Generate image
         product_focus_list = pipeline_settings.get("product_focus")
         primary_product = product_focus_list[0] if product_focus_list else default_primary_product_type(archetype)
         fmt = get_product_format(primary_product)
-        image_prompt = build_image_prompt(
-            trend.raw_signal, archetype, niche_name, design.concept_name,
-            product_type=primary_product,
-        )
-        if image_prompt:
-            from app.services.design.preference_learner import get_prompt_preferences
-            pref_suffix = get_prompt_preferences(db)
-            if pref_suffix:
-                image_prompt = f"{image_prompt} {pref_suffix}"
-            style_hint = pipeline_settings.get("style_filter")
-            if style_hint:
-                image_prompt = f"{image_prompt} Style direction: {style_hint}."
-        design.image_prompt = image_prompt
-        db.commit()
-        logger.info(
-            "design_task[%s] prompt built product_type=%s aspect=%s prompt='%s'",
-            trend_id[:8], primary_product, fmt["aspect_ratio"],
-            (image_prompt or "")[:150],
-        )
-
-        # 4d: Generate image (if applicable)
         processed_url = None
         color_palette = []
-        if image_api and image_prompt:
+
+        if archetype == "image_with_text":
+            # --- Ideogram path: integrated image + text in one call ---
+            from app.services.design.ideogram_service import generate_and_store
+            iwt_image_desc = iwt_meta.get("image_description", trend.raw_signal)
+            iwt_text = iwt_meta.get("text_content", design.concept_name)
             try:
-                logger.info(f"design_task[{trend_id[:8]}] generating image via {image_api} aspect={fmt['aspect_ratio']}...")
-                raw_bytes, api_used = generate_image(image_prompt, image_api, aspect_ratio=fmt["aspect_ratio"])
-                design.image_api_used = api_used
-                logger.info(f"design_task[{trend_id[:8]}] image generated via {api_used}, {len(raw_bytes)} bytes")
-
-                # Upload raw image
-                raw_path = storage.design_raw_path(design_id)
-                raw_url = storage.upload(raw_path, raw_bytes)
+                raw_url, processed_url, ideogram_prompt = generate_and_store(
+                    design_id, iwt_image_desc, iwt_text, product_type=primary_product,
+                )
                 design.raw_image_url = raw_url
-
-                from app.services.design.bg_remover import remove_white_background
-                clean_bytes = remove_white_background(raw_bytes)
-                proc_path = storage.design_processed_path(design_id)
-                processed_url = storage.upload(proc_path, clean_bytes)
                 design.processed_image_url = processed_url
+                design.image_prompt = ideogram_prompt
+                design.image_api_used = "ideogram"
                 db.commit()
-                logger.info(f"design_task[{trend_id[:8]}] images uploaded (bg removed)")
-
+                logger.info(
+                    "design_task[%s] ideogram image generated prompt='%s'",
+                    trend_id[:8], ideogram_prompt[:120],
+                )
             except Exception as img_err:
-                error_msg = f"Image generation failed: {type(img_err).__name__}: {img_err}"
-                logger.warning(f"{error_msg} — design {design_id}; forcing text_only")
-                archetype = "text_only"
-                design.archetype = archetype
-                design.image_api_used = None
+                error_msg = f"Ideogram generation failed: {type(img_err).__name__}: {img_err}"
+                logger.error("design_task[%s] %s", trend_id[:8], error_msg)
+                design.status = "generation_failed"
                 design.font_reasoning = error_msg[:500]
                 _log_batch_error(db.query(Batch).filter(Batch.id == batch_id).first(), db, error_msg[:300])
                 db.commit()
+                raise
+        else:
+            # --- Standard Flux/DALL-E path ---
+            image_prompt = build_image_prompt(
+                trend.raw_signal, archetype, niche_name, design.concept_name,
+                product_type=primary_product,
+            )
+            if image_prompt:
+                from app.services.design.preference_learner import get_prompt_preferences
+                pref_suffix = get_prompt_preferences(db)
+                if pref_suffix:
+                    image_prompt = f"{image_prompt} {pref_suffix}"
+                style_hint = pipeline_settings.get("style_filter")
+                if style_hint:
+                    image_prompt = f"{image_prompt} Style direction: {style_hint}."
+            design.image_prompt = image_prompt
+            db.commit()
+            logger.info(
+                "design_task[%s] prompt built product_type=%s aspect=%s prompt='%s'",
+                trend_id[:8], primary_product, fmt["aspect_ratio"],
+                (image_prompt or "")[:150],
+            )
+
+            if image_api and image_prompt:
+                try:
+                    logger.info(f"design_task[{trend_id[:8]}] generating image via {image_api} aspect={fmt['aspect_ratio']}...")
+                    raw_bytes, api_used = generate_image(image_prompt, image_api, aspect_ratio=fmt["aspect_ratio"])
+                    design.image_api_used = api_used
+                    logger.info(f"design_task[{trend_id[:8]}] image generated via {api_used}, {len(raw_bytes)} bytes")
+
+                    # Upload raw image
+                    raw_path = storage.design_raw_path(design_id)
+                    raw_url = storage.upload(raw_path, raw_bytes)
+                    design.raw_image_url = raw_url
+
+                    if archetype == "illustration":
+                        from app.services.design.post_processor import process_image as full_process, image_to_bytes as img2b
+                        canvas, report = full_process(raw_bytes)
+                        clean_bytes = img2b(canvas)
+                        color_palette = report.get("color_palette", [])
+                        logger.info("design_task[%s] illustration: rembg + canvas 4500x5400", trend_id[:8])
+                    else:
+                        from app.services.design.bg_remover import remove_white_background
+                        clean_bytes = remove_white_background(raw_bytes)
+                    proc_path = storage.design_processed_path(design_id)
+                    processed_url = storage.upload(proc_path, clean_bytes)
+                    design.processed_image_url = processed_url
+                    db.commit()
+                    logger.info(f"design_task[{trend_id[:8]}] images uploaded (bg removed)")
+
+                except Exception as img_err:
+                    error_msg = f"Image generation failed: {type(img_err).__name__}: {img_err}"
+                    logger.warning(f"{error_msg} — design {design_id}; forcing text_only")
+                    archetype = "text_only"
+                    design.archetype = archetype
+                    design.image_api_used = None
+                    design.font_reasoning = error_msg[:500]
+                    _log_batch_error(db.query(Batch).filter(Batch.id == batch_id).first(), db, error_msg[:300])
+                    db.commit()
 
         design.color_palette = color_palette
 
-        # 4f: Generate + composite text content
-        text_content = generate_text_content(trend.raw_signal, archetype, niche_name)
+        # 4f: Generate + composite text content (skip for image_with_text — Ideogram already rendered text)
+        if archetype == "image_with_text":
+            text_content = {
+                "primary_text": iwt_meta.get("text_content", design.concept_name),
+                "secondary_text": None,
+                "tagline": None,
+                "text_concept_scoring": None,
+            }
+        else:
+            text_content = generate_text_content(trend.raw_signal, archetype, niche_name)
 
         # 4f: Select font
         font_result = select_font_pair(
@@ -792,7 +852,7 @@ def _detect_failed_step(exc: Exception) -> str:
     msg = str(exc).lower()
     if "archetype" in msg or "classify" in msg:
         return "archetype"
-    if "image" in msg or "flux" in msg or "dalle" in msg or "replicate" in msg or "openai" in msg:
+    if "image" in msg or "flux" in msg or "dalle" in msg or "replicate" in msg or "openai" in msg or "ideogram" in msg:
         return "image_generation"
     if "quality" in msg or "score" in msg:
         return "quality"
