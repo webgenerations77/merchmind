@@ -299,7 +299,7 @@ class PrintifyService:
         Downloads mockups, replaces white backgrounds, re-uploads to Supabase.
         Returns {front: url, back?: url} dict.
         """
-        _DELAYS = [8, 15, 25]
+        _DELAYS = [5, 10, 15]
         try:
             images = []
             for attempt, delay in enumerate(_DELAYS):
