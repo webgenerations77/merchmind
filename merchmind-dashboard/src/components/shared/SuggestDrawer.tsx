@@ -177,7 +177,7 @@ export default function SuggestDrawer({
             <button
               onClick={handleRegenerate}
               disabled={regenerating}
-              className="w-full py-2.5 rounded-lg bg-purple-500/20 text-purple-400 font-semibold text-sm hover:bg-purple-500/30 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-2.5 rounded-lg bg-accent/20 text-accent font-semibold text-sm hover:bg-accent/30 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
             >
               {regenerating ? (
                 <>

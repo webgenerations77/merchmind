@@ -87,7 +87,7 @@ function ProductDetail({ product, allProducts, onBack, onUpdate }: {
                 <StatusBadge status={design.archetype} />
                 <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase ${
                   design.classification === 'collection'
-                    ? 'bg-purple-500/20 text-purple-400'
+                    ? 'bg-accent/20 text-accent'
                     : 'bg-accent/20 text-accent'
                 }`}>
                   {design.classification === 'collection' ? 'Collection' : 'Design Idea'}

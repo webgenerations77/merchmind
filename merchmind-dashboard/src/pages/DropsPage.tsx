@@ -6,8 +6,8 @@ import { formatProductType, formatCurrency } from '../utils/formatters';
 
 function DropStatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    scheduled: 'bg-blue-500/20 text-blue-400',
-    in_progress: 'bg-amber-500/20 text-amber-400',
+    scheduled: 'bg-regen/20 text-regen',
+    in_progress: 'bg-confidence-medium/20 text-confidence-medium',
     published: 'bg-approve/20 text-approve',
     failed: 'bg-reject/20 text-reject',
   };
