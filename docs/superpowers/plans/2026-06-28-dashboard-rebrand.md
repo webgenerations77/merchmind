@@ -12,7 +12,7 @@
 
 - Spec: `docs/superpowers/specs/2026-06-28-dashboard-rebrand-design.md`. Brand reference: `merchmind-dashboard/brand-kit/README.md`.
 - All work is in `merchmind-dashboard/`. Do NOT touch `merchmind-backend/`, `merchmind-app/`, or `shopify-theme/`.
-- No test runner exists in this project; do NOT add one. Verification = `npx tsc -b` (type-check) + `npm run lint` + `npm run build`, plus browser-driven visual checks (Claude-in-Chrome) for themed surfaces.
+- No test runner exists in this project; do NOT add one. Verification = `npx tsc -b` (type-check) and `npm run build` must both PASS. **The repo has ~22 pre-existing `eslint` errors** (in `ReviewPage.tsx`, `reviewStore.ts`, etc.) that are out of scope — `npm run lint` will NOT pass cleanly. The lint gate is therefore: a task must introduce **no NEW lint errors in the files it touches** (don't try to fix pre-existing errors, and don't be blocked by them). Pure CSS/HTML changes aren't linted at all. Browser-driven visual checks (Claude-in-Chrome) are the controller's responsibility, not the implementer's.
 - Default theme is **light**. Dark is opt-in via toggle, persisted at `localStorage` key `mm-theme` (`'light'` | `'dark'`).
 - Brand palette (exact hex): paper `#F6F5FB`, cream `#EFEDF7`, violet-100 `#ECE8FF`, violet-200 `#D8CEFF`, violet-300 `#B4A4FF`, violet `#6D4AFF`, violet-deep `#5634E0`, mint-200 `#B7F0E0`, mint `#19D3A2`, mint-deep `#0FB488`, ink `#15132B`, slate `#3A3550`, muted `#8B85A3`, alert `#F2575B`. Dark: d-bg `#0F0E1A`, d-surface `#1C1A2E`, d-border `#2A2740`, d-text `#E8E6F0`, d-muted `#9A95B5`, violet-on-dark `#7C5CFF`.
 - Principle: violet = nav/primary/identity; mint = signal (live/success/data); alert = real errors only.
