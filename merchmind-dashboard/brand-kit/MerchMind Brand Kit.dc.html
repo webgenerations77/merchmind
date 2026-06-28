@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<meta name="design_doc_mode" content="canvas">
+<style>
+  :root{
+    --paper:#F6F5FB; --cream:#EFEDF7;
+    --violet:#6D4AFF; --violet-deep:#5634E0; --ink:#15132B;
+    --violet-100:#ECE8FF; --violet-200:#D8CEFF; --violet-300:#B4A4FF;
+    --mint:#19D3A2; --mint-200:#B7F0E0; --mint-deep:#0FB488;
+    --slate:#3A3550; --muted:#8B85A3;
+    --d-bg:#0F0E1A; --d-surface:#1C1A2E; --d-border:#2A2740; --d-text:#E8E6F0; --d-muted:#9A95B5;
+    --alert:#F2575B;
+  }
+  *{ box-sizing:border-box; }
+  .lbl{ font-family:'Geist Mono','Geist',monospace; font-size:11px; font-weight:500; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin:0 0 12px 2px; }
+  .card{ background:#fff; border-radius:8px; box-shadow:0 1px 2px rgba(21,19,43,.08), 0 18px 44px rgba(21,19,43,.08); overflow:hidden; }
+  .ctr{ display:flex; align-items:center; justify-content:center; }
+  .sec{ font-family:'Geist Mono','Geist',monospace; font-size:12px; font-weight:500; letter-spacing:.14em; text-transform:uppercase; color:var(--violet); }
+  .wm{ font-family:'Space Grotesk',sans-serif; font-weight:700; letter-spacing:-.02em; }
+</style>
+</helmet>
+
+<!-- ===== TITLE ===== -->
+<div style="position:absolute; left:140px; top:64px; width:1140px;" data-drags-parent="1">
+  <div style="font-family:'Geist Mono','Geist',monospace; font-size:12px; font-weight:500; letter-spacing:.22em; text-transform:uppercase; color:var(--muted); margin-bottom:18px;">Brand &amp; Graphics System</div>
+  <div style="display:flex; align-items:center; gap:24px;">
+    <svg width="78" height="78" viewBox="0 0 120 120" fill="none">
+      <path d="M60 12 L101.6 36 L101.6 84 L60 108 L18.4 84 L18.4 36 Z" stroke="var(--violet)" stroke-width="4" stroke-linejoin="round"/>
+      <g stroke="var(--violet)" stroke-width="2" stroke-opacity=".4" stroke-linecap="round"><line x1="60" y1="12" x2="60" y2="40"/><line x1="101.6" y1="36" x2="77.3" y2="50"/><line x1="101.6" y1="84" x2="77.3" y2="70"/><line x1="60" y1="108" x2="60" y2="80"/><line x1="18.4" y1="84" x2="42.7" y2="70"/><line x1="18.4" y1="36" x2="42.7" y2="50"/></g>
+      <path d="M60 40 L77.3 50 L77.3 70 L60 80 L42.7 70 L42.7 50 Z" fill="var(--mint)"/>
+    </svg>
+    <div class="wm" style="font-size:64px; line-height:.9;"><span style="color:var(--ink);">Merch</span><span style="color:var(--violet);">Mind</span></div>
+  </div>
+  <div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:500; font-size:22px; color:var(--slate); margin-top:20px;">Design it. Sell it. Track it.</div>
+</div>
+
+<!-- ===== 01 LOGO ===== -->
+<div style="position:absolute; left:140px; top:340px;" data-drags-parent="1"><div class="sec">01 — Logo</div></div>
+
+<div style="position:absolute; left:140px; top:386px; width:560px;">
+  <p class="lbl" data-drags-parent="1">Primary lockup · light</p>
+  <div class="card ctr" style="height:340px; gap:24px; background:var(--paper);">
+    <svg width="96" height="96" viewBox="0 0 120 120" fill="none">
+      <path d="M60 12 L101.6 36 L101.6 84 L60 108 L18.4 84 L18.4 36 Z" stroke="var(--violet)" stroke-width="4" stroke-linejoin="round"/>
+      <g stroke="var(--violet)" stroke-width="2" stroke-opacity=".4" stroke-linecap="round"><line x1="60" y1="12" x2="60" y2="40"/><line x1="101.6" y1="36" x2="77.3" y2="50"/><line x1="101.6" y1="84" x2="77.3" y2="70"/><line x1="60" y1="108" x2="60" y2="80"/><line x1="18.4" y1="84" x2="42.7" y2="70"/><line x1="18.4" y1="36" x2="42.7" y2="50"/></g>
+      <path d="M60 40 L77.3 50 L77.3 70 L60 80 L42.7 70 L42.7 50 Z" fill="var(--mint)"/>
+    </svg>
+    <div class="wm" style="font-size:50px;"><span style="color:var(--ink);">Merch</span><span style="color:var(--violet);">Mind</span></div>
+  </div>
+</div>
+
+<div style="position:absolute; left:740px; top:386px; width:560px;">
+  <p class="lbl" data-drags-parent="1">Reversed · dark</p>
+  <div class="card ctr" style="height:340px; gap:24px; background:var(--d-bg);">
+    <svg width="96" height="96" viewBox="0 0 120 120" fill="none">
+      <path d="M60 12 L101.6 36 L101.6 84 L60 108 L18.4 84 L18.4 36 Z" stroke="var(--violet-300)" stroke-width="4" stroke-linejoin="round"/>
+      <g stroke="var(--violet-300)" stroke-width="2" stroke-opacity=".4" stroke-linecap="round"><line x1="60" y1="12" x2="60" y2="40"/><line x1="101.6" y1="36" x2="77.3" y2="50"/><line x1="101.6" y1="84" x2="77.3" y2="70"/><line x1="60" y1="108" x2="60" y2="80"/><line x1="18.4" y1="84" x2="42.7" y2="70"/><line x1="18.4" y1="36" x2="42.7" y2="50"/></g>
+      <path d="M60 40 L77.3 50 L77.3 70 L60 80 L42.7 70 L42.7 50 Z" fill="var(--mint)"/>
+    </svg>
+    <div class="wm" style="font-size:50px;"><span style="color:var(--d-text);">Merch</span><span style="color:var(--violet-300);">Mind</span></div>
+  </div>
+</div>
+
+<div style="position:absolute; left:1340px; top:386px; width:420px;">
+  <p class="lbl" data-drags-parent="1">Stacked</p>
+  <div class="card" style="height:340px; background:var(--paper); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;">
+    <svg width="86" height="86" viewBox="0 0 120 120" fill="none">
+      <path d="M60 12 L101.6 36 L101.6 84 L60 108 L18.4 84 L18.4 36 Z" stroke="var(--violet)" stroke-width="4" stroke-linejoin="round"/>
+      <g stroke="var(--violet)" stroke-width="2" stroke-opacity=".4" stroke-linecap="round"><line x1="60" y1="12" x2="60" y2="40"/><line x1="101.6" y1="36" x2="77.3" y2="50"/><line x1="101.6" y1="84" x2="77.3" y2="70"/><line x1="60" y1="108" x2="60" y2="80"/><line x1="18.4" y1="84" x2="42.7" y2="70"/><line x1="18.4" y1="36" x2="42.7" y2="50"/></g>
+      <path d="M60 40 L77.3 50 L77.3 70 L60 80 L42.7 70 L42.7 50 Z" fill="var(--mint)"/>
+    </svg>
+    <div class="wm" style="font-size:34px;"><span style="color:var(--ink);">Merch</span><span style="color:var(--violet);">Mind</span></div>
+    <div style="font-family:'Geist Mono','Geist',monospace; font-size:10px; font-weight:500; letter-spacing:.26em; text-transform:uppercase; color:var(--muted);">Design · Sell · Track</div>
+  </div>
+</div>
+
+<div style="position:absolute; left:1800px; top:386px; width:480px;">
+  <p class="lbl" data-drags-parent="1">Symbol &amp; clearspace</p>
+  <div class="card" style="height:340px; background:var(--paper); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:28px; padding:24px;">
+    <div style="padding:22px; border:2px dashed var(--violet-200); border-radius:12px;">
+      <svg width="108" height="108" viewBox="0 0 120 120" fill="none">
+        <path d="M60 12 L101.6 36 L101.6 84 L60 108 L18.4 84 L18.4 36 Z" stroke="var(--violet)" stroke-width="4" stroke-linejoin="round"/>
+        <g stroke="var(--violet)" stroke-width="2" stroke-opacity=".4" stroke-linecap="round"><line x1="60" y1="12" x2="60" y2="40"/><line x1="101.6" y1="36" x2="77.3" y2="50"/><line x1="101.6" y1="84" x2="77.3" y2="70"/><line x1="60" y1="108" x2="60" y2="80"/><line x1="18.4" y1="84" x2="42.7" y2="70"/><line x1="18.4" y1="36" x2="42.7" y2="50"/></g>
+        <path d="M60 40 L77.3 50 L77.3 70 L60 80 L42.7 70 L42.7 50 Z" fill="var(--mint)"/>
+      </svg>
+    </div>
+    <div style="display:flex; align-items:center; gap:26px;">
+      <svg width="46" height="46" viewBox="0 0 120 120" fill="none"><path d="M60 12 L101.6 36 L101.6 84 L60 108 L18.4 84 L18.4 36 Z" stroke="var(--violet)" stroke-width="5" stroke-linejoin="round"/><path d="M60 40 L77.3 50 L77.3 70 L60 80 L42.7 70 L42.7 50 Z" fill="var(--mint)"/></svg>
+      <svg width="30" height="30" viewBox="0 0 120 120" fill="none"><path d="M60 12 L101.6 36 L101.6 84 L60 108 L18.4 84 L18.4 36 Z" stroke="var(--violet)" stroke-width="7" stroke-linejoin="round"/><path d="M60 44 L73 52 L73 68 L60 76 L47 68 L47 52 Z" fill="var(--mint)"/></svg>
+      <svg width="18" height="18" viewBox="0 0 120 120" fill="none"><path d="M60 14 L100 37 L100 83 L60 106 L20 83 L20 37 Z" stroke="var(--violet)" stroke-width="10" stroke-linejoin="round"/><circle cx="60" cy="60" r="14" fill="var(--mint)"/></svg>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 02 APP ICON ===== -->
+<div style="position:absolute; left:140px; top:810px;" data-drags-parent="1"><div class="sec">02 — App icon</div></div>
+
+<div style="position:absolute; left:140px; top:856px; width:260px;">
+  <p class="lbl" data-drags-parent="1">Full color</p>
+  <div class="card ctr" style="height:300px; background:var(--cream);">
+    <div style="width:184px; height:184px; border-radius:42px; background:linear-gradient(150deg, var(--violet), var(--violet-deep)); box-shadow:0 14px 28px rgba(86,52,224,.34); display:flex; align-items:center; justify-content:center;">
+      <svg width="112" height="112" viewBox="0 0 120 120" fill="none">
+        <path d="M60 12 L101.6 36 L101.6 84 L60 108 L18.4 84 L18.4 36 Z" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>
+        <g stroke="#fff" stroke-width="2" stroke-opacity=".4" stroke-linecap="round"><line x1="60" y1="12" x2="60" y2="40"/><line x1="101.6" y1="36" x2="77.3" y2="50"/><line x1="101.6" y1="84" x2="77.3" y2="70"/><line x1="60" y1="108" x2="60" y2="80"/><line x1="18.4" y1="84" x2="42.7" y2="70"/><line x1="18.4" y1="36" x2="42.7" y2="50"/></g>
+        <path d="M60 40 L77.3 50 L77.3 70 L60 80 L42.7 70 L42.7 50 Z" fill="var(--mint)"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<div style="position:absolute; left:420px; top:856px; width:260px;">
+  <p class="lbl" data-drags-parent="1">Dark</p>
+  <div class="card ctr" style="height:300px; background:var(--cream);">
+    <div style="width:184px; height:184px; border-radius:42px; background:linear-gradient(150deg,#211E3A,var(--ink)); box-shadow:0 14px 28px rgba(21,19,43,.4); display:flex; align-items:center; justify-content:center;">
+      <svg width="112" height="112" viewBox="0 0 120 120" fill="none">
+        <path d="M60 12 L101.6 36 L101.6 84 L60 108 L18.4 84 L18.4 36 Z" stroke="var(--violet-300)" stroke-width="4" stroke-linejoin="round"/>
+        <g stroke="var(--violet-300)" stroke-width="2" stroke-opacity=".4" stroke-linecap="round"><line x1="60" y1="12" x2="60" y2="40"/><line x1="101.6" y1="36" x2="77.3" y2="50"/><line x1="101.6" y1="84" x2="77.3" y2="70"/><line x1="60" y1="108" x2="60" y2="80"/><line x1="18.4" y1="84" x2="42.7" y2="70"/><line x1="18.4" y1="36" x2="42.7" y2="50"/></g>
+        <path d="M60 40 L77.3 50 L77.3 70 L60 80 L42.7 70 L42.7 50 Z" fill="var(--mint)"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<div style="position:absolute; left:700px; top:856px; width:260px;">
+  <p class="lbl" data-drags-parent="1">Monochrome</p>
+  <div class="card ctr" style="height:300px; background:var(--cream);">
+    <div style="width:184px; height:184px; border-radius:42px; background:var(--ink); display:flex; align-items:center; justify-content:center;">
+      <svg width="112" height="112" viewBox="0 0 120 120" fill="none">
+        <path d="M60 12 L101.6 36 L101.6 84 L60 108 L18.4 84 L18.4 36 Z" stroke="#fff" stroke-width="4" stroke-linejoin="round"/>
+        <g stroke="#fff" stroke-width="2" stroke-opacity=".4" stroke-linecap="round"><line x1="60" y1="12" x2="60" y2="40"/><line x1="101.6" y1="36" x2="77.3" y2="50"/><line x1="101.6" y1="84" x2="77.3" y2="70"/><line x1="60" y1="108" x2="60" y2="80"/><line x1="18.4" y1="84" x2="42.7" y2="70"/><line x1="18.4" y1="36" x2="42.7" y2="50"/></g>
+        <path d="M60 40 L77.3 50 L77.3 70 L60 80 L42.7 70 L42.7 50 Z" fill="#fff"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<div style="position:absolute; left:980px; top:856px; width:260px;">
+  <p class="lbl" data-drags-parent="1">Light tint</p>
+  <div class="card ctr" style="height:300px; background:var(--cream);">
+    <div style="width:184px; height:184px; border-radius:42px; background:linear-gradient(150deg,#fff,var(--violet-100)); border:1px solid var(--violet-200); box-shadow:0 14px 28px rgba(21,19,43,.1); display:flex; align-items:center; justify-content:center;">
+      <svg width="112" height="112" viewBox="0 0 120 120" fill="none">
+        <path d="M60 12 L101.6 36 L101.6 84 L60 108 L18.4 84 L18.4 36 Z" stroke="var(--violet)" stroke-width="4" stroke-linejoin="round"/>
+        <g stroke="var(--violet)" stroke-width="2" stroke-opacity=".4" stroke-linecap="round"><line x1="60" y1="12" x2="60" y2="40"/><line x1="101.6" y1="36" x2="77.3" y2="50"/><line x1="101.6" y1="84" x2="77.3" y2="70"/><line x1="60" y1="108" x2="60" y2="80"/><line x1="18.4" y1="84" x2="42.7" y2="70"/><line x1="18.4" y1="36" x2="42.7" y2="50"/></g>
+        <path d="M60 40 L77.3 50 L77.3 70 L60 80 L42.7 70 L42.7 50 Z" fill="var(--mint)"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<div style="position:absolute; left:1260px; top:856px; width:320px;">
+  <p class="lbl" data-drags-parent="1">Construction</p>
+  <div class="card" style="height:300px; background:var(--paper); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px;">
+    <div style="position:relative; width:160px; height:160px;">
+      <div style="position:absolute; inset:0; border-radius:36px; background:linear-gradient(150deg, var(--violet), var(--violet-deep));"></div>
+      <div style="position:absolute; left:50%; top:0; bottom:0; width:1px; background:rgba(255,255,255,.25);"></div>
+      <div style="position:absolute; top:50%; left:0; right:0; height:1px; background:rgba(255,255,255,.25);"></div>
+      <div style="position:absolute; inset:18px; border:1px dashed rgba(255,255,255,.5); border-radius:24px;"></div>
+    </div>
+    <div style="font-family:'Geist Mono','Geist',monospace; font-size:11px; color:var(--slate); text-align:center; line-height:1.8;">RADIUS 22.4%<br/>HEX · MINT CORE</div>
+  </div>
+</div>
+
+<!-- ===== 03 COLOR ===== -->
+<div style="position:absolute; left:140px; top:1252px;" data-drags-parent="1"><div class="sec">03 — Color</div></div>
+
+<div style="position:absolute; left:140px; top:1298px; width:1100px;">
+  <p class="lbl" data-drags-parent="1">Palette</p>
+  <div class="card" style="background:#fff; padding:34px;">
+    <div style="display:grid; grid-template-columns:repeat(5,1fr); gap:18px;">
+      <div><div style="height:78px; border-radius:8px; background:var(--paper); border:1px solid #e8e6f2;"></div><div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:13px; color:var(--ink); margin-top:10px;">Paper</div><div style="font-family:'Geist Mono',monospace; font-size:11px; color:var(--muted);">#F6F5FB</div></div>
+      <div><div style="height:78px; border-radius:8px; background:var(--violet-100);"></div><div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:13px; color:var(--ink); margin-top:10px;">Violet 100</div><div style="font-family:'Geist Mono',monospace; font-size:11px; color:var(--muted);">#ECE8FF</div></div>
+      <div><div style="height:78px; border-radius:8px; background:var(--violet-300);"></div><div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:13px; color:var(--ink); margin-top:10px;">Violet 300</div><div style="font-family:'Geist Mono',monospace; font-size:11px; color:var(--muted);">#B4A4FF</div></div>
+      <div><div style="height:78px; border-radius:8px; background:var(--violet);"></div><div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:13px; color:var(--ink); margin-top:10px;">Violet</div><div style="font-family:'Geist Mono',monospace; font-size:11px; color:var(--muted);">#6D4AFF</div></div>
+      <div><div style="height:78px; border-radius:8px; background:var(--violet-deep);"></div><div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:13px; color:var(--ink); margin-top:10px;">Violet deep</div><div style="font-family:'Geist Mono',monospace; font-size:11px; color:var(--muted);">#5634E0</div></div>
+      <div><div style="height:78px; border-radius:8px; background:var(--mint-200);"></div><div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:13px; color:var(--ink); margin-top:10px;">Mint 200</div><div style="font-family:'Geist Mono',monospace; font-size:11px; color:var(--muted);">#B7F0E0</div></div>
+      <div><div style="height:78px; border-radius:8px; background:var(--mint);"></div><div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:13px; color:var(--ink); margin-top:10px;">Mint</div><div style="font-family:'Geist Mono',monospace; font-size:11px; color:var(--muted);">#19D3A2</div></div>
+      <div><div style="height:78px; border-radius:8px; background:var(--mint-deep);"></div><div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:13px; color:var(--ink); margin-top:10px;">Mint deep</div><div style="font-family:'Geist Mono',monospace; font-size:11px; color:var(--muted);">#0FB488</div></div>
+      <div><div style="height:78px; border-radius:8px; background:var(--ink);"></div><div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:13px; color:var(--ink); margin-top:10px;">Ink</div><div style="font-family:'Geist Mono',monospace; font-size:11px; color:var(--muted);">#15132B</div></div>
+      <div><div style="height:78px; border-radius:8px; background:var(--alert);"></div><div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:13px; color:var(--ink); margin-top:10px;">Alert</div><div style="font-family:'Geist Mono',monospace; font-size:11px; color:var(--muted);">#F2575B</div></div>
+    </div>
+    <div style="font-family:'Geist','Space Grotesk',sans-serif; font-size:13px; color:var(--slate); opacity:.85; margin-top:24px; line-height:1.6;">Violet is the workhorse — navigation, primary actions, identity. Mint is the signal color: live status, success, the "selling" moments and data highlights. Ink anchors text and the dark UI. Everything else is structural neutral.</div>
+  </div>
+</div>
+
+<div style="position:absolute; left:1280px; top:1252px;" data-drags-parent="1"><div class="sec">04 — Type</div></div>
+
+<div style="position:absolute; left:1280px; top:1298px; width:700px;">
+  <p class="lbl" data-drags-parent="1">Typography</p>
+  <div class="card" style="background:#fff; padding:36px; display:flex; flex-direction:column; gap:26px;">
+    <div style="display:flex; align-items:baseline; justify-content:space-between; gap:20px; border-bottom:1px solid #ece9f5; padding-bottom:22px;">
+      <div class="wm" style="font-size:70px; line-height:.85; color:var(--ink);">Aa</div>
+      <div style="text-align:right;">
+        <div style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted);">Display · Space Grotesk</div>
+        <div class="wm" style="font-weight:500; font-size:22px; color:var(--slate); margin-top:6px;">Precise, technical, premium</div>
+      </div>
+    </div>
+    <div>
+      <div style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-bottom:12px;">Text / UI · Geist</div>
+      <div style="font-family:'Geist','Space Grotesk',sans-serif; font-size:17px; line-height:1.65; color:var(--slate);">A clean, neutral interface sans built for dense dashboards — tables, labels, and controls stay legible and calm at small sizes.</div>
+    </div>
+    <div style="display:flex; gap:40px;">
+      <div><div style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-bottom:8px;">Mono · Geist Mono</div><div style="font-family:'Geist Mono',monospace; font-size:15px; color:var(--ink);">SKU-0042 · $24.00 · +18%</div></div>
+      <div style="flex:1;"><div style="font-family:'Geist Mono',monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-bottom:8px;">Weights</div><div style="font-family:'Geist','Space Grotesk',sans-serif; font-size:15px; color:var(--ink);"><span style="font-weight:400;">Regular</span> · <span style="font-weight:500;">Medium</span> · <span style="font-weight:600;">Semibold</span></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- light / dark surfaces -->
+<div style="position:absolute; left:140px; top:1664px; width:1100px;">
+  <p class="lbl" data-drags-parent="1">Surfaces · light &amp; dark</p>
+  <div class="card" style="background:#fff; padding:26px; display:grid; grid-template-columns:1fr 1fr; gap:22px;">
+    <div style="background:var(--paper); border:1px solid #e8e6f2; border-radius:10px; padding:20px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:14px; color:var(--ink);">Light UI</div>
+        <div style="font-family:'Geist Mono',monospace; font-size:10px; color:var(--muted);">DASHBOARD</div>
+      </div>
+      <div style="background:#fff; border:1px solid #ece9f5; border-radius:8px; padding:14px; display:flex; align-items:center; gap:12px;">
+        <div style="width:34px; height:34px; border-radius:8px; background:var(--violet-100); display:flex; align-items:center; justify-content:center;"><div style="width:12px; height:12px; border-radius:3px; background:var(--violet);"></div></div>
+        <div style="flex:1;"><div style="height:8px; width:70%; border-radius:4px; background:#e6e3f0;"></div><div style="height:8px; width:45%; border-radius:4px; background:#efedf6; margin-top:7px;"></div></div>
+        <div style="font-family:'Geist Mono',monospace; font-size:12px; color:var(--mint-deep); font-weight:500;">+18%</div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:14px;"><div style="background:var(--violet); color:#fff; font-family:'Geist',sans-serif; font-weight:500; font-size:12px; padding:8px 14px; border-radius:7px;">Primary</div><div style="background:#fff; border:1px solid #ddd9ea; color:var(--slate); font-family:'Geist',sans-serif; font-weight:500; font-size:12px; padding:8px 14px; border-radius:7px;">Ghost</div></div>
+    </div>
+    <div style="background:var(--d-bg); border:1px solid var(--d-border); border-radius:10px; padding:20px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:14px; color:var(--d-text);">Dark UI</div>
+        <div style="font-family:'Geist Mono',monospace; font-size:10px; color:var(--d-muted);">STUDIO</div>
+      </div>
+      <div style="background:var(--d-surface); border:1px solid var(--d-border); border-radius:8px; padding:14px; display:flex; align-items:center; gap:12px;">
+        <div style="width:34px; height:34px; border-radius:8px; background:rgba(124,92,255,.2); display:flex; align-items:center; justify-content:center;"><div style="width:12px; height:12px; border-radius:3px; background:var(--violet-300);"></div></div>
+        <div style="flex:1;"><div style="height:8px; width:70%; border-radius:4px; background:#34304e;"></div><div style="height:8px; width:45%; border-radius:4px; background:#272343; margin-top:7px;"></div></div>
+        <div style="font-family:'Geist Mono',monospace; font-size:12px; color:var(--mint); font-weight:500;">+18%</div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:14px;"><div style="background:var(--violet); color:#fff; font-family:'Geist',sans-serif; font-weight:500; font-size:12px; padding:8px 14px; border-radius:7px;">Primary</div><div style="background:transparent; border:1px solid var(--d-border); color:var(--d-text); font-family:'Geist',sans-serif; font-weight:500; font-size:12px; padding:8px 14px; border-radius:7px;">Ghost</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 05 BACKGROUNDS ===== -->
+<div style="position:absolute; left:140px; top:1980px;" data-drags-parent="1"><div class="sec">05 — Backgrounds &amp; textures</div></div>
+
+<div style="position:absolute; left:140px; top:2026px; width:250px;">
+  <p class="lbl" data-drags-parent="1">Dot grid</p>
+  <div class="card" style="height:240px; position:relative; background:radial-gradient(rgba(109,74,255,.13) 1.4px, transparent 1.5px) 0 0 / 20px 20px, var(--paper);">
+    <div style="position:absolute; left:14px; bottom:12px; font-family:'Geist Mono',monospace; font-size:10px; color:var(--slate);">canvas · studio</div>
+  </div>
+</div>
+<div style="position:absolute; left:410px; top:2026px; width:250px;">
+  <p class="lbl" data-drags-parent="1">Violet mesh</p>
+  <div class="card" style="height:240px; position:relative; background:radial-gradient(at 18% 22%, rgba(109,74,255,.24), transparent 56%), radial-gradient(at 84% 30%, rgba(25,211,162,.22), transparent 56%), radial-gradient(at 50% 94%, rgba(180,164,255,.28), transparent 58%), var(--paper);">
+    <div style="position:absolute; left:14px; bottom:12px; font-family:'Geist Mono',monospace; font-size:10px; color:var(--slate);">onboarding</div>
+  </div>
+</div>
+<div style="position:absolute; left:680px; top:2026px; width:250px;">
+  <p class="lbl" data-drags-parent="1">Graph paper</p>
+  <div class="card" style="height:240px; position:relative; background:repeating-linear-gradient(0deg, transparent 0 23px, rgba(21,19,43,.05) 23px 24px), repeating-linear-gradient(90deg, transparent 0 23px, rgba(21,19,43,.05) 23px 24px), var(--cream);">
+    <div style="position:absolute; left:14px; bottom:12px; font-family:'Geist Mono',monospace; font-size:10px; color:var(--slate);">tables · ops</div>
+  </div>
+</div>
+<div style="position:absolute; left:950px; top:2026px; width:250px;">
+  <p class="lbl" data-drags-parent="1">Calm wash</p>
+  <div class="card" style="height:240px; position:relative; background:linear-gradient(165deg, var(--paper), var(--violet-100));">
+    <div style="position:absolute; left:14px; bottom:12px; font-family:'Geist Mono',monospace; font-size:10px; color:var(--muted);">screens · default</div>
+  </div>
+</div>
+<div style="position:absolute; left:1220px; top:2026px; width:250px;">
+  <p class="lbl" data-drags-parent="1">Brand wash</p>
+  <div class="card" style="height:240px; position:relative; background:linear-gradient(150deg, var(--violet), var(--violet-deep));">
+    <div style="position:absolute; left:14px; bottom:12px; font-family:'Geist Mono',monospace; font-size:10px; color:rgba(255,255,255,.82);">headers · cta</div>
+  </div>
+</div>
+<div style="position:absolute; left:1490px; top:2026px; width:250px;">
+  <p class="lbl" data-drags-parent="1">Dark surface</p>
+  <div class="card" style="height:240px; position:relative; background:radial-gradient(at 80% 0%, rgba(124,92,255,.28), transparent 50%), linear-gradient(160deg,var(--d-surface),var(--d-bg));">
+    <div style="position:absolute; left:14px; bottom:12px; font-family:'Geist Mono',monospace; font-size:10px; color:var(--d-muted);">dark mode</div>
+  </div>
+</div>
+
+<!-- ===== 06 ICONOGRAPHY ===== -->
+<div style="position:absolute; left:140px; top:2370px;" data-drags-parent="1"><div class="sec">06 — Iconography</div></div>
+
+<div style="position:absolute; left:140px; top:2416px; width:1330px;">
+  <p class="lbl" data-drags-parent="1">Core screen icons · 2pt stroke, round caps</p>
+  <div class="card" style="background:#fff; padding:38px 30px; display:grid; grid-template-columns:repeat(5,1fr); gap:20px;">
+    <div style="display:flex; flex-direction:column; align-items:center; gap:18px;">
+      <svg width="52" height="52" viewBox="0 0 48 48" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linejoin="round">
+        <rect x="10" y="10" width="12" height="12" rx="3"/><rect x="26" y="10" width="12" height="12" rx="3" fill="var(--mint)" stroke="none"/><rect x="10" y="26" width="12" height="12" rx="3"/><rect x="26" y="26" width="12" height="12" rx="3"/>
+      </svg>
+      <div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:14px; color:var(--ink);">Dashboard</div>
+    </div>
+    <div style="display:flex; flex-direction:column; align-items:center; gap:18px;">
+      <svg width="52" height="52" viewBox="0 0 48 48" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 10l-7 5 4 5 3-2v15h12V23l3 2 4-5-7-5a6 6 0 0 1-12 0z"/>
+        <path d="M30 12l1.4 3 3 1.4-3 1.4-1.4 3-1.4-3-3-1.4 3-1.4z" fill="var(--mint)" stroke="none"/>
+      </svg>
+      <div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:14px; color:var(--ink);">Design Studio</div>
+    </div>
+    <div style="display:flex; flex-direction:column; align-items:center; gap:18px;">
+      <svg width="52" height="52" viewBox="0 0 48 48" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M24 9H13a4 4 0 0 0-4 4v11l15 15 15-15z"/><circle cx="18" cy="18" r="2.5" fill="var(--mint)" stroke="none"/>
+      </svg>
+      <div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:14px; color:var(--ink);">Catalog</div>
+    </div>
+    <div style="display:flex; flex-direction:column; align-items:center; gap:18px;">
+      <svg width="52" height="52" viewBox="0 0 48 48" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M24 10l13 7v14l-13 7-13-7V17z"/><path d="M11 17l13 7 13-7M24 24v14"/>
+      </svg>
+      <div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:14px; color:var(--ink);">Orders</div>
+    </div>
+    <div style="display:flex; flex-direction:column; align-items:center; gap:18px;">
+      <svg width="52" height="52" viewBox="0 0 48 48" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 38h28"/><rect x="13" y="26" width="6" height="10" rx="1.5"/><rect x="21" y="18" width="6" height="18" rx="1.5" fill="var(--mint)" stroke="none"/><rect x="29" y="22" width="6" height="14" rx="1.5"/>
+      </svg>
+      <div style="font-family:'Geist','Space Grotesk',sans-serif; font-weight:600; font-size:14px; color:var(--ink);">Analytics</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 07 ILLUSTRATIONS ===== -->
+<div style="position:absolute; left:140px; top:2750px;" data-drags-parent="1"><div class="sec">07 — Empty-state illustrations</div></div>
+
+<div style="position:absolute; left:140px; top:2796px; width:330px;">
+  <p class="lbl" data-drags-parent="1">Start designing</p>
+  <div class="card ctr" style="height:300px; background:radial-gradient(rgba(109,74,255,.1) 1.4px, transparent 1.5px) 0 0 / 20px 20px, var(--paper); flex-direction:column; gap:22px; padding:24px;">
+    <svg width="150" height="140" viewBox="0 0 150 140" fill="none" stroke="var(--ink)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="33" y="24" width="84" height="84" rx="10" fill="#fff"/>
+      <path d="M62 44l-9 6 5 6 4-2.5V74h16V59.5l4 2.5 5-6-9-6a8 8 0 0 1-16 0z" fill="var(--violet-100)"/>
+      <path d="M104 96l1.8 4 4 1.8-4 1.8-1.8 4-1.8-4-4-1.8 4-1.8z" fill="var(--mint)" stroke="none"/>
+      <circle cx="100" cy="106" r="3.5" fill="var(--violet)" stroke="none"/>
+    </svg>
+    <div class="wm" style="font-weight:600; font-size:18px; color:var(--ink);">Your canvas is ready</div>
+  </div>
+</div>
+<div style="position:absolute; left:510px; top:2796px; width:330px;">
+  <p class="lbl" data-drags-parent="1">Empty catalog</p>
+  <div class="card ctr" style="height:300px; background:linear-gradient(160deg, var(--violet-100), var(--paper)); flex-direction:column; gap:22px; padding:24px;">
+    <svg width="150" height="140" viewBox="0 0 150 140" fill="none" stroke="var(--ink)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M70 34H44a6 6 0 0 0-6 6v22l34 34 32-32z" fill="#fff"/>
+      <circle cx="54" cy="50" r="4" fill="var(--mint)" stroke="none"/>
+      <circle cx="104" cy="92" r="15" fill="var(--violet)" stroke="none"/>
+      <path d="M104 86v12M98 92h12" stroke="#fff"/>
+    </svg>
+    <div class="wm" style="font-weight:600; font-size:18px; color:var(--ink);">Add your first product</div>
+  </div>
+</div>
+<div style="position:absolute; left:880px; top:2796px; width:330px;">
+  <p class="lbl" data-drags-parent="1">No data yet</p>
+  <div class="card ctr" style="height:300px; background:linear-gradient(160deg, var(--paper), var(--mint-200)); flex-direction:column; gap:22px; padding:24px;">
+    <svg width="160" height="130" viewBox="0 0 160 130" fill="none" stroke="var(--ink)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M26 104h108"/>
+      <rect x="38" y="74" width="16" height="26" rx="2" fill="#fff"/>
+      <rect x="66" y="54" width="16" height="46" rx="2" fill="var(--violet)" stroke="none"/>
+      <rect x="94" y="64" width="16" height="36" rx="2" fill="#fff"/>
+      <path d="M42 50 L74 34 L102 44 L132 22" stroke="var(--mint)" stroke-width="3"/>
+      <circle cx="132" cy="22" r="4" fill="var(--mint)" stroke="none"/>
+    </svg>
+    <div class="wm" style="font-weight:600; font-size:18px; color:var(--ink);">Insights start here</div>
+  </div>
+</div>
+
+<!-- ===== 08 FEATURE CARDS ===== -->
+<div style="position:absolute; left:140px; top:3180px;" data-drags-parent="1"><div class="sec">08 — Feature spot graphics</div></div>
+
+<div style="position:absolute; left:140px; top:3226px; width:236px;">
+  <div class="card" style="height:300px; background:linear-gradient(155deg, var(--violet), var(--violet-deep)); padding:26px; display:flex; flex-direction:column; justify-content:space-between;">
+    <svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round"><rect x="10" y="10" width="12" height="12" rx="3"/><rect x="26" y="10" width="12" height="12" rx="3" fill="var(--mint)" stroke="none"/><rect x="10" y="26" width="12" height="12" rx="3"/><rect x="26" y="26" width="12" height="12" rx="3"/></svg>
+    <div>
+      <div class="wm" style="font-weight:700; font-size:25px; color:#fff; line-height:1;">Dashboard</div>
+      <div style="font-family:'Geist',sans-serif; font-size:13.5px; color:rgba(255,255,255,.82); margin-top:8px; line-height:1.5;">Everything, at a glance.</div>
+    </div>
+  </div>
+</div>
+<div style="position:absolute; left:396px; top:3226px; width:236px;">
+  <div class="card" style="height:300px; background:linear-gradient(155deg,#2A2748,var(--ink)); padding:26px; display:flex; flex-direction:column; justify-content:space-between;">
+    <svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10l-7 5 4 5 3-2v15h12V23l3 2 4-5-7-5a6 6 0 0 1-12 0z"/><path d="M30 12l1.4 3 3 1.4-3 1.4-1.4 3-1.4-3-3-1.4 3-1.4z" fill="var(--mint)" stroke="none"/></svg>
+    <div>
+      <div class="wm" style="font-weight:700; font-size:25px; color:#fff; line-height:1;">Design Studio</div>
+      <div style="font-family:'Geist',sans-serif; font-size:13.5px; color:rgba(232,230,240,.78); margin-top:8px; line-height:1.5;">Design merch that sells.</div>
+    </div>
+  </div>
+</div>
+<div style="position:absolute; left:652px; top:3226px; width:236px;">
+  <div class="card" style="height:300px; background:linear-gradient(155deg, var(--mint), var(--mint-deep)); padding:26px; display:flex; flex-direction:column; justify-content:space-between;">
+    <svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="#0a2f26" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M24 9H13a4 4 0 0 0-4 4v11l15 15 15-15z"/><circle cx="18" cy="18" r="2.5" fill="#0a2f26" stroke="none"/></svg>
+    <div>
+      <div class="wm" style="font-weight:700; font-size:25px; color:#0a2f26; line-height:1;">Catalog</div>
+      <div style="font-family:'Geist',sans-serif; font-size:13.5px; color:rgba(10,47,38,.72); margin-top:8px; line-height:1.5;">Your whole line, organized.</div>
+    </div>
+  </div>
+</div>
+<div style="position:absolute; left:908px; top:3226px; width:236px;">
+  <div class="card" style="height:300px; background:linear-gradient(155deg,#3A2F7A,var(--violet-deep)); padding:26px; display:flex; flex-direction:column; justify-content:space-between;">
+    <svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M24 10l13 7v14l-13 7-13-7V17z"/><path d="M11 17l13 7 13-7M24 24v14"/></svg>
+    <div>
+      <div class="wm" style="font-weight:700; font-size:25px; color:#fff; line-height:1;">Orders</div>
+      <div style="font-family:'Geist',sans-serif; font-size:13.5px; color:rgba(255,255,255,.82); margin-top:8px; line-height:1.5;">From cart to doorstep, tracked.</div>
+    </div>
+  </div>
+</div>
+<div style="position:absolute; left:1164px; top:3226px; width:236px;">
+  <div class="card" style="height:300px; background:linear-gradient(155deg,#211E3A,var(--d-bg)); padding:26px; display:flex; flex-direction:column; justify-content:space-between;">
+    <svg width="40" height="40" viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 38h28"/><rect x="13" y="26" width="6" height="10" rx="1.5"/><rect x="21" y="18" width="6" height="18" rx="1.5" fill="var(--mint)" stroke="none"/><rect x="29" y="22" width="6" height="14" rx="1.5"/></svg>
+    <div>
+      <div class="wm" style="font-weight:700; font-size:25px; color:#fff; line-height:1;">Analytics</div>
+      <div style="font-family:'Geist',sans-serif; font-size:13.5px; color:rgba(232,230,240,.78); margin-top:8px; line-height:1.5;">Know what moves.</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;violet&quot;: {&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#6D4AFF&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#6D4AFF&quot;,&quot;#7C5CFF&quot;,&quot;#5E3BEF&quot;,&quot;#7A3DF2&quot;],&quot;section&quot;:&quot;Brand&quot;},
+  &quot;mint&quot;: {&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#19D3A2&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#19D3A2&quot;,&quot;#20E0AC&quot;,&quot;#10C2B0&quot;,&quot;#2BD17E&quot;],&quot;section&quot;:&quot;Brand&quot;},
+  &quot;ink&quot;: {&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#15132B&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#15132B&quot;,&quot;#15162E&quot;,&quot;#161427&quot;,&quot;#101022&quot;],&quot;section&quot;:&quot;Brand&quot;}
+}">
+class Component extends DCLogic {
+  componentDidMount(){ this.applyTheme(); }
+  componentDidUpdate(){ this.applyTheme(); }
+  applyTheme(){
+    const r = document.documentElement.style;
+    const p = this.props || {};
+    if(p.violet){ r.setProperty('--violet', p.violet); }
+    if(p.mint){ r.setProperty('--mint', p.mint); }
+    if(p.ink){ r.setProperty('--ink', p.ink); }
+  }
+  renderVals(){ return {}; }
+}
+</script>
+</body>
+</html>

@@ -94,18 +94,18 @@ export default function DashboardPage() {
       )}
 
       {featured.length > 0 && (
-        <div className="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 rounded-xl p-5">
+        <div className="bg-gradient-to-r from-confidence-medium/10 via-confidence-medium/5 to-transparent border border-confidence-medium/30 rounded-xl p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center">
+              <span className="w-6 h-6 rounded-full bg-confidence-medium flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-3.5 h-3.5">
                   <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clipRule="evenodd" />
                 </svg>
               </span>
-              <h2 className="text-lg font-bold text-amber-400">Featured</h2>
-              <span className="text-xs text-amber-400/60 bg-amber-500/10 px-2 py-0.5 rounded-full">{featured.length}</span>
+              <h2 className="text-lg font-bold text-confidence-medium">Featured</h2>
+              <span className="text-xs text-confidence-medium/60 bg-confidence-medium/10 px-2 py-0.5 rounded-full">{featured.length}</span>
             </div>
-            <Link to="/review" className="text-xs text-amber-400 hover:text-amber-300 transition-colors">
+            <Link to="/review" className="text-xs text-confidence-medium hover:text-confidence-medium/80 transition-colors">
               Review all &rarr;
             </Link>
           </div>
@@ -113,7 +113,7 @@ export default function DashboardPage() {
             {featured.map((item) => (
               <div
                 key={item.id}
-                className="group relative bg-bg-secondary border border-border rounded-lg overflow-hidden hover:border-amber-500/50 transition-all cursor-pointer"
+                className="group relative bg-bg-secondary border border-border rounded-lg overflow-hidden hover:border-confidence-medium/50 transition-all cursor-pointer"
                 onClick={() => navigate('/review', { state: { openDesignId: item.id, from: '/' } })}
               >
                 <div className="relative aspect-square bg-bg-tertiary">
@@ -130,7 +130,7 @@ export default function DashboardPage() {
                   )}
                   <button
                     onClick={(e) => { e.stopPropagation(); handleUnfeature(item.id); }}
-                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/30 hover:bg-amber-600 transition-colors"
+                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-confidence-medium text-white flex items-center justify-center shadow-lg shadow-confidence-medium/30 hover:bg-confidence-medium transition-colors"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3">
                       <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clipRule="evenodd" />

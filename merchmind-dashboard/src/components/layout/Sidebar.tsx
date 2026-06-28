@@ -1,7 +1,8 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { logout, type User } from '../../firebase';
-import { getLogoUrl } from '../../assets/logos/logoConfig';
+import Logo from '../brand/Logo';
+import ThemeToggle from '../shared/ThemeToggle';
 
 const links = [
   { to: '/review', label: 'Review', icon: '#' },
@@ -18,16 +19,11 @@ const links = [
 
 export default function Sidebar({ user }: { user: User }) {
   const [open, setOpen] = useState(false);
-  const [headerLogo, setHeaderLogo] = useState<string | null>(null);
   const location = useLocation();
 
   useEffect(() => {
     setOpen(false);
   }, [location.pathname]);
-
-  useEffect(() => {
-    getLogoUrl('header').then(setHeaderLogo).catch(() => null);
-  }, []);
 
   return (
     <>
@@ -50,15 +46,14 @@ export default function Sidebar({ user }: { user: User }) {
             )}
           </svg>
         </button>
-        {headerLogo ? (
-          <img src={headerLogo} alt="MerchMind" className="h-7 object-contain" />
-        ) : (
-          <h1 className="text-base font-bold text-accent">MerchMind</h1>
-        )}
-        <div className="w-10 h-10 flex items-center justify-center">
-          {user.photoURL && (
-            <img src={user.photoURL} alt="" className="w-7 h-7 rounded-full" />
-          )}
+        <Logo markSize={24} wordmarkClassName="text-base" />
+        <div className="flex items-center gap-1">
+          <ThemeToggle />
+          <div className="w-9 h-9 flex items-center justify-center">
+            {user.photoURL && (
+              <img src={user.photoURL} alt="" className="w-7 h-7 rounded-full" />
+            )}
+          </div>
         </div>
       </div>
 
@@ -78,12 +73,8 @@ export default function Sidebar({ user }: { user: User }) {
         ${open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
       `}>
         <div className="p-5 border-b border-border">
-          {headerLogo ? (
-            <img src={headerLogo} alt="MerchMind" className="h-8 object-contain mb-1" />
-          ) : (
-            <h1 className="text-lg font-bold text-accent">MerchMind</h1>
-          )}
-          <p className="text-xs text-text-tertiary mt-0.5">Spinach The Cow Merch Pipe</p>
+          <Logo markSize={28} wordmarkClassName="text-lg" />
+          <p className="text-xs text-text-tertiary mt-1.5">Spinach The Cow Merch Pipe</p>
         </div>
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {links.map((link) => (
@@ -113,12 +104,15 @@ export default function Sidebar({ user }: { user: User }) {
               {user.displayName || user.email}
             </span>
           </div>
-          <button
-            onClick={logout}
-            className="w-full px-3 py-1.5 rounded-lg text-xs text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary transition-colors text-left"
-          >
-            Sign out
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={logout}
+              className="flex-1 px-3 py-1.5 rounded-lg text-xs text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary transition-colors text-left"
+            >
+              Sign out
+            </button>
+            <ThemeToggle />
+          </div>
         </div>
       </aside>
     </>

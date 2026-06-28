@@ -164,7 +164,7 @@ function AiReasoningSection({ design, products }: { design: DesignOut; products:
         className="w-full flex items-center justify-between p-3 hover:bg-bg-tertiary/50 transition-colors text-left"
       >
         <div className="flex items-center gap-2">
-          <span className="text-purple-400 text-sm">&#9670;</span>
+          <span className="text-accent text-sm">&#9670;</span>
           <span className="text-sm font-medium text-text-primary">Why did the AI create this?</span>
         </div>
         <svg
@@ -185,7 +185,7 @@ function AiReasoningSection({ design, products }: { design: DesignOut; products:
             <>
               {hasTrend && (
                 <div>
-                  <p className="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-1.5">Trend Source</p>
+                  <p className="text-xs font-semibold text-accent uppercase tracking-wide mb-1.5">Trend Source</p>
                   <p className="text-sm text-text-secondary leading-relaxed">
                     {design.trend_source && (
                       <>Spotted on <span className="text-text-primary font-medium">{SOURCE_LABELS[design.trend_source] || design.trend_source}</span></>
@@ -216,7 +216,7 @@ function AiReasoningSection({ design, products }: { design: DesignOut; products:
 
               {hasQualityBreakdown && (
                 <div>
-                  <p className="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-1.5">Quality Assessment</p>
+                  <p className="text-xs font-semibold text-accent uppercase tracking-wide mb-1.5">Quality Assessment</p>
                   <p className="text-sm text-text-secondary leading-relaxed">
                     {'This '}
                     {ARCHETYPE_LABELS[design.archetype]?.toLowerCase() || design.archetype.replace(/_/g, ' ')}
@@ -244,7 +244,7 @@ function AiReasoningSection({ design, products }: { design: DesignOut; products:
 
               {products.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-1.5">Product Selection</p>
+                  <p className="text-xs font-semibold text-accent uppercase tracking-wide mb-1.5">Product Selection</p>
                   <p className="text-sm text-text-secondary leading-relaxed">
                     {'Assigned to '}
                     <span className="text-text-primary font-medium">{products.length} product type{products.length !== 1 ? 's' : ''}</span>
@@ -266,7 +266,7 @@ function AiReasoningSection({ design, products }: { design: DesignOut; products:
 
               {hasTextScoring && (
                 <div>
-                  <p className="text-xs font-semibold text-purple-400 uppercase tracking-wide mb-1.5">Text Selection</p>
+                  <p className="text-xs font-semibold text-accent uppercase tracking-wide mb-1.5">Text Selection</p>
                   <p className="text-sm text-text-secondary leading-relaxed mb-2">
                     {'The AI evaluated '}
                     <span className="text-text-primary font-medium">{design.text_concept_scoring!.candidates.length} text candidates</span>
@@ -345,8 +345,8 @@ function DesignCard({ item, action, onClick, onToggleFeatured }: {
           onClick={handleStar}
           className={`absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer ${
             item.is_featured
-              ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
-              : 'bg-black/40 text-white/60 opacity-0 group-hover:opacity-100 hover:bg-black/60 hover:text-amber-400'
+              ? 'bg-confidence-medium text-white shadow-lg shadow-confidence-medium/30'
+              : 'bg-black/40 text-white/60 opacity-0 group-hover:opacity-100 hover:bg-black/60 hover:text-confidence-medium'
           }`}
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
@@ -364,7 +364,7 @@ function DesignCard({ item, action, onClick, onToggleFeatured }: {
         {/* Revisit badge overlay */}
         {(item.revisit_count ?? 0) > 0 && (
           <div className="absolute top-2 left-2">
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase bg-blue-500/80 text-white backdrop-blur-sm">
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase bg-regen/80 text-white backdrop-blur-sm">
               Revisit{item.revisit_count! > 1 ? ` x${item.revisit_count}` : ''}
             </span>
           </div>
@@ -381,7 +381,7 @@ function DesignCard({ item, action, onClick, onToggleFeatured }: {
           <div className="flex items-center gap-1.5 mt-1.5">
             <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${
               item.classification === 'collection'
-                ? 'bg-purple-500/20 text-purple-400'
+                ? 'bg-accent/20 text-accent'
                 : 'bg-accent/20 text-accent'
             }`}>
               {item.classification === 'collection' ? 'Collection' : 'Idea'}
@@ -402,9 +402,9 @@ function DesignCard({ item, action, onClick, onToggleFeatured }: {
           </span>
           {item.image_api_used && (
             <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-              item.image_api_used === 'flux_schnell' ? 'bg-emerald-500/15 text-emerald-400' :
-              item.image_api_used === 'ideogram' ? 'bg-violet-500/15 text-violet-400' :
-              'bg-sky-500/15 text-sky-400'
+              item.image_api_used === 'flux_schnell' ? 'bg-approve/15 text-approve' :
+              item.image_api_used === 'ideogram' ? 'bg-violet/15 text-violet' :
+              'bg-bg-tertiary text-text-secondary'
             }`}>
               {item.image_api_used === 'flux_schnell' ? 'Flux' : item.image_api_used === 'dalle3' ? 'DALL·E' : item.image_api_used === 'ideogram' ? 'Ideogram' : item.image_api_used}
             </span>
@@ -536,11 +536,11 @@ function TrendApprovalGate({ batchId, onGenerationStarted, onCancelled }: { batc
   if (loading) return <div className="bg-bg-secondary border border-accent/30 rounded-xl p-5 mb-6 text-text-secondary text-sm">Loading trends…</div>;
 
   return (
-    <div className="bg-bg-secondary border border-amber-500/40 rounded-xl p-5 mb-6">
+    <div className="bg-bg-secondary border border-confidence-medium/40 rounded-xl p-5 mb-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+            <span className="w-2 h-2 rounded-full bg-confidence-medium inline-block" />
             Trend Approval Gate
           </h3>
           <p className="text-xs text-text-secondary mt-0.5">
@@ -590,7 +590,7 @@ function TrendApprovalGate({ batchId, onGenerationStarted, onCancelled }: { batc
       )}
 
       {!loading && pending.length === 0 && approved.length === 0 && (
-        <p className="text-xs text-amber-400 mb-3">
+        <p className="text-xs text-confidence-medium mb-3">
           No trends approved. Restore a trend below to generate, or cancel the batch to start over.
         </p>
       )}
@@ -635,7 +635,7 @@ function TrendApprovalGate({ batchId, onGenerationStarted, onCancelled }: { batc
                       </span>
                     )}
                     {t.risk_flag && t.risk_flag !== 'none' && (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${t.risk_flag === 'hard' ? 'bg-reject/20 text-reject' : 'bg-amber-500/20 text-amber-400'}`}>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${t.risk_flag === 'hard' ? 'bg-reject/20 text-reject' : 'bg-confidence-medium/20 text-confidence-medium'}`}>
                         ⚠ {t.risk_flag}
                       </span>
                     )}
@@ -698,7 +698,7 @@ function TrendApprovalGate({ batchId, onGenerationStarted, onCancelled }: { batc
                   {/* Why this shirt */}
                   {t.claude_reasoning ? (
                     <div>
-                      <p className="text-[10px] font-semibold text-purple-400 uppercase tracking-wide mb-1">Why this shirt</p>
+                      <p className="text-[10px] font-semibold text-accent uppercase tracking-wide mb-1">Why this shirt</p>
                       <p className="text-sm text-text-secondary leading-relaxed">{t.claude_reasoning}</p>
                     </div>
                   ) : (
@@ -708,7 +708,7 @@ function TrendApprovalGate({ batchId, onGenerationStarted, onCancelled }: { batc
                   {/* Score breakdown */}
                   <div className="flex gap-4">
                     <div>
-                      <p className="text-[10px] font-semibold text-purple-400 uppercase tracking-wide mb-1">Score Breakdown</p>
+                      <p className="text-[10px] font-semibold text-accent uppercase tracking-wide mb-1">Score Breakdown</p>
                       <div className="flex gap-3">
                         <div className="text-center">
                           <span className="text-sm font-bold text-text-primary">{t.trend_score}</span>
@@ -727,7 +727,7 @@ function TrendApprovalGate({ batchId, onGenerationStarted, onCancelled }: { batc
 
                     {/* Generator recommendation */}
                     <div className="flex-1">
-                      <p className="text-[10px] font-semibold text-purple-400 uppercase tracking-wide mb-1">Suggested Generator</p>
+                      <p className="text-[10px] font-semibold text-accent uppercase tracking-wide mb-1">Suggested Generator</p>
                       <p className="text-xs text-text-primary font-medium">{genOption?.label ?? gen}</p>
                       {genOption?.description && (
                         <p className="text-[10px] text-text-tertiary mt-0.5">{genOption.description}</p>
@@ -737,7 +737,7 @@ function TrendApprovalGate({ batchId, onGenerationStarted, onCancelled }: { batc
 
                   {/* Risk reason */}
                   {t.risk_flag && t.risk_flag !== 'none' && t.risk_reason && (
-                    <div className={`p-2 rounded-lg text-xs ${t.risk_flag === 'hard' ? 'bg-reject/10 text-reject' : 'bg-amber-500/10 text-amber-400'}`}>
+                    <div className={`p-2 rounded-lg text-xs ${t.risk_flag === 'hard' ? 'bg-reject/10 text-reject' : 'bg-confidence-medium/10 text-confidence-medium'}`}>
                       <span className="font-semibold">Risk ({t.risk_flag}):</span> {t.risk_reason}
                     </div>
                   )}
@@ -886,7 +886,7 @@ function ScheduleDropModal({ designId, onClose, onScheduled }: {
           <button
             onClick={handleSchedule}
             disabled={scheduling}
-            className="flex-1 py-2.5 rounded-lg bg-blue-500 text-white font-semibold text-sm hover:bg-blue-500/90 disabled:opacity-50 transition-colors"
+            className="flex-1 py-2.5 rounded-lg bg-regen text-white font-semibold text-sm hover:bg-regen/90 disabled:opacity-50 transition-colors"
           >
             {scheduling ? 'Scheduling...' : 'Schedule'}
           </button>
@@ -997,18 +997,18 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
               >
                 Reject
               </button>
-              <button onClick={onArchive} className="py-2.5 px-3 rounded-lg bg-amber-500/20 text-amber-400 font-semibold text-sm hover:bg-amber-500/30 transition-colors">
+              <button onClick={onArchive} className="py-2.5 px-3 rounded-lg bg-confidence-medium/20 text-confidence-medium font-semibold text-sm hover:bg-confidence-medium/30 transition-colors">
                 Archive
               </button>
-              <button onClick={onRevisit} className="py-2.5 px-3 rounded-lg bg-blue-500/20 text-blue-400 font-semibold text-sm hover:bg-blue-500/30 transition-colors">
+              <button onClick={onRevisit} className="py-2.5 px-3 rounded-lg bg-regen/20 text-regen font-semibold text-sm hover:bg-regen/30 transition-colors">
                 Revisit
               </button>
-              <button onClick={() => setShowSuggestDrawer(true)} className="py-2.5 px-3 rounded-lg bg-purple-500/20 text-purple-400 font-semibold text-sm hover:bg-purple-500/30 transition-colors">
+              <button onClick={() => setShowSuggestDrawer(true)} className="py-2.5 px-3 rounded-lg bg-accent/20 text-accent font-semibold text-sm hover:bg-accent/30 transition-colors">
                 Suggest
               </button>
               <button
                 onClick={() => setShowScheduleDropDialog(true)}
-                className="py-2.5 px-3 rounded-lg bg-blue-500/20 text-blue-400 font-semibold text-sm hover:bg-blue-500/30 transition-colors"
+                className="py-2.5 px-3 rounded-lg bg-regen/20 text-regen font-semibold text-sm hover:bg-regen/30 transition-colors"
               >
                 Schedule Drop
               </button>
@@ -1060,8 +1060,8 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
                 onClick={() => { setIsFeatured(!isFeatured); onToggleFeatured?.(); }}
                 className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shrink-0 ${
                   isFeatured
-                    ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
-                    : 'bg-bg-tertiary text-text-tertiary hover:text-amber-400 hover:bg-amber-500/20'
+                    ? 'bg-confidence-medium text-white shadow-lg shadow-confidence-medium/30'
+                    : 'bg-bg-tertiary text-text-tertiary hover:text-confidence-medium hover:bg-confidence-medium/20'
                 }`}
                 title={isFeatured ? 'Remove from Featured' : 'Mark as Featured'}
               >
@@ -1075,7 +1075,7 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
               <StatusBadge status={design.archetype} />
               <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase ${
                 design.classification === 'collection'
-                  ? 'bg-purple-500/20 text-purple-400'
+                  ? 'bg-accent/20 text-accent'
                   : 'bg-accent/20 text-accent'
               }`}>
                 {design.classification === 'collection' ? 'Collection' : 'Design Idea'}
@@ -1261,7 +1261,7 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
                   </div>
 
                   {deselectedTypes.length > 0 && !noneSelected && (
-                    <p className="text-xs text-amber-400 mb-3">
+                    <p className="text-xs text-confidence-medium mb-3">
                       {deselectedTypes.map((p) => formatProductType(p.product_type)).join(', ')} will be permanently removed.
                     </p>
                   )}

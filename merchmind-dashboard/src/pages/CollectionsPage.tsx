@@ -164,7 +164,7 @@ export default function CollectionsPage() {
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                         c.status === 'ready' ? 'bg-approve/15 text-approve' :
                         c.status === 'generating' ? 'bg-accent/15 text-accent' :
-                        c.status === 'published' ? 'bg-blue-500/15 text-blue-400' :
+                        c.status === 'published' ? 'bg-regen/15 text-regen' :
                         'bg-bg-tertiary text-text-tertiary'
                       }`}>
                         {c.status}
