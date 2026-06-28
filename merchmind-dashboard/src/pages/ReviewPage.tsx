@@ -1353,6 +1353,27 @@ export default function ReviewPage() {
     return () => clearInterval(interval);
   }, [runningBatch, checkBatchStatus]);
 
+  // Bootstrap poll: after triggering a batch, the worker creates the batch row
+  // asynchronously. Poll until it appears (then the effect above takes over),
+  // with a safety cap so a never-started batch doesn't poll forever.
+  useEffect(() => {
+    if (!triggering) return;
+    let attempts = 0;
+    const poll = () => {
+      attempts += 1;
+      checkBatchStatus();
+      if (attempts >= 20) setTriggering(false);  // ~30s cap (20 × 1.5s)
+    };
+    poll();  // check immediately, then on an interval
+    const interval = setInterval(poll, 1500);
+    return () => clearInterval(interval);
+  }, [triggering, checkBatchStatus]);
+
+  // Once the batch is detected, stop the bootstrap poll.
+  useEffect(() => {
+    if (runningBatch && triggering) setTriggering(false);
+  }, [runningBatch, triggering]);
+
   const [showBatchConfig, setShowBatchConfig] = useState(false);
 
   const handleTriggerClick = async () => {
@@ -1367,9 +1388,12 @@ export default function ReviewPage() {
     setTriggering(true);
     try {
       await triggerBatch(config);
-      setTimeout(checkBatchStatus, 2000);
-    } catch { /* ignore */ }
-    setTriggering(false);
+      // Keep `triggering` true — the Celery worker creates the batch row
+      // asynchronously, so the bootstrap poll below watches for it and shows
+      // the progress banner as soon as it appears.
+    } catch {
+      setTriggering(false);
+    }
   };
 
   const handleRefresh = () => {
