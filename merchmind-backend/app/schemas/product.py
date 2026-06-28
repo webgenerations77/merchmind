@@ -24,6 +24,7 @@ class ProductOut(BaseModel):
     published_at: Optional[datetime]
     unpublished_at: Optional[datetime]
     drop_id: Optional[UUID] = None
+    target_store: Optional[str] = "store_1"
     created_at: datetime
     concept_name: Optional[str] = None
     batch_id: Optional[UUID] = None
@@ -34,3 +35,4 @@ class ProductOut(BaseModel):
 class ProductUpdate(BaseModel):
     retail_price: Optional[float] = None
     publish_status: Optional[str] = None
+    target_store: Optional[str] = None

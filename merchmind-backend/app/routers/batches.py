@@ -71,6 +71,7 @@ def trigger_batch(
     trend_sources = config.get("trend_sources")
     style_filter = config.get("style_filter")
     product_focus = config.get("product_focus")
+    pause_after_scoring = config.get("pause_after_scoring", False)
 
     task = run_weekly_batch.delay(
         None,
@@ -79,6 +80,7 @@ def trigger_batch(
         trend_sources=trend_sources,
         style_filter=style_filter,
         product_focus=product_focus,
+        pause_after_scoring=pause_after_scoring,
     )
     return _envelope({
         "task_id": task.id,
@@ -88,7 +90,35 @@ def trigger_batch(
         "trend_sources": trend_sources,
         "style_filter": style_filter,
         "product_focus": product_focus,
+        "pause_after_scoring": pause_after_scoring,
     })
+
+
+@router.post("/{batch_id}/generate-approved")
+def generate_approved(
+    batch_id: UUID,
+    body: Optional[dict] = None,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key),
+):
+    """
+    Start design generation for approved trends.
+    Called after the user has approved/rejected trends in the approval gate.
+    """
+    batch = db.query(Batch).filter(Batch.id == batch_id).first()
+    if not batch:
+        raise HTTPException(404, f"Batch {batch_id} not found")
+    if batch.status not in ("pending_approval", "running"):
+        raise HTTPException(409, f"Batch {batch_id} is in status '{batch.status}', cannot generate")
+
+    config = body or {}
+    from app.tasks.batch_pipeline import generate_approved_designs
+    task = generate_approved_designs.delay(
+        str(batch_id),
+        style_filter=config.get("style_filter"),
+        product_focus=config.get("product_focus"),
+    )
+    return _envelope({"task_id": task.id, "message": "Generation started for approved trends"})
 
 
 @router.post("/{batch_id}/cancel")

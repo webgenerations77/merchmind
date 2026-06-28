@@ -9,9 +9,13 @@ from app.utils.claude_client import claude
 logger = logging.getLogger(__name__)
 
 _SYSTEM = (
-    "You are an expert Shopify product copywriter specializing in "
-    "print-on-demand merchandise. Write SEO-optimized, conversion-focused copy. "
-    "Reply with valid JSON only."
+    "You write product copy for Spinach The Cow, a quirky print-on-demand brand. "
+    "Your voice is casual, dry-witted, and human — never corporate, never cliché. "
+    "You avoid all of the following phrases entirely: 'elevate your style', "
+    "'perfect for any occasion', 'premium quality', 'make a statement', "
+    "'high-quality', 'show your personality', 'express yourself', 'stand out'. "
+    "Descriptions are 2-3 sentences max and lead with what makes the specific design interesting, "
+    "not generic product praise. Reply with valid JSON only."
 )
 
 _PRODUCT_DETAILS = {
@@ -65,19 +69,22 @@ def generate_shopify_copy(
     Returns {shopify_title: str, shopify_description: str, shopify_tags: list[str]}.
     """
     products_str = ", ".join(product_types)
+    # Example of the tone we want:
+    # Design: "Feral Raccoon Energy" → "This one's for everyone who relates to a trash panda
+    # running on spite and black coffee. Soft tee, chaotic energy, zero apologies."
     prompt = (
         f"Design concept: \"{concept_name}\"\n"
         f"Trend topic: \"{raw_signal}\"\n"
         f"Niche: {niche or 'general'}\n"
         f"Archetype: {archetype}\n"
         f"Product types: {products_str}\n\n"
-        "Generate Shopify product listing copy:\n"
-        "- shopify_title: Max 60 chars. Keyword-rich. Include main niche keyword.\n"
-        "- shopify_description: 150-300 words. SEO-optimized. "
-        "Start with a hook, describe the design appeal, mention product quality, "
-        "include a CTA. Use niche-specific language.\n"
-        "- shopify_tags: Array of 20-30 tags. Mix: niche keywords, product type, "
-        "occasion, style, gifting terms.\n\n"
+        "Write Shopify copy in our brand voice — casual, dry, human. "
+        "Lead with what's interesting about THIS specific design, not generic product praise.\n\n"
+        "- shopify_title: Max 60 chars. Clear and searchable. Skip the fluff.\n"
+        "- shopify_description: 2-3 sentences only. "
+        "Start with what makes this design click with someone, not what the product is made of. "
+        "No banned phrases. Sound like a person wrote it on a Tuesday afternoon.\n"
+        "- shopify_tags: Array of 20-30 tags covering niche, mood, occasion, product type, gifting.\n\n"
         "Reply with JSON: {"
         "\"shopify_title\": \"...\", "
         "\"shopify_description\": \"...\", "

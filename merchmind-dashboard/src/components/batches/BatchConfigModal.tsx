@@ -21,6 +21,7 @@ export default function BatchConfigModal({ onRun, onClose }: { onRun: (config: B
   const [sources, setSources] = useState<Set<string>>(new Set(TREND_SOURCES.map((s) => s.key)));
   const [styleFilter, setStyleFilter] = useState('');
   const [productFocus, setProductFocus] = useState<Set<string>>(new Set());
+  const [pauseAfterScoring, setPauseAfterScoring] = useState(true);
 
   const toggleSource = (key: string) => {
     setSources((prev) => {
@@ -52,6 +53,9 @@ export default function BatchConfigModal({ onRun, onClose }: { onRun: (config: B
     }
     if (productFocus.size > 0) {
       config.product_focus = Array.from(productFocus);
+    }
+    if (pauseAfterScoring) {
+      config.pause_after_scoring = true;
     }
     onRun(config);
   };
@@ -145,6 +149,22 @@ export default function BatchConfigModal({ onRun, onClose }: { onRun: (config: B
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Trend approval gate toggle */}
+        <div>
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <div
+              onClick={() => setPauseAfterScoring(!pauseAfterScoring)}
+              className={`relative w-9 h-5 rounded-full transition-colors ${pauseAfterScoring ? 'bg-accent' : 'bg-bg-tertiary border border-border'}`}
+            >
+              <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${pauseAfterScoring ? 'translate-x-4' : ''}`} />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-text-primary">Trend Approval Gate</p>
+              <p className="text-xs text-text-tertiary">Pause after scoring — review and approve trends before images are generated</p>
+            </div>
+          </label>
         </div>
 
         {/* Cost estimate */}

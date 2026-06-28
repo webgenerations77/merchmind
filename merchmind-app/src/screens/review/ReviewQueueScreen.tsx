@@ -87,6 +87,10 @@ export default function ReviewQueueScreen({ navigation }: ReviewQueueScreenProps
     { key: 'niche', label: 'Niche' },
   ];
 
+  const totalCount = queue.length;
+  const reviewedCount = acted.length;
+  const progressPct = totalCount > 0 ? Math.round((reviewedCount / totalCount) * 100) : 0;
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -110,6 +114,18 @@ export default function ReviewQueueScreen({ navigation }: ReviewQueueScreenProps
           ))}
         </View>
       </View>
+
+      {/* Feature #7: Review progress bar */}
+      {totalCount > 0 && (
+        <View style={styles.progressContainer}>
+          <Text style={styles.progressLabel}>
+            {reviewedCount} of {totalCount} reviewed · {progressPct}%
+          </Text>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
+          </View>
+        </View>
+      )}
 
       {pending.length === 0 ? (
         <EmptyState
@@ -195,4 +211,27 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   approvedLabel: { ...typography.body, color: colors.confidence.high },
+  progressContainer: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  progressLabel: {
+    ...typography.caption,
+    color: colors.text.secondary,
+    marginBottom: 6,
+  },
+  progressTrack: {
+    width: '100%',
+    height: 4,
+    backgroundColor: colors.bg.tertiary,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 4,
+    backgroundColor: colors.accent,
+    borderRadius: 2,
+  },
 });

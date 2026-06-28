@@ -74,7 +74,7 @@ def _emit_progress(batch_id: str, step: int, total: int, message: str, data: dic
     acks_late=True,
     name="app.tasks.batch_pipeline.run_weekly_batch",
 )
-def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional[int] = None, max_trends: Optional[int] = 30, trend_sources: Optional[list] = None, style_filter: Optional[str] = None, product_focus: Optional[list] = None):
+def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional[int] = None, max_trends: Optional[int] = 30, trend_sources: Optional[list] = None, style_filter: Optional[str] = None, product_focus: Optional[list] = None, pause_after_scoring: bool = False):
     """
     Main Sunday batch task. Creates or resumes a batch and runs all 8 pipeline steps.
     Optional max_designs/max_trends limit output for testing.
@@ -288,9 +288,36 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                 trend.status = "rejected"
         db.commit()
 
+        # Pre-classify archetype for each queued trend (for display in approval gate)
+        for trend in queued_trends:
+            if not trend.proposed_archetype:
+                try:
+                    niche_name = ""
+                    if trend.niche_cluster_id:
+                        cluster = db.query(NicheCluster).filter(NicheCluster.id == trend.niche_cluster_id).first()
+                        if cluster:
+                            niche_name = cluster.name
+                    result = classify_archetype(trend.raw_signal, trend.source, niche_name)
+                    archetype = result["archetype"] if isinstance(result, dict) else result
+                    trend.proposed_archetype = archetype
+                    if not trend.selected_generator:
+                        api = select_image_api(archetype)
+                        trend.selected_generator = api or "text_only"
+                except Exception:
+                    pass
+        db.commit()
+
         batch.queued_count = len(queued_trends)
         db.commit()
         logger.info(f"Queued {len(queued_trends)} trends for design generation")
+
+        # Trend approval gate: pause and wait for human approval before generating
+        if pause_after_scoring or _settings.REQUIRE_TREND_APPROVAL:
+            batch.status = "pending_approval"
+            db.commit()
+            _emit_progress(bid, 3, 8, f"Awaiting trend approval — {len(queued_trends)} trends scored")
+            logger.info(f"Batch {bid}: pending_approval — {len(queued_trends)} trends awaiting approval")
+            return
 
         # Steps 4-7: Generate designs for each queued trend (run inline, not as subtasks)
         _emit_progress(bid, 4, 8, f"Generating {len(queued_trends)} designs")
@@ -438,8 +465,27 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
             archetype = classify_result
         logger.info(f"design_task[{trend_id[:8]}] archetype={archetype} bias={archetype_bias}")
 
-        # 4b: Select image API
-        image_api = select_image_api(archetype)
+        # 4b: Select image API — respect user's generator selection from approval gate
+        if trend.selected_generator:
+            sg = trend.selected_generator
+            if sg == "text_only":
+                image_api = None
+                archetype = "text_only"
+                logger.info(f"design_task[{trend_id[:8]}] generator override: text_only")
+            elif sg == "ideogram":
+                image_api = "ideogram"
+                if archetype != "image_with_text":
+                    archetype = "image_with_text"
+                    iwt_meta = {}
+                logger.info(f"design_task[{trend_id[:8]}] generator override: ideogram → image_with_text")
+            else:
+                image_api = sg  # dalle3 or flux_schnell
+                if archetype == "image_with_text":
+                    archetype = "illustration"
+                    iwt_meta = {}
+                logger.info(f"design_task[{trend_id[:8]}] generator override: {sg}")
+        else:
+            image_api = select_image_api(archetype)
 
         # Create design record
         design = Design(
@@ -900,3 +946,137 @@ def _summarize_error(exc: Exception, step: str) -> str:
         "marketing": f"Marketing asset generation failed: {etype}",
     }
     return summaries.get(step, f"{step} failed: {etype} — {msg[:100]}")
+
+
+@celery_app.task(
+    bind=True,
+    max_retries=2,
+    default_retry_delay=60,
+    acks_late=True,
+    name="app.tasks.batch_pipeline.generate_approved_designs",
+)
+def generate_approved_designs(self, batch_id: str, style_filter: Optional[str] = None, product_focus: Optional[list] = None):
+    """
+    Phase 2 of the approval-gated batch: generate designs for approved trends only.
+    Triggered via POST /batches/{id}/generate-approved after user approves trends.
+    """
+    db = SessionLocal()
+    batch = None
+    try:
+        batch = db.query(Batch).filter(Batch.id == batch_id).first()
+        if not batch:
+            raise ValueError(f"Batch {batch_id} not found")
+
+        if batch.status not in ("pending_approval", "running"):
+            raise ValueError(f"Batch {batch_id} is in status '{batch.status}', cannot generate designs")
+
+        batch.status = "running"
+        db.commit()
+
+        approved_trends = db.query(Trend).filter(
+            Trend.batch_id == batch_id,
+            Trend.status == "queued",
+            Trend.approval_status == "approved",
+        ).order_by(Trend.final_score.desc()).all()
+
+        if not approved_trends:
+            batch.status = "complete"
+            batch.run_completed_at = datetime.utcnow()
+            db.commit()
+            _emit_progress(batch_id, 8, 8, "No approved trends — batch complete")
+            return
+
+        settings_row = db.query(AppSettings).first()
+        quality_threshold = settings_row.quality_threshold if settings_row else 28
+        trend_boost_max = float(settings_row.trend_boost_max) if settings_row else 0.20
+        base_markup = settings_row.base_markup if settings_row else {}
+        floor_prices = settings_row.floor_prices if settings_row else {}
+        back_logo_url = settings_row.back_logo_url if settings_row else None
+        back_logo_products = settings_row.back_logo_products if settings_row else ["tshirt", "hat"]
+        marketing_generation_enabled = settings_row.marketing_generation_enabled if settings_row else False
+
+        _emit_progress(batch_id, 4, 8, f"Generating {len(approved_trends)} approved designs")
+        approved_count = 0
+        _BIAS_ROTATION = ("image_only", "text", "image_text", "image_with_text")
+
+        for i, trend in enumerate(approved_trends):
+            concept = to_title_case(trend.raw_signal[:100])
+            item = BatchItem(
+                batch_id=batch.id,
+                trend_id=trend.id,
+                concept_name=concept,
+                status="running",
+                started_at=datetime.utcnow(),
+            )
+            db.add(item)
+            db.commit()
+            db.refresh(item)
+
+            try:
+                _emit_progress(
+                    batch_id, 4, 8,
+                    f"Designing {i + 1}/{len(approved_trends)}: {trend.raw_signal[:40]}",
+                    {"current": i + 1, "total": len(approved_trends)},
+                )
+                archetype_bias = _BIAS_ROTATION[i % len(_BIAS_ROTATION)]
+                pipeline_cfg = {
+                    "quality_threshold": quality_threshold,
+                    "trend_boost_max": trend_boost_max,
+                    "base_markup": base_markup,
+                    "floor_prices": floor_prices,
+                    "back_logo_enabled": True,
+                    "back_logo_url": back_logo_url,
+                    "back_logo_products": back_logo_products,
+                    "archetype_bias": archetype_bias,
+                    "marketing_generation_enabled": marketing_generation_enabled,
+                    "_batch_item_id": str(item.id),
+                }
+                if style_filter:
+                    pipeline_cfg["style_filter"] = style_filter
+                if product_focus:
+                    pipeline_cfg["product_focus"] = product_focus
+
+                _generate_design_for_trend(str(trend.id), str(batch.id), pipeline_cfg)
+                approved_count += 1
+
+                db.refresh(item)
+                design = db.query(Design).filter(
+                    Design.batch_id == batch.id, Design.trend_id == trend.id
+                ).order_by(Design.created_at.desc()).first()
+                if design:
+                    item.design_id = design.id
+                    products = db.query(Product).filter(Product.design_id == design.id).all()
+                    item.product_types = [p.product_type for p in products]
+                item.status = "success"
+                item.completed_at = datetime.utcnow()
+                db.commit()
+
+            except Exception as e:
+                logger.error(f"generate_approved: Design gen failed for trend {trend.id}: {e}")
+                _log_batch_error(batch, db, f"Design error for trend {trend.id}: {type(e).__name__}: {e}")
+                import traceback
+                item.status = "failed"
+                item.failed_step = _detect_failed_step(e)
+                item.error_summary = _summarize_error(e, item.failed_step or "design_generation")
+                item.error_detail = traceback.format_exc()
+                item.completed_at = datetime.utcnow()
+                db.commit()
+
+        batch.approved_count = approved_count
+        batch.status = "complete"
+        batch.run_completed_at = datetime.utcnow()
+        db.commit()
+
+        _emit_progress(batch_id, 8, 8, "Batch complete — all approved designs generated")
+        notify_batch_ready(batch_id, len(approved_trends))
+        logger.info(f"generate_approved_designs: batch {batch_id} complete ({approved_count}/{len(approved_trends)} designs)")
+
+    except Exception as e:
+        logger.exception(f"generate_approved_designs crashed: {e}")
+        if batch:
+            batch.status = "failed"
+            _log_batch_error(batch, db, f"Generation crash: {e}")
+            db.commit()
+        raise self.retry(exc=e, countdown=300)
+    finally:
+        db.close()

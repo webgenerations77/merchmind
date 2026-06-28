@@ -58,6 +58,24 @@ class Settings(BaseSettings):
     # Expo Push
     EXPO_ACCESS_TOKEN: str = ""
 
+    # Shopify Store 1 (primary / Spinach The Cow HQ)
+    STORE_1_NAME: str = "Spinach The Cow"
+    STORE_1_SHOPIFY_URL: str = ""
+    STORE_1_ACCESS_TOKEN: str = ""
+
+    # Shopify Store 2 (secondary / overflow store)
+    STORE_2_NAME: str = "Store 2"
+    STORE_2_SHOPIFY_URL: str = ""
+    STORE_2_ACCESS_TOKEN: str = ""
+
+    # Generator cost config (USD per image, for UI display)
+    DALLE3_COST_PER_IMAGE: float = 0.04
+    IDEOGRAM_COST_PER_IMAGE: float = 0.08
+    FLUX_SCHNELL_COST_PER_IMAGE: float = 0.003
+
+    # Batch settings
+    REQUIRE_TREND_APPROVAL: bool = False  # Pause batch after scoring for human trend approval
+
     # App
     APP_API_KEY: str = "dev-api-key"
     ENVIRONMENT: str = "development"

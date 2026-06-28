@@ -73,6 +73,8 @@ def update_product(
         product.retail_price = body.retail_price
     if body.publish_status is not None:
         product.publish_status = body.publish_status
+    if body.target_store is not None:
+        product.target_store = body.target_store
     db.commit()
     return _envelope(ProductOut.model_validate(product).model_dump())
 

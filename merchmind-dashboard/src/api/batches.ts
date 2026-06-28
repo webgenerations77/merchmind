@@ -26,6 +26,7 @@ export interface BatchConfig {
   trend_sources?: string[];
   style_filter?: string;
   product_focus?: string[];
+  pause_after_scoring?: boolean;
 }
 
 export async function triggerBatch(config?: BatchConfig): Promise<{ task_id: string; message: string }> {

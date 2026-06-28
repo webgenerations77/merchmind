@@ -1,10 +1,10 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useReviewStore } from '../stores/reviewStore';
 import { getDesign, getReviewQueue, updateShopifyCopy } from '../api/designs';
 import { listBatches, triggerBatch, cancelBatch, type BatchConfig } from '../api/batches';
 import BatchConfigModal from '../components/batches/BatchConfigModal';
-import { listProducts } from '../api/products';
+import { listProducts, updateProduct } from '../api/products';
 import { getApiBalance, type ApiBalanceResult } from '../api/health';
 import MockupTabs from '../components/shared/MockupTabs';
 import SuggestDrawer from '../components/shared/SuggestDrawer';
@@ -13,6 +13,9 @@ import ConfidenceBadge from '../components/shared/ConfidenceBadge';
 import StatusBadge from '../components/shared/StatusBadge';
 import { formatCurrency, formatProductType, toTitleCase } from '../utils/formatters';
 import { calculateCostBreakdown } from '../utils/profitCalc';
+import { getBatchTrends, approveTrend, rejectTrend, bulkTrendAction, generateApproved, setTrendGenerator, type TrendOut } from '../api/trends';
+import { GENERATOR_OPTIONS, GENERATOR_DEFAULT_BY_ARCHETYPE, getGeneratorOption } from '../constants/generatorCosts';
+import { getLogoUrl } from '../assets/logos/logoConfig';
 
 function BatchProgress({ batch, productCount, designCount, onCancel }: { batch: BatchOut; productCount: number; designCount: number; onCancel: () => void }) {
   const [elapsed, setElapsed] = useState(0);
@@ -417,6 +420,242 @@ function DesignCard({ item, action, onClick, onToggleFeatured }: {
   );
 }
 
+// ─── Feature #1 & #2: Trend Approval Gate ─────────────────────────────────
+
+const SOURCE_LABELS_GATE: Record<string, string> = {
+  google: 'Google Trends',
+  reddit: 'Reddit',
+  twitter: 'Twitter/X',
+  seasonal: 'Seasonal',
+  manual: 'Manual',
+};
+
+function GeneratorSelector({ trend, onChange }: { trend: TrendOut; onChange: (g: string) => void }) {
+  const current = trend.selected_generator || GENERATOR_DEFAULT_BY_ARCHETYPE[trend.proposed_archetype || ''] || 'flux_schnell';
+  return (
+    <select
+      value={current}
+      onChange={(e) => onChange(e.target.value)}
+      className="text-xs rounded bg-bg-tertiary border border-border text-text-secondary px-2 py-1 focus:outline-none focus:border-accent"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {GENERATOR_OPTIONS.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label} {opt.costPerImage > 0 ? `$${opt.costPerImage.toFixed(3)}` : 'free'}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function TrendApprovalGate({ batchId, onGenerationStarted }: { batchId: string; onGenerationStarted: () => void }) {
+  const [trends, setTrends] = useState<TrendOut[]>([]);
+  const [generatorCosts, setGeneratorCosts] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [err, setErr] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const result = await getBatchTrends(batchId);
+      setTrends(result.trends);
+      setGeneratorCosts(result.generator_costs);
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, [batchId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const approved = trends.filter((t) => t.approval_status === 'approved');
+  const pending = trends.filter((t) => t.approval_status === 'pending_review');
+  const rejected = trends.filter((t) => t.approval_status === 'rejected');
+
+  const handleApprove = async (t: TrendOut) => {
+    const updated = await approveTrend(t.id, t.selected_generator || undefined).catch(() => null);
+    if (updated) setTrends((prev) => prev.map((x) => x.id === t.id ? updated : x));
+  };
+
+  const handleReject = async (t: TrendOut) => {
+    const updated = await rejectTrend(t.id).catch(() => null);
+    if (updated) setTrends((prev) => prev.map((x) => x.id === t.id ? updated : x));
+  };
+
+  const handleGeneratorChange = async (t: TrendOut, gen: string) => {
+    setTrends((prev) => prev.map((x) => x.id === t.id ? { ...x, selected_generator: gen } : x));
+    await setTrendGenerator(t.id, gen).catch(() => null);
+  };
+
+  const handleBulkApprove = async () => {
+    const ids = pending.map((t) => t.id);
+    if (!ids.length) return;
+    await bulkTrendAction(ids, 'approve').catch(() => null);
+    setTrends((prev) => prev.map((t) => ids.includes(t.id) ? { ...t, approval_status: 'approved' } : t));
+  };
+
+  const handleBulkReject = async () => {
+    const ids = pending.map((t) => t.id);
+    if (!ids.length) return;
+    await bulkTrendAction(ids, 'reject').catch(() => null);
+    setTrends((prev) => prev.map((t) => ids.includes(t.id) ? { ...t, approval_status: 'rejected' } : t));
+  };
+
+  const handleGenerate = async () => {
+    if (approved.length === 0) { setErr('Approve at least one trend first.'); return; }
+    setGenerating(true);
+    setErr('');
+    try {
+      await generateApproved(batchId);
+      onGenerationStarted();
+    } catch (e) {
+      setErr((e as Error).message || 'Failed to start generation');
+    }
+    setGenerating(false);
+  };
+
+  // Estimated total cost
+  const totalCost = approved.reduce((sum, t) => {
+    const gen = t.selected_generator || GENERATOR_DEFAULT_BY_ARCHETYPE[t.proposed_archetype || ''] || 'flux_schnell';
+    return sum + (generatorCosts[gen] ?? 0);
+  }, 0);
+
+  if (loading) return <div className="bg-bg-secondary border border-accent/30 rounded-xl p-5 mb-6 text-text-secondary text-sm">Loading trends…</div>;
+
+  return (
+    <div className="bg-bg-secondary border border-amber-500/40 rounded-xl p-5 mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+            Trend Approval Gate
+          </h3>
+          <p className="text-xs text-text-secondary mt-0.5">
+            {approved.length} approved · {pending.length} pending · {rejected.length} rejected
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {pending.length > 0 && (
+            <>
+              <button
+                onClick={handleBulkApprove}
+                className="px-3 py-1.5 rounded-lg bg-approve/20 text-approve text-xs font-medium hover:bg-approve/30 transition-colors"
+              >
+                Approve All
+              </button>
+              <button
+                onClick={handleBulkReject}
+                className="px-3 py-1.5 rounded-lg bg-reject/10 text-reject text-xs font-medium hover:bg-reject/20 transition-colors"
+              >
+                Reject All
+              </button>
+            </>
+          )}
+          <button
+            onClick={handleGenerate}
+            disabled={generating || approved.length === 0}
+            className="px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent/80 disabled:opacity-40 transition-colors"
+          >
+            {generating ? 'Starting…' : `Generate ${approved.length} Design${approved.length !== 1 ? 's' : ''}`}
+          </button>
+        </div>
+      </div>
+
+      {err && <p className="text-xs text-reject mb-3">{err}</p>}
+
+      {approved.length > 0 && (
+        <p className="text-xs text-text-tertiary mb-3">
+          Estimated image cost: <span className="text-text-primary font-medium">${totalCost.toFixed(3)}</span>
+        </p>
+      )}
+
+      <div className="space-y-2">
+        {trends.map((t) => (
+          <div
+            key={t.id}
+            className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+              t.approval_status === 'approved'
+                ? 'border-approve/40 bg-approve/5'
+                : t.approval_status === 'rejected'
+                ? 'border-reject/20 bg-reject/5 opacity-50'
+                : 'border-border hover:border-accent/30'
+            }`}
+          >
+            {/* Score badge */}
+            <div className="text-center shrink-0 w-10">
+              <span className="text-sm font-bold text-text-primary">{t.final_score}</span>
+              <p className="text-[9px] text-text-tertiary leading-none">score</p>
+            </div>
+
+            {/* Trend info */}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-text-primary truncate">{t.raw_signal}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[10px] text-text-tertiary">{SOURCE_LABELS_GATE[t.source] || t.source}</span>
+                {t.proposed_archetype && (
+                  <span className="text-[10px] bg-bg-tertiary text-text-tertiary px-1.5 py-0.5 rounded">
+                    {t.proposed_archetype.replace(/_/g, ' ')}
+                  </span>
+                )}
+                {t.risk_flag && t.risk_flag !== 'none' && (
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${t.risk_flag === 'hard' ? 'bg-reject/20 text-reject' : 'bg-amber-500/20 text-amber-400'}`}>
+                    ⚠ {t.risk_flag}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Generator selector */}
+            <GeneratorSelector
+              trend={t}
+              onChange={(gen) => handleGeneratorChange(t, gen)}
+            />
+
+            {/* Cost display */}
+            {(() => {
+              const gen = t.selected_generator || GENERATOR_DEFAULT_BY_ARCHETYPE[t.proposed_archetype || ''] || 'flux_schnell';
+              const cost = generatorCosts[gen] ?? getGeneratorOption(gen)?.costPerImage ?? 0;
+              return (
+                <span className="text-[10px] text-text-tertiary w-12 text-right shrink-0">
+                  {cost > 0 ? `$${cost.toFixed(3)}` : 'free'}
+                </span>
+              );
+            })()}
+
+            {/* Approve/Reject */}
+            {t.approval_status === 'pending_review' && (
+              <div className="flex gap-1 shrink-0">
+                <button
+                  onClick={() => handleApprove(t)}
+                  className="w-7 h-7 rounded-lg bg-approve/20 text-approve text-sm font-bold hover:bg-approve/30 transition-colors flex items-center justify-center"
+                  title="Approve"
+                >✓</button>
+                <button
+                  onClick={() => handleReject(t)}
+                  className="w-7 h-7 rounded-lg bg-reject/10 text-reject text-sm font-bold hover:bg-reject/20 transition-colors flex items-center justify-center"
+                  title="Reject"
+                >✕</button>
+              </div>
+            )}
+            {t.approval_status === 'approved' && (
+              <button
+                onClick={() => handleReject(t)}
+                className="text-[10px] text-reject hover:underline shrink-0"
+              >undo</button>
+            )}
+            {t.approval_status === 'rejected' && (
+              <button
+                onClick={() => handleApprove(t)}
+                className="text-[10px] text-approve hover:underline shrink-0"
+              >restore</button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+
 function ScheduleDropModal({ designId, onClose, onScheduled }: {
   designId: string;
   onClose: () => void;
@@ -560,6 +799,12 @@ function ScheduleDropModal({ designId, onClose, onScheduled }: {
   );
 }
 
+// Store config pulled from window/env — display names only (tokens stay server-side)
+const STORE_OPTIONS = [
+  { value: 'store_1', label: (import.meta.env as Record<string, string>).VITE_STORE_1_NAME || 'Store 1' },
+  { value: 'store_2', label: (import.meta.env as Record<string, string>).VITE_STORE_2_NAME || 'Store 2' },
+];
+
 function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisit, onSuggestRegenerated, onToggleFeatured, onScheduledForDrop }: {
   design: DesignOut;
   onBack: () => void;
@@ -581,14 +826,52 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
   const [editTitle, setEditTitle] = useState(design.shopify_title || '');
   const [editDesc, setEditDesc] = useState(design.shopify_description || '');
   const [copySaving, setCopySaving] = useState(false);
+  // Inline title edit state
+  const [inlineTitleEdit, setInlineTitleEdit] = useState(false);
+  const [inlineTitleValue, setInlineTitleValue] = useState(design.shopify_title || design.concept_name || '');
+  const inlineTitleRef = useRef<HTMLInputElement>(null);
+  // Store selection (per design — applied to all products)
+  const [targetStore, setTargetStore] = useState<string>('store_1');
+  // Card logo
+  const [cardLogo, setCardLogo] = useState<string | null>(null);
 
   useEffect(() => {
     listProducts().then((all) => {
       const matched = all.filter((p) => p.design_id === design.id);
       setProducts(matched);
       setSelectedPublishTypes(new Set(matched.map((p) => p.product_type)));
+      // Use first product's target_store as the design-level default
+      if (matched[0]?.target_store) setTargetStore(matched[0].target_store);
     }).catch(() => null);
+    getLogoUrl('reviewCard').then(setCardLogo).catch(() => null);
   }, [design.id]);
+
+  useEffect(() => {
+    if (inlineTitleEdit && inlineTitleRef.current) {
+      inlineTitleRef.current.focus();
+      inlineTitleRef.current.select();
+    }
+  }, [inlineTitleEdit]);
+
+  const saveInlineTitle = async () => {
+    const trimmed = inlineTitleValue.trim().slice(0, 60);
+    if (!trimmed || trimmed === (design.shopify_title || design.concept_name)) {
+      setInlineTitleEdit(false);
+      return;
+    }
+    try {
+      await updateShopifyCopy(design.id, { shopify_title: trimmed });
+      design.shopify_title = trimmed;
+      setEditTitle(trimmed);
+    } catch { /* ignore */ }
+    setInlineTitleEdit(false);
+  };
+
+  const handleStoreChange = async (store: string) => {
+    setTargetStore(store);
+    // Update all products for this design to the selected store
+    await Promise.all(products.map((p) => updateProduct(p.id, { target_store: store }).catch(() => null)));
+  };
 
   return (
     <div>
@@ -608,8 +891,39 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
 
         <div className="space-y-4">
           <div>
-            <div className="flex items-center gap-3">
-              <h2 className="text-xl font-bold text-text-primary">{toTitleCase(design.concept_name)}</h2>
+            <div className="flex items-start gap-3">
+              {/* Inline-editable product title */}
+              <div className="flex-1 min-w-0">
+                {inlineTitleEdit ? (
+                  <input
+                    ref={inlineTitleRef}
+                    value={inlineTitleValue}
+                    maxLength={60}
+                    onChange={(e) => setInlineTitleValue(e.target.value)}
+                    onBlur={saveInlineTitle}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveInlineTitle();
+                      if (e.key === 'Escape') { setInlineTitleValue(design.shopify_title || design.concept_name || ''); setInlineTitleEdit(false); }
+                    }}
+                    className="w-full text-xl font-bold text-text-primary bg-bg-tertiary border border-accent rounded px-2 py-0.5 focus:outline-none"
+                  />
+                ) : (
+                  <h2
+                    className="text-xl font-bold text-text-primary cursor-text hover:text-accent transition-colors"
+                    title="Click to edit title"
+                    onClick={() => { setInlineTitleValue(design.shopify_title || design.concept_name || ''); setInlineTitleEdit(true); }}
+                  >
+                    {inlineTitleValue || toTitleCase(design.concept_name)}
+                  </h2>
+                )}
+                {!inlineTitleEdit && (
+                  <p className="text-xs text-text-tertiary mt-0.5">{toTitleCase(design.concept_name)}</p>
+                )}
+              </div>
+              {/* Card logo mark (if available) */}
+              {cardLogo && (
+                <img src={cardLogo} alt="" className="w-8 h-8 object-contain opacity-60 shrink-0 mt-0.5" />
+              )}
               <button
                 onClick={() => { setIsFeatured(!isFeatured); onToggleFeatured?.(); }}
                 className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shrink-0 ${
@@ -673,6 +987,26 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
               </div>
             </div>
           )}
+
+          {/* Feature #5: Store selection */}
+          <div className="p-3 bg-bg-secondary rounded-lg border border-border">
+            <p className="text-xs text-text-tertiary mb-2">Publish to Store</p>
+            <div className="flex gap-1">
+              {STORE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => handleStoreChange(opt.value)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    targetStore === opt.value
+                      ? 'bg-accent text-white'
+                      : 'bg-bg-tertiary text-text-secondary hover:text-text-primary border border-border'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <AiReasoningSection design={design} products={products} />
 
@@ -881,7 +1215,7 @@ export default function ReviewPage() {
     try {
       const batches = await listBatches();
       const latest = batches[0];
-      if (latest?.status === 'running') {
+      if (latest?.status === 'running' || latest?.status === 'pending_approval') {
         setRunningBatch(latest);
         setRecentBatch(null);
         const latestQueue = await getReviewQueue();
@@ -1071,12 +1405,24 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {runningBatch && <BatchProgress batch={runningBatch} productCount={productCount} designCount={batchDesignCount} onCancel={async () => {
-        if (!confirm('Cancel the running batch? Designs already generated will be kept.')) return;
-        try { await cancelBatch(runningBatch.id); } catch { /* ignore */ }
-        setRunningBatch(null);
-        fetchQueue();
-      }} />}
+      {runningBatch && runningBatch.status === 'pending_approval' && (
+        <TrendApprovalGate
+          batchId={runningBatch.id}
+          onGenerationStarted={() => {
+            // Transition from approval gate to running state
+            setRunningBatch((prev) => prev ? { ...prev, status: 'running' } : prev);
+            setTimeout(checkBatchStatus, 3000);
+          }}
+        />
+      )}
+      {runningBatch && runningBatch.status !== 'pending_approval' && (
+        <BatchProgress batch={runningBatch} productCount={productCount} designCount={batchDesignCount} onCancel={async () => {
+          if (!confirm('Cancel the running batch? Designs already generated will be kept.')) return;
+          try { await cancelBatch(runningBatch.id); } catch { /* ignore */ }
+          setRunningBatch(null);
+          fetchQueue();
+        }} />
+      )}
       {recentBatch && <BatchComplete batch={recentBatch} onRefresh={handleRefresh} />}
 
       <div className="flex gap-1 mb-6 bg-bg-secondary rounded-lg p-1 border border-border">

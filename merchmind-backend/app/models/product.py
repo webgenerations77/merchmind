@@ -40,6 +40,7 @@ class Product(Base):
     published_at = Column(DateTime(timezone=True), nullable=True)
     unpublished_at = Column(DateTime(timezone=True), nullable=True)
     drop_id = Column(UUID(as_uuid=True), ForeignKey("merch_drops.id"), nullable=True)
+    target_store = Column(Text, nullable=True, default="store_1")  # store_1 | store_2
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
     design = relationship("Design", back_populates="products")

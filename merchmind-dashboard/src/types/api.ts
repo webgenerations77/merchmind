@@ -142,6 +142,7 @@ export interface ProductOut {
   published_at: string | null;
   unpublished_at: string | null;
   drop_id: string | null;
+  target_store: 'store_1' | 'store_2' | null;
   created_at: string;
   concept_name: string | null;
   batch_id: string | null;

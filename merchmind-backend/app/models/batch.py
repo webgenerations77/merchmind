@@ -14,7 +14,7 @@ class Batch(Base):
     run_started_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     run_completed_at = Column(DateTime(timezone=True), nullable=True)
     status = Column(
-        SAEnum("running", "complete", "failed", "partial", name="batch_status"),
+        SAEnum("running", "complete", "failed", "partial", "pending_approval", name="batch_status"),
         nullable=False,
         default="running",
     )

@@ -34,6 +34,10 @@ class Trend(Base):
         nullable=False,
         default="raw",
     )
+    # Trend approval gate fields (migration 023)
+    approval_status = Column(String, nullable=False, default="pending_review")
+    selected_generator = Column(String, nullable=True)  # dalle3 | flux_schnell | ideogram | text_only
+    proposed_archetype = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
 
     batch = relationship("Batch", back_populates="trends")
