@@ -280,14 +280,13 @@ class PrintifyService:
         return buf.getvalue()
 
     def _rehost_mockup(self, url: str, design_id: str, product_type: str, position: str) -> str:
-        """Download a Printify mockup, replace white bg, upload to Supabase."""
+        """Download a Printify mockup and re-upload to Supabase."""
         try:
             with httpx.Client(timeout=15) as client:
                 resp = client.get(url)
                 resp.raise_for_status()
-            processed = self._replace_white_bg(resp.content)
             path = f"designs/{design_id}/mockups/{product_type}/{position}.png"
-            return storage.upload(path, processed, "image/png")
+            return storage.upload(path, resp.content, "image/png")
         except Exception as e:
             logger.warning("printify.rehost_mockup failed type=%s pos=%s: %s", product_type, position, e)
             return url
