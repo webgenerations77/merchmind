@@ -33,7 +33,7 @@ export async function getLogoUrl(context: LogoContext): Promise<string | null> {
 }
 
 // Synchronous variant for use in components that pre-load on mount
-export function useLogoUrl(context: LogoContext): string | null {
+export function useLogoUrl(_context: LogoContext): string | null {
   // Intentionally returns null until the async load completes.
   // Components should handle null gracefully (no <img> render).
   return null; // replaced by actual URL after mount via useEffect + getLogoUrl

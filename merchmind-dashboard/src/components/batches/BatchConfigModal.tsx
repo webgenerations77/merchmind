@@ -23,6 +23,12 @@ export default function BatchConfigModal({ onRun, onClose }: { onRun: (config: B
   const [productFocus, setProductFocus] = useState<Set<string>>(new Set());
   const [pauseAfterScoring, setPauseAfterScoring] = useState(true);
 
+  const applyQuickTest = () => {
+    setNumDesigns(4);
+    setSources(new Set(['seasonal']));
+    setPauseAfterScoring(true);
+  };
+
   const toggleSource = (key: string) => {
     setSources((prev) => {
       const next = new Set(prev);
@@ -63,9 +69,18 @@ export default function BatchConfigModal({ onRun, onClose }: { onRun: (config: B
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-bg-secondary border border-border rounded-2xl w-full max-w-lg p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
-        <div>
-          <h2 className="text-xl font-bold text-text-primary">Run Batch</h2>
-          <p className="text-sm text-text-secondary mt-1">Configure the batch pipeline before running.</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-text-primary">Run Batch</h2>
+            <p className="text-sm text-text-secondary mt-1">Configure the batch pipeline before running.</p>
+          </div>
+          <button
+            onClick={applyQuickTest}
+            className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30 transition-colors shrink-0"
+            title="4 designs · Seasonal only · No network calls"
+          >
+            ⚡ Quick Test
+          </button>
         </div>
 
         {/* Number of designs */}

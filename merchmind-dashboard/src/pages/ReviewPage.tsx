@@ -454,6 +454,7 @@ function TrendApprovalGate({ batchId, onGenerationStarted }: { batchId: string; 
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [err, setErr] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -568,87 +569,156 @@ function TrendApprovalGate({ batchId, onGenerationStarted }: { batchId: string; 
       )}
 
       <div className="space-y-2">
-        {trends.map((t) => (
-          <div
-            key={t.id}
-            className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-              t.approval_status === 'approved'
-                ? 'border-approve/40 bg-approve/5'
-                : t.approval_status === 'rejected'
-                ? 'border-reject/20 bg-reject/5 opacity-50'
-                : 'border-border hover:border-accent/30'
-            }`}
-          >
-            {/* Score badge */}
-            <div className="text-center shrink-0 w-10">
-              <span className="text-sm font-bold text-text-primary">{t.final_score}</span>
-              <p className="text-[9px] text-text-tertiary leading-none">score</p>
-            </div>
+        {trends.map((t) => {
+          const isExpanded = expandedId === t.id;
+          const gen = t.selected_generator || GENERATOR_DEFAULT_BY_ARCHETYPE[t.proposed_archetype || ''] || 'flux_schnell';
+          const cost = generatorCosts[gen] ?? getGeneratorOption(gen)?.costPerImage ?? 0;
+          const genOption = getGeneratorOption(gen);
 
-            {/* Trend info */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-text-primary truncate">{t.raw_signal}</p>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="text-[10px] text-text-tertiary">{SOURCE_LABELS_GATE[t.source] || t.source}</span>
-                {t.proposed_archetype && (
-                  <span className="text-[10px] bg-bg-tertiary text-text-tertiary px-1.5 py-0.5 rounded">
-                    {t.proposed_archetype.replace(/_/g, ' ')}
-                  </span>
-                )}
-                {t.risk_flag && t.risk_flag !== 'none' && (
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${t.risk_flag === 'hard' ? 'bg-reject/20 text-reject' : 'bg-amber-500/20 text-amber-400'}`}>
-                    ⚠ {t.risk_flag}
-                  </span>
-                )}
-              </div>
-            </div>
+          return (
+            <div
+              key={t.id}
+              className={`rounded-lg border transition-colors ${
+                t.approval_status === 'approved'
+                  ? 'border-approve/40 bg-approve/5'
+                  : t.approval_status === 'rejected'
+                  ? 'border-reject/20 bg-reject/5 opacity-50'
+                  : 'border-border hover:border-accent/30'
+              }`}
+            >
+              {/* Main row — click to expand */}
+              <div
+                className="flex items-center gap-3 p-3 cursor-pointer select-none"
+                onClick={() => setExpandedId(isExpanded ? null : t.id)}
+              >
+                {/* Score badge */}
+                <div className="text-center shrink-0 w-10">
+                  <span className="text-sm font-bold text-text-primary">{t.final_score}</span>
+                  <p className="text-[9px] text-text-tertiary leading-none">score</p>
+                </div>
 
-            {/* Generator selector */}
-            <GeneratorSelector
-              trend={t}
-              onChange={(gen) => handleGeneratorChange(t, gen)}
-            />
+                {/* Trend info */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-text-primary truncate">{t.raw_signal}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] text-text-tertiary">{SOURCE_LABELS_GATE[t.source] || t.source}</span>
+                    {t.proposed_archetype && (
+                      <span className="text-[10px] bg-bg-tertiary text-text-tertiary px-1.5 py-0.5 rounded">
+                        {t.proposed_archetype.replace(/_/g, ' ')}
+                      </span>
+                    )}
+                    {t.risk_flag && t.risk_flag !== 'none' && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${t.risk_flag === 'hard' ? 'bg-reject/20 text-reject' : 'bg-amber-500/20 text-amber-400'}`}>
+                        ⚠ {t.risk_flag}
+                      </span>
+                    )}
+                  </div>
+                </div>
 
-            {/* Cost display */}
-            {(() => {
-              const gen = t.selected_generator || GENERATOR_DEFAULT_BY_ARCHETYPE[t.proposed_archetype || ''] || 'flux_schnell';
-              const cost = generatorCosts[gen] ?? getGeneratorOption(gen)?.costPerImage ?? 0;
-              return (
+                {/* Generator selector */}
+                <GeneratorSelector
+                  trend={t}
+                  onChange={(gen) => handleGeneratorChange(t, gen)}
+                />
+
+                {/* Cost display */}
                 <span className="text-[10px] text-text-tertiary w-12 text-right shrink-0">
                   {cost > 0 ? `$${cost.toFixed(3)}` : 'free'}
                 </span>
-              );
-            })()}
 
-            {/* Approve/Reject */}
-            {t.approval_status === 'pending_review' && (
-              <div className="flex gap-1 shrink-0">
-                <button
-                  onClick={() => handleApprove(t)}
-                  className="w-7 h-7 rounded-lg bg-approve/20 text-approve text-sm font-bold hover:bg-approve/30 transition-colors flex items-center justify-center"
-                  title="Approve"
-                >✓</button>
-                <button
-                  onClick={() => handleReject(t)}
-                  className="w-7 h-7 rounded-lg bg-reject/10 text-reject text-sm font-bold hover:bg-reject/20 transition-colors flex items-center justify-center"
-                  title="Reject"
-                >✕</button>
+                {/* Expand chevron */}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className={`w-4 h-4 text-text-tertiary shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                >
+                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                </svg>
+
+                {/* Approve/Reject */}
+                {t.approval_status === 'pending_review' && (
+                  <div className="flex gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => handleApprove(t)}
+                      className="w-7 h-7 rounded-lg bg-approve/20 text-approve text-sm font-bold hover:bg-approve/30 transition-colors flex items-center justify-center"
+                      title="Approve"
+                    >✓</button>
+                    <button
+                      onClick={() => handleReject(t)}
+                      className="w-7 h-7 rounded-lg bg-reject/10 text-reject text-sm font-bold hover:bg-reject/20 transition-colors flex items-center justify-center"
+                      title="Reject"
+                    >✕</button>
+                  </div>
+                )}
+                {t.approval_status === 'approved' && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleReject(t); }}
+                    className="text-[10px] text-reject hover:underline shrink-0"
+                  >undo</button>
+                )}
+                {t.approval_status === 'rejected' && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleApprove(t); }}
+                    className="text-[10px] text-approve hover:underline shrink-0"
+                  >restore</button>
+                )}
               </div>
-            )}
-            {t.approval_status === 'approved' && (
-              <button
-                onClick={() => handleReject(t)}
-                className="text-[10px] text-reject hover:underline shrink-0"
-              >undo</button>
-            )}
-            {t.approval_status === 'rejected' && (
-              <button
-                onClick={() => handleApprove(t)}
-                className="text-[10px] text-approve hover:underline shrink-0"
-              >restore</button>
-            )}
-          </div>
-        ))}
+
+              {/* Expanded detail panel */}
+              {isExpanded && (
+                <div className="px-4 pb-4 pt-1 border-t border-border/50 space-y-3">
+                  {/* Why this shirt */}
+                  {t.claude_reasoning ? (
+                    <div>
+                      <p className="text-[10px] font-semibold text-purple-400 uppercase tracking-wide mb-1">Why this shirt</p>
+                      <p className="text-sm text-text-secondary leading-relaxed">{t.claude_reasoning}</p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-text-tertiary italic">No AI reasoning available for this trend.</p>
+                  )}
+
+                  {/* Score breakdown */}
+                  <div className="flex gap-4">
+                    <div>
+                      <p className="text-[10px] font-semibold text-purple-400 uppercase tracking-wide mb-1">Score Breakdown</p>
+                      <div className="flex gap-3">
+                        <div className="text-center">
+                          <span className="text-sm font-bold text-text-primary">{t.trend_score}</span>
+                          <p className="text-[9px] text-text-tertiary">trend</p>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-sm font-bold text-text-primary">{t.viability_score}</span>
+                          <p className="text-[9px] text-text-tertiary">viability</p>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-sm font-bold text-accent">{t.final_score}</span>
+                          <p className="text-[9px] text-text-tertiary">final</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Generator recommendation */}
+                    <div className="flex-1">
+                      <p className="text-[10px] font-semibold text-purple-400 uppercase tracking-wide mb-1">Suggested Generator</p>
+                      <p className="text-xs text-text-primary font-medium">{genOption?.label ?? gen}</p>
+                      {genOption?.description && (
+                        <p className="text-[10px] text-text-tertiary mt-0.5">{genOption.description}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Risk reason */}
+                  {t.risk_flag && t.risk_flag !== 'none' && t.risk_reason && (
+                    <div className={`p-2 rounded-lg text-xs ${t.risk_flag === 'hard' ? 'bg-reject/10 text-reject' : 'bg-amber-500/10 text-amber-400'}`}>
+                      <span className="font-semibold">Risk ({t.risk_flag}):</span> {t.risk_reason}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
