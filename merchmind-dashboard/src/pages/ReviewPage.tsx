@@ -987,6 +987,41 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
         />
 
         <div className="space-y-4">
+          {/* Design Decisions — primary actions (top of column) */}
+          <div className="pb-4 border-b border-border">
+            <p className="text-xs text-text-tertiary mb-2">Design Decisions</p>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => { if (confirm('Permanently delete this design and all assets? This cannot be undone.')) onReject(); }}
+                className="py-2.5 px-3 rounded-lg bg-reject/20 text-reject font-semibold text-sm hover:bg-reject/30 transition-colors"
+              >
+                Reject
+              </button>
+              <button onClick={onArchive} className="py-2.5 px-3 rounded-lg bg-amber-500/20 text-amber-400 font-semibold text-sm hover:bg-amber-500/30 transition-colors">
+                Archive
+              </button>
+              <button onClick={onRevisit} className="py-2.5 px-3 rounded-lg bg-blue-500/20 text-blue-400 font-semibold text-sm hover:bg-blue-500/30 transition-colors">
+                Revisit
+              </button>
+              <button onClick={() => setShowSuggestDrawer(true)} className="py-2.5 px-3 rounded-lg bg-purple-500/20 text-purple-400 font-semibold text-sm hover:bg-purple-500/30 transition-colors">
+                Suggest
+              </button>
+              <button
+                onClick={() => setShowScheduleDropDialog(true)}
+                className="py-2.5 px-3 rounded-lg bg-blue-500/20 text-blue-400 font-semibold text-sm hover:bg-blue-500/30 transition-colors"
+              >
+                Schedule Drop
+              </button>
+              <button
+                onClick={() => setShowPublishDialog(true)}
+                disabled={isPublishing}
+                className="flex-1 py-2.5 rounded-lg bg-approve/20 text-approve font-semibold text-sm hover:bg-approve/30 disabled:opacity-50 transition-colors"
+              >
+                {isPublishing ? 'Publishing...' : 'Approve & Publish'}
+              </button>
+            </div>
+          </div>
+
           <div>
             <div className="flex items-start gap-3">
               {/* Inline-editable product title */}
@@ -1175,37 +1210,6 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
               </div>
             </div>
           )}
-
-          <div className="flex gap-2 pt-4 border-t border-border">
-            <button
-              onClick={() => { if (confirm('Permanently delete this design and all assets? This cannot be undone.')) onReject(); }}
-              className="py-2.5 px-3 rounded-lg bg-reject/20 text-reject font-semibold text-sm hover:bg-reject/30 transition-colors"
-            >
-              Reject
-            </button>
-            <button onClick={onArchive} className="py-2.5 px-3 rounded-lg bg-amber-500/20 text-amber-400 font-semibold text-sm hover:bg-amber-500/30 transition-colors">
-              Archive
-            </button>
-            <button onClick={onRevisit} className="py-2.5 px-3 rounded-lg bg-blue-500/20 text-blue-400 font-semibold text-sm hover:bg-blue-500/30 transition-colors">
-              Revisit
-            </button>
-            <button onClick={() => setShowSuggestDrawer(true)} className="py-2.5 px-3 rounded-lg bg-purple-500/20 text-purple-400 font-semibold text-sm hover:bg-purple-500/30 transition-colors">
-              Suggest
-            </button>
-            <button
-              onClick={() => setShowScheduleDropDialog(true)}
-              className="py-2.5 px-3 rounded-lg bg-blue-500/20 text-blue-400 font-semibold text-sm hover:bg-blue-500/30 transition-colors"
-            >
-              Schedule Drop
-            </button>
-            <button
-              onClick={() => setShowPublishDialog(true)}
-              disabled={isPublishing}
-              className="flex-1 py-2.5 rounded-lg bg-approve/20 text-approve font-semibold text-sm hover:bg-approve/30 disabled:opacity-50 transition-colors"
-            >
-              {isPublishing ? 'Publishing...' : 'Approve & Publish'}
-            </button>
-          </div>
 
           {showSuggestDrawer && (
             <SuggestDrawer
@@ -1420,10 +1424,10 @@ export default function ReviewPage() {
       }
     } catch { /* continue to navigate back */ }
 
+    // Always close the detail view; if we arrived from another page, return there.
+    setSelectedDesign(null);
     if (navFrom && action === 'reject') {
       navigate(navFrom);
-    } else {
-      setSelectedDesign(null);
     }
   };
 
