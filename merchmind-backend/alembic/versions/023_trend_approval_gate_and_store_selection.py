@@ -35,6 +35,9 @@ def upgrade():
         "ALTER TABLE products ADD COLUMN IF NOT EXISTS target_store VARCHAR(10) DEFAULT 'store_1'"
     ))
 
+    # Explicitly commit the manual transaction opened by BEGIN above
+    conn.execute(sa.text("COMMIT"))
+
 
 def downgrade():
     conn = op.get_bind()

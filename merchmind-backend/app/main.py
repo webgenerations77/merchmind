@@ -104,7 +104,9 @@ async def on_startup():
         logger.info("Alembic migrations applied")
     except Exception as e:
         logger.warning(f"Alembic migration skipped: {e}")
-        _apply_critical_schema_fallback()
+    # Always run the schema fallback — idempotent IF NOT EXISTS guards make it safe.
+    # This catches cases where a migration ran but its DDL didn't commit (COMMIT/BEGIN pattern).
+    _apply_critical_schema_fallback()
 
 
 def _apply_critical_schema_fallback():
@@ -119,7 +121,21 @@ def _apply_critical_schema_fallback():
         conn.execute(sa_text("ALTER TYPE product_type ADD VALUE IF NOT EXISTS 'long_sleeve'"))
         conn.execute(sa_text("ALTER TYPE design_archetype ADD VALUE IF NOT EXISTS 'image_with_text'"))
         conn.execute(sa_text("ALTER TYPE image_api ADD VALUE IF NOT EXISTS 'ideogram'"))
+        conn.execute(sa_text("ALTER TYPE batch_status ADD VALUE IF NOT EXISTS 'pending_approval'"))
         conn.execute(sa_text("BEGIN"))
+        # Migration 023: trend approval gate + store selection columns
+        conn.execute(sa_text(
+            "ALTER TABLE trends ADD COLUMN IF NOT EXISTS approval_status VARCHAR(20) NOT NULL DEFAULT 'pending_review'"
+        ))
+        conn.execute(sa_text(
+            "ALTER TABLE trends ADD COLUMN IF NOT EXISTS selected_generator VARCHAR(50)"
+        ))
+        conn.execute(sa_text(
+            "ALTER TABLE trends ADD COLUMN IF NOT EXISTS proposed_archetype VARCHAR(50)"
+        ))
+        conn.execute(sa_text(
+            "ALTER TABLE products ADD COLUMN IF NOT EXISTS target_store VARCHAR(10) DEFAULT 'store_1'"
+        ))
         conn.execute(sa_text(
             "DO $$ BEGIN "
             "  CREATE TYPE drop_status AS ENUM ('scheduled','in_progress','published','failed'); "
