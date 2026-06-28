@@ -122,6 +122,7 @@ def _apply_critical_schema_fallback():
         conn.execute(sa_text("ALTER TYPE design_archetype ADD VALUE IF NOT EXISTS 'image_with_text'"))
         conn.execute(sa_text("ALTER TYPE image_api ADD VALUE IF NOT EXISTS 'ideogram'"))
         conn.execute(sa_text("ALTER TYPE batch_status ADD VALUE IF NOT EXISTS 'pending_approval'"))
+        conn.execute(sa_text("ALTER TYPE design_status ADD VALUE IF NOT EXISTS 'generation_failed'"))
         conn.execute(sa_text("BEGIN"))
         # Migration 023: trend approval gate + store selection columns
         conn.execute(sa_text(

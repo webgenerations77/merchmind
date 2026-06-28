@@ -55,6 +55,7 @@ class Design(Base):
     status = Column(
         SAEnum(
             "generating", "ready", "approved", "rejected", "delayed", "archived",
+            "generation_failed",
             name="design_status",
         ),
         nullable=False,
