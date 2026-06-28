@@ -187,6 +187,52 @@ def cancel_batch(
     return _envelope({"batch_id": str(batch_id), "status": "failed", "stuck_designs_rejected": len(stuck), **purged})
 
 
+@router.delete("/{batch_id}")
+def delete_batch(
+    batch_id: UUID,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key),
+):
+    """Permanently delete a terminal (failed/complete) batch and all its children.
+    Refuses to delete a running or pending_approval batch — cancel it first."""
+    batch = db.query(Batch).filter(Batch.id == batch_id).first()
+    if not batch:
+        raise HTTPException(404, f"Batch {batch_id} not found")
+    if batch.status in ("running", "pending_approval"):
+        raise HTTPException(409, f"Batch {batch_id} is '{batch.status}'; cancel it before deleting")
+
+    from app.models.marketing_asset import MarketingAsset
+    from app.models.feedback_log import FeedbackLog
+    from app.models.alert import Alert
+
+    designs = db.query(Design).filter(Design.batch_id == batch_id).all()
+    design_ids = [d.id for d in designs]
+    if design_ids:
+        db.query(MarketingAsset).filter(MarketingAsset.design_id.in_(design_ids)).delete(synchronize_session=False)
+        db.query(FeedbackLog).filter(FeedbackLog.design_id.in_(design_ids)).delete(synchronize_session=False)
+        db.query(Alert).filter(Alert.design_id.in_(design_ids)).delete(synchronize_session=False)
+        db.query(Product).filter(Product.design_id.in_(design_ids)).delete(synchronize_session=False)
+        db.query(Design).filter(Design.parent_design_id.in_(design_ids)).update(
+            {Design.parent_design_id: None}, synchronize_session=False
+        )
+    db.query(Alert).filter(Alert.batch_id == batch_id).delete(synchronize_session=False)
+    items_deleted = db.query(BatchItem).filter(BatchItem.batch_id == batch_id).delete(synchronize_session=False)
+    designs_deleted = db.query(Design).filter(Design.batch_id == batch_id).delete(synchronize_session=False)
+    trends_deleted = db.query(Trend).filter(Trend.batch_id == batch_id).delete(synchronize_session=False)
+    db.delete(batch)
+    db.commit()
+
+    logger.info("Batch %s deleted (designs=%s trends=%s items=%s)", batch_id, designs_deleted, trends_deleted, items_deleted)
+    return _envelope({
+        "batch_id": str(batch_id),
+        "deleted": True,
+        "designs_deleted": designs_deleted,
+        "products_deleted": len(design_ids),
+        "trends_deleted": trends_deleted,
+        "items_deleted": items_deleted,
+    })
+
+
 @router.get("/{batch_id}/detail")
 def get_batch_detail(batch_id: UUID, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
     """Full batch detail with per-item results."""
