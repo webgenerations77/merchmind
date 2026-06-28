@@ -3,6 +3,8 @@ import { listDrops, getDrop, createDrop, updateDrop, deleteDrop, publishDropNow,
 import type { MerchDropOut, MerchDropDetail } from '../types/api';
 import StatusBadge from '../components/shared/StatusBadge';
 import { formatProductType, formatCurrency } from '../utils/formatters';
+import EmptyState from '../components/empty/EmptyState';
+import EmptyCatalog from '../components/empty/EmptyCatalog';
 
 function DropStatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
@@ -317,10 +319,11 @@ export default function DropsPage() {
       {loading ? (
         <div className="flex items-center justify-center h-64 text-text-secondary">Loading drops...</div>
       ) : drops.length === 0 ? (
-        <div className="text-center py-16 text-text-tertiary">
-          <p className="text-lg">No drops yet</p>
-          <p className="text-sm mt-1">Create a drop and schedule designs from the Review page</p>
-        </div>
+        <EmptyState
+          illustration={<EmptyCatalog />}
+          heading="No drops yet"
+          subtext="Create a drop and schedule designs from the Review page"
+        />
       ) : (
         <div className="space-y-3">
           {drops.map((drop) => (

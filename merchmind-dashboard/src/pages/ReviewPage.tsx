@@ -17,6 +17,8 @@ import { getBatchTrends, approveTrend, rejectTrend, bulkTrendAction, generateApp
 import { GENERATOR_OPTIONS, GENERATOR_DEFAULT_BY_ARCHETYPE, getGeneratorOption } from '../constants/generatorCosts';
 import { getLogoUrl } from '../assets/logos/logoConfig';
 import { ChevronDown, Star } from 'lucide-react';
+import EmptyState from '../components/empty/EmptyState';
+import EmptyCanvas from '../components/empty/EmptyCanvas';
 
 function BatchProgress({ batch, productCount, designCount, onCancel }: { batch: BatchOut; productCount: number; designCount: number; onCancel: () => void }) {
   const [elapsed, setElapsed] = useState(0);
@@ -1560,10 +1562,11 @@ export default function ReviewPage() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-16 text-text-tertiary">
-            <p className="text-lg">No batch designs to review</p>
-            <p className="text-sm mt-1">Click "Run Batch" to generate designs from trending topics</p>
-          </div>
+          <EmptyState
+            illustration={<EmptyCanvas />}
+            heading="No batch designs to review"
+            subtext='Click "Run Batch" to generate designs from trending topics'
+          />
         )
       )}
 
@@ -1585,10 +1588,11 @@ export default function ReviewPage() {
             </div>
           ))
         ) : (
-          <div className="text-center py-16 text-text-tertiary">
-            <p className="text-lg">No collection designs to review</p>
-            <p className="text-sm mt-1">Create a collection and generate designs from the Collections page</p>
-          </div>
+          <EmptyState
+            illustration={<EmptyCanvas />}
+            heading="No collection designs to review"
+            subtext="Create a collection and generate designs from the Collections page"
+          />
         )
       )}
 
@@ -1600,10 +1604,11 @@ export default function ReviewPage() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-16 text-text-tertiary">
-            <p className="text-lg">No Drew's Mind designs to review</p>
-            <p className="text-sm mt-1">Create ideas from the Drew's Mind page</p>
-          </div>
+          <EmptyState
+            illustration={<EmptyCanvas />}
+            heading="No Drew's Mind designs to review"
+            subtext="Create ideas from the Drew's Mind page"
+          />
         )
       )}
 
@@ -1623,10 +1628,11 @@ export default function ReviewPage() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-16 text-text-tertiary">
-            <p className="text-lg">No archived designs</p>
-            <p className="text-sm mt-1">Archived designs will appear here</p>
-          </div>
+          <EmptyState
+            illustration={<EmptyCanvas />}
+            heading="No archived designs"
+            subtext="Archived designs will appear here"
+          />
         )
       )}
 

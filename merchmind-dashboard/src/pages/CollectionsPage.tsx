@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { listCollections, createCollection, deleteCollection, generateCollectionDesigns, getCollection } from '../api/collections';
 import type { CollectionOut } from '../types/api';
 import { toTitleCase } from '../utils/formatters';
+import EmptyState from '../components/empty/EmptyState';
+import EmptyCatalog from '../components/empty/EmptyCatalog';
 
 const ARCHETYPE_OPTIONS = ['', 'illustration', 'hybrid', 'text_icon', 'image_with_text', 'typographic', 'text_only'];
 
@@ -148,9 +150,11 @@ export default function CollectionsPage() {
       )}
 
       {collections.length === 0 ? (
-        <div className="bg-bg-secondary border border-border rounded-xl p-12 text-center">
-          <p className="text-text-tertiary">No collections yet. Create one to get started.</p>
-        </div>
+        <EmptyState
+          illustration={<EmptyCatalog />}
+          heading="No collections yet"
+          subtext="Create one to get started."
+        />
       ) : (
         <div className="space-y-3">
           {collections.map((c) => (
