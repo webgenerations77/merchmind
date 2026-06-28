@@ -8,6 +8,28 @@ from datetime import date, timedelta
 logger = logging.getLogger(__name__)
 
 _LOOKAHEAD_DAYS = 45
+# Minimum production + shipping lead time. Events closer than this are skipped —
+# there's no way to design, produce (Printify), and ship to a customer in time.
+_MIN_LEAD_DAYS = 14
+
+# Evergreen merch themes — steady year-round demand, not tied to a date.
+# Always available so the seasonal source stays productive in calendar gaps
+# (e.g. mid-summer) and so seasonal-only batches always have material.
+_EVERGREEN_THEMES: list[tuple[str, list[str]]] = [
+    ("Dog Lovers",       ["dog mom", "fur baby", "rescue dog"]),
+    ("Cat Lovers",       ["cat mom", "crazy cat lady", "adopt don't shop"]),
+    ("Coffee Lovers",    ["but first coffee", "espresso yourself", "caffeine"]),
+    ("Plant Parents",    ["plant lady", "crazy plant person", "propagation"]),
+    ("Book Lovers",      ["bookworm", "just one more chapter", "bibliophile"]),
+    ("Mental Health",    ["self care", "you matter", "be kind to your mind"]),
+    ("Fitness",          ["gym rat", "lift heavy", "rest day"]),
+    ("Gamers",           ["just one more game", "press start", "loading"]),
+    ("Outdoors",         ["adventure awaits", "take a hike", "national park"]),
+    ("Sarcasm / Humor",  ["ugh, people", "introvert", "running late"]),
+    ("Music Lovers",     ["vinyl", "good vibes", "concert ready"]),
+    ("Foodies",          ["taco lover", "pizza is life", "snack queen"]),
+]
+_EVERGREEN_SCORE = 55  # steady demand, ranks below an imminent timely holiday
 
 # Static calendar — (month, day, name, keywords)
 _EVENTS: list[tuple[int, int, str, list[str]]] = [
@@ -54,6 +76,7 @@ def get_upcoming_events(from_date: date = None) -> list[dict]:
     """
     from_date = from_date or date.today()
     results = []
+    skipped_close = 0
 
     for month, day, name, keywords in _EVENTS:
         try:
@@ -62,6 +85,11 @@ def get_upcoming_events(from_date: date = None) -> list[dict]:
             continue  # invalid date like Feb 29
 
         if days_until > _LOOKAHEAD_DAYS:
+            continue
+
+        # Skip events too close to design, produce, and ship in time.
+        if days_until < _MIN_LEAD_DAYS:
+            skipped_close += 1
             continue
 
         # Score inversely proportional to days remaining; floor at 30
@@ -79,5 +107,23 @@ def get_upcoming_events(from_date: date = None) -> list[dict]:
                 },
             })
 
-    logger.info(f"Seasonal calendar: {len(results)} signals for next {_LOOKAHEAD_DAYS} days")
+    # Evergreen themes — always available, no date gating.
+    for theme, keywords in _EVERGREEN_THEMES:
+        for kw in keywords:
+            results.append({
+                "raw_signal": f"{theme}: {kw}",
+                "source": "seasonal",
+                "source_metadata": {
+                    "event": theme,
+                    "keyword": kw,
+                    "evergreen": True,
+                    "proximity_score": _EVERGREEN_SCORE,
+                },
+            })
+
+    logger.info(
+        f"Seasonal calendar: {len(results)} signals "
+        f"({len(_EVERGREEN_THEMES)} evergreen themes, "
+        f"{skipped_close} event(s) skipped for <{_MIN_LEAD_DAYS}d lead time)"
+    )
     return results
