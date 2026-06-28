@@ -76,7 +76,7 @@ export default function BatchConfigModal({ onRun, onClose }: { onRun: (config: B
           </div>
           <button
             onClick={applyQuickTest}
-            className="px-3 py-1.5 rounded-lg bg-amber-500/20 text-amber-400 text-xs font-semibold hover:bg-amber-500/30 transition-colors shrink-0"
+            className="px-3 py-1.5 rounded-lg bg-confidence-medium/20 text-confidence-medium text-xs font-semibold hover:bg-confidence-medium/30 transition-colors shrink-0"
             title="4 designs · Seasonal only · No network calls"
           >
             ⚡ Quick Test

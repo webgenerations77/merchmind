@@ -135,9 +135,9 @@ export default function SettingsPage() {
           </button>
         </div>
         {!settings.marketing_generation_enabled && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-            <span className="text-yellow-400 text-sm">&#9888;</span>
-            <span className="text-xs text-yellow-300">Paused — batch runs will skip marketing assets until re-enabled</span>
+          <div className="flex items-center gap-2 px-3 py-2 bg-confidence-medium/10 border border-confidence-medium/20 rounded-lg">
+            <span className="text-confidence-medium text-sm">&#9888;</span>
+            <span className="text-xs text-confidence-medium">Paused — batch runs will skip marketing assets until re-enabled</span>
           </div>
         )}
       </section>
