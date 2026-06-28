@@ -105,7 +105,7 @@ export default function DashboardPage() {
               <h2 className="text-lg font-bold text-confidence-medium">Featured</h2>
               <span className="text-xs text-confidence-medium/60 bg-confidence-medium/10 px-2 py-0.5 rounded-full">{featured.length}</span>
             </div>
-            <Link to="/review" className="text-xs text-confidence-medium hover:text-confidence-medium transition-colors">
+            <Link to="/review" className="text-xs text-confidence-medium hover:text-confidence-medium/80 transition-colors">
               Review all &rarr;
             </Link>
           </div>

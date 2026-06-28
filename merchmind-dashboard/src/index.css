@@ -35,7 +35,7 @@
   --color-regen: #6D4AFF;
   --color-delay: #B4A4FF;
   --color-confidence-high: #0FB488;
-  --color-confidence-medium: #EAB308;
+  --color-confidence-medium: #B45309;
   --color-confidence-low: #F2575B;
 
   /* ---- Fonts ---- */
@@ -60,6 +60,7 @@
   --color-text-tertiary: #9A95B5;
   --color-approve: #19D3A2;
   --color-confidence-high: #19D3A2;
+  --color-confidence-medium: #EAB308;
 }
 
 /* ---- Background textures ---- */
