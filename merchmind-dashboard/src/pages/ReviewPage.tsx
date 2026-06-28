@@ -448,11 +448,12 @@ function GeneratorSelector({ trend, onChange }: { trend: TrendOut; onChange: (g:
   );
 }
 
-function TrendApprovalGate({ batchId, onGenerationStarted }: { batchId: string; onGenerationStarted: () => void }) {
+function TrendApprovalGate({ batchId, onGenerationStarted, onCancelled }: { batchId: string; onGenerationStarted: () => void; onCancelled: () => void }) {
   const [trends, setTrends] = useState<TrendOut[]>([]);
   const [generatorCosts, setGeneratorCosts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [err, setErr] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -513,6 +514,19 @@ function TrendApprovalGate({ batchId, onGenerationStarted }: { batchId: string; 
     setGenerating(false);
   };
 
+  const handleCancel = async () => {
+    if (!confirm('Cancel this batch? All scored trends will be discarded and you can start a new batch.')) return;
+    setCancelling(true);
+    setErr('');
+    try {
+      await cancelBatch(batchId);
+      onCancelled();
+    } catch (e) {
+      setErr((e as Error).message || 'Failed to cancel batch');
+      setCancelling(false);
+    }
+  };
+
   // Estimated total cost
   const totalCost = approved.reduce((sum, t) => {
     const gen = t.selected_generator || GENERATOR_DEFAULT_BY_ARCHETYPE[t.proposed_archetype || ''] || 'flux_schnell';
@@ -551,8 +565,15 @@ function TrendApprovalGate({ batchId, onGenerationStarted }: { batchId: string; 
             </>
           )}
           <button
+            onClick={handleCancel}
+            disabled={cancelling || generating}
+            className="px-3 py-1.5 rounded-lg bg-bg-tertiary border border-border text-text-secondary text-xs font-medium hover:text-text-primary disabled:opacity-40 transition-colors"
+          >
+            {cancelling ? 'Cancelling…' : 'Cancel Batch'}
+          </button>
+          <button
             onClick={handleGenerate}
-            disabled={generating || approved.length === 0}
+            disabled={generating || cancelling || approved.length === 0}
             className="px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent/80 disabled:opacity-40 transition-colors"
           >
             {generating ? 'Starting…' : `Generate ${approved.length} Design${approved.length !== 1 ? 's' : ''}`}
@@ -565,6 +586,12 @@ function TrendApprovalGate({ batchId, onGenerationStarted }: { batchId: string; 
       {approved.length > 0 && (
         <p className="text-xs text-text-tertiary mb-3">
           Estimated image cost: <span className="text-text-primary font-medium">${totalCost.toFixed(3)}</span>
+        </p>
+      )}
+
+      {!loading && pending.length === 0 && approved.length === 0 && (
+        <p className="text-xs text-amber-400 mb-3">
+          No trends approved. Restore a trend below to generate, or cancel the batch to start over.
         </p>
       )}
 
@@ -1482,6 +1509,11 @@ export default function ReviewPage() {
             // Transition from approval gate to running state
             setRunningBatch((prev) => prev ? { ...prev, status: 'running' } : prev);
             setTimeout(checkBatchStatus, 3000);
+          }}
+          onCancelled={() => {
+            setRunningBatch(null);
+            setRecentBatch(null);
+            fetchQueue();
           }}
         />
       )}
