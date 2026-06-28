@@ -1,20 +1,25 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import {
+  ClipboardCheck, LayoutDashboard, Layers, Brain, Rocket,
+  Megaphone, Tag, Boxes, Activity, Settings, Menu, X,
+  type LucideIcon,
+} from 'lucide-react';
 import { logout, type User } from '../../firebase';
 import Logo from '../brand/Logo';
 import ThemeToggle from '../shared/ThemeToggle';
 
-const links = [
-  { to: '/review', label: 'Review', icon: '#' },
-  { to: '/', label: 'Dashboard', icon: '~' },
-  { to: '/collections', label: 'Collections', icon: '&' },
-  { to: '/drews-mind', label: "Drew's Mind", icon: '!' },
-  { to: '/drops', label: 'Drops', icon: '>' },
-  { to: '/marketing', label: 'Marketing', icon: '^' },
-  { to: '/products', label: 'Products', icon: '%' },
-  { to: '/batches', label: 'Batches', icon: '@' },
-  { to: '/api-usage', label: 'API Usage', icon: '$' },
-  { to: '/settings', label: 'Settings', icon: '*' },
+const links: { to: string; label: string; Icon: LucideIcon }[] = [
+  { to: '/review', label: 'Review', Icon: ClipboardCheck },
+  { to: '/', label: 'Dashboard', Icon: LayoutDashboard },
+  { to: '/collections', label: 'Collections', Icon: Layers },
+  { to: '/drews-mind', label: "Drew's Mind", Icon: Brain },
+  { to: '/drops', label: 'Drops', Icon: Rocket },
+  { to: '/marketing', label: 'Marketing', Icon: Megaphone },
+  { to: '/products', label: 'Products', Icon: Tag },
+  { to: '/batches', label: 'Batches', Icon: Boxes },
+  { to: '/api-usage', label: 'API Usage', Icon: Activity },
+  { to: '/settings', label: 'Settings', Icon: Settings },
 ];
 
 export default function Sidebar({ user }: { user: User }) {
@@ -34,17 +39,7 @@ export default function Sidebar({ user }: { user: User }) {
           className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-bg-tertiary transition-colors"
           aria-label="Toggle menu"
         >
-          <svg width="22" height="18" viewBox="0 0 22 18" fill="none" className="text-text-primary">
-            {open ? (
-              <path d="M2 2L20 16M2 16L20 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            ) : (
-              <>
-                <path d="M1 1H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                <path d="M1 9H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                <path d="M1 17H21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </>
-            )}
-          </svg>
+          {open ? <X size={22} strokeWidth={2} /> : <Menu size={22} strokeWidth={2} />}
         </button>
         <Logo markSize={24} wordmarkClassName="text-base" />
         <div className="flex items-center gap-1">
@@ -90,7 +85,7 @@ export default function Sidebar({ user }: { user: User }) {
                 }`
               }
             >
-              <span className="text-base font-mono">{link.icon}</span>
+              <link.Icon size={18} strokeWidth={2} />
               {link.label}
             </NavLink>
           ))}
