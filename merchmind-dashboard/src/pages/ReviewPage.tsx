@@ -403,8 +403,8 @@ function DesignCard({ item, action, onClick, onToggleFeatured }: {
           {item.image_api_used && (
             <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
               item.image_api_used === 'flux_schnell' ? 'bg-approve/15 text-approve' :
-              item.image_api_used === 'ideogram' ? 'bg-violet-500/15 text-violet-400' :
-              'bg-sky-500/15 text-sky-400'
+              item.image_api_used === 'ideogram' ? 'bg-violet/15 text-violet' :
+              'bg-bg-tertiary text-text-secondary'
             }`}>
               {item.image_api_used === 'flux_schnell' ? 'Flux' : item.image_api_used === 'dalle3' ? 'DALL·E' : item.image_api_used === 'ideogram' ? 'Ideogram' : item.image_api_used}
             </span>
