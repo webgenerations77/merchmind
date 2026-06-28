@@ -111,6 +111,14 @@ def generate_approved(
     if batch.status not in ("pending_approval", "running"):
         raise HTTPException(409, f"Batch {batch_id} is in status '{batch.status}', cannot generate")
 
+    # Flip to "running" synchronously, before dispatching the async task. The
+    # Celery task also sets this, but worker-pickup latency leaves a window
+    # where the batch still reads "pending_approval" — during which the
+    # dashboard's status poll reverts the UI back to the approval gate, making
+    # it look like generation never started.
+    batch.status = "running"
+    db.commit()
+
     config = body or {}
     from app.tasks.batch_pipeline import generate_approved_designs
     task = generate_approved_designs.delay(
