@@ -74,7 +74,10 @@ class Settings(BaseSettings):
     FLUX_SCHNELL_COST_PER_IMAGE: float = 0.003
 
     # Batch settings
-    REQUIRE_TREND_APPROVAL: bool = False  # Pause batch after scoring for human trend approval
+    # Mandatory by default: every trend-based batch pauses at the approval gate
+    # after scoring so no design is generated without human trend approval.
+    # (Custom flows — Drew's Mind, Collections — have their own paths and are unaffected.)
+    REQUIRE_TREND_APPROVAL: bool = True
 
     # App
     APP_API_KEY: str = "dev-api-key"
