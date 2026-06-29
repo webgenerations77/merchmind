@@ -856,6 +856,22 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                     product.printify_product_id = printify_id
                     mockups = _get_printify().generate_mockups(printify_id, design_id=design_id, product_type=product.product_type)
                     product.mockup_urls = mockups
+                    # Harvest per-color hex/mockups from the created product
+                    try:
+                        from app.services.publishing.printify_publisher import (
+                            get_printify_service, _BLUEPRINT_MAP, _PROVIDER_MAP,
+                        )
+                        from app.services.catalog.catalog_service import get_catalog_service
+                        from app.services.catalog.product_apply import apply_catalog_colors
+                        bp = _BLUEPRINT_MAP.get(product.product_type)
+                        prov = _PROVIDER_MAP.get(product.product_type, 99)
+                        if bp and printify_id:
+                            pj = get_printify_service()._request(
+                                "GET", f"/shops/{_settings.PRINTIFY_SHOP_ID}/products/{printify_id}.json"
+                            )
+                            apply_catalog_colors(product, pj, bp, prov, get_catalog_service())
+                    except Exception as cat_err:
+                        logger.warning(f"design_task[{trend_id[:8]}] catalog harvest failed for {product.product_type}: {cat_err}")
                     db.commit()
                     logger.info(f"design_task[{trend_id[:8]}] Printify mockup for {product.product_type}")
                 except Exception as mock_err:
