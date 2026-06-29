@@ -11,7 +11,7 @@ class Trend(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     source = Column(
-        SAEnum("google", "reddit", "twitter", "seasonal", "manual", name="trend_source"),
+        SAEnum("google", "reddit", "twitter", "seasonal", "manual", "firecrawl", name="trend_source"),
         nullable=False,
     )
     raw_signal = Column(Text, nullable=False)

@@ -81,6 +81,14 @@ def test_extract_concepts_filters_garbage():
     assert "a real concept phrase" in concepts
 
 
+def test_trend_source_enum_includes_firecrawl():
+    # The Trend.source Postgres enum must include 'firecrawl', or inserts of
+    # firecrawl-sourced trends fail with InvalidTextRepresentation and poison the
+    # batch's DB session (root cause of the 2026-06-29 batch wedge).
+    from app.models.trend import Trend
+    assert "firecrawl" in Trend.__table__.c.source.type.enums
+
+
 def test_query_count_capped():
     svc = FirecrawlTrendsService()
     calls = []

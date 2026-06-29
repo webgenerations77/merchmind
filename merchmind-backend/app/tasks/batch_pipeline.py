@@ -247,6 +247,7 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
         logger.info(f"Batch scored {len(scores)} signals in {len(range(0, len(batch_inputs), 10))} Claude calls")
 
         for signal, score_result in zip(raw_signals, scores):
+            trend = None
             try:
                 trend = Trend(
                     batch_id=batch.id,
@@ -273,6 +274,13 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
 
                 db.commit()
             except Exception as e:
+                # Roll back the failed transaction FIRST — otherwise the session
+                # stays in PendingRollbackError and every subsequent row (and the
+                # error logging below) cascades, wedging the whole batch. A single
+                # bad row (e.g. an unknown enum value) must not poison the rest.
+                db.rollback()
+                if trend is not None and trend in queued_trends:
+                    queued_trends.remove(trend)
                 logger.error(f"Saving score failed for '{signal.get('raw_signal', '')}': {e}")
                 _log_batch_error(batch, db, f"Score error: {e}")
 
