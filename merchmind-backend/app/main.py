@@ -151,6 +151,12 @@ def _apply_critical_schema_fallback():
             "ALTER TABLE products ADD COLUMN IF NOT EXISTS target_store VARCHAR(10) DEFAULT 'store_1'"
         ))
         conn.execute(sa_text(
+            "ALTER TABLE products ADD COLUMN IF NOT EXISTS selected_color VARCHAR(64)"
+        ))
+        conn.execute(sa_text(
+            "ALTER TABLE products ADD COLUMN IF NOT EXISTS color_mockups JSONB DEFAULT '{}'::jsonb"
+        ))
+        conn.execute(sa_text(
             "DO $$ BEGIN "
             "  CREATE TYPE drop_status AS ENUM ('scheduled','in_progress','published','failed'); "
             "EXCEPTION WHEN duplicate_object THEN NULL; END $$;"

@@ -29,6 +29,8 @@ class Product(Base):
     margin_flag = Column(Boolean, default=False)
     variants = Column(JSONB, default=list)
     mockup_urls = Column(JSONB, default=dict)
+    selected_color = Column(Text, nullable=True)
+    color_mockups = Column(JSONB, default=dict)
     publish_status = Column(
         SAEnum(
             "pending", "printify_only", "live", "failed", "unpublished", "retired",

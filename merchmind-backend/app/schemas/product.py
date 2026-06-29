@@ -20,6 +20,8 @@ class ProductOut(BaseModel):
     margin_flag: bool
     variants: Optional[list]
     mockup_urls: Optional[dict]
+    selected_color: Optional[str] = None
+    color_mockups: Optional[dict] = None
     publish_status: str
     published_at: Optional[datetime]
     unpublished_at: Optional[datetime]
@@ -36,3 +38,4 @@ class ProductUpdate(BaseModel):
     retail_price: Optional[float] = None
     publish_status: Optional[str] = None
     target_store: Optional[str] = None
+    selected_color: Optional[str] = None

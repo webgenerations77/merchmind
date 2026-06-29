@@ -75,6 +75,8 @@ def update_product(
         product.publish_status = body.publish_status
     if body.target_store is not None:
         product.target_store = body.target_store
+    if body.selected_color is not None:
+        product.selected_color = body.selected_color
     db.commit()
     return _envelope(ProductOut.model_validate(product).model_dump())
 
