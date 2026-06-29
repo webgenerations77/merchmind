@@ -34,6 +34,27 @@ def _envelope(data=None, error: str = None) -> dict:
     return {"success": error is None, "data": data, "error": error}
 
 
+def _delete_printify_products(db: Session, design_ids: list) -> int:
+    """Delete the Printify draft products for these designs before their DB rows
+    are removed, so a purge doesn't orphan drafts in the Printify shop. Best
+    effort — a failed delete is logged and skipped, never blocks the purge.
+    """
+    if not design_ids:
+        return 0
+    from app.services.publishing.printify_publisher import delete_product as printify_delete
+    deleted = 0
+    products = db.query(Product).filter(
+        Product.design_id.in_(design_ids), Product.printify_product_id.isnot(None)
+    ).all()
+    for p in products:
+        try:
+            printify_delete(p.printify_product_id)
+            deleted += 1
+        except Exception as e:
+            logger.warning("purge: Printify delete failed for %s: %s", p.printify_product_id, e)
+    return deleted
+
+
 @router.get("")
 def list_batches(db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
     batches = db.query(Batch).order_by(Batch.created_at.desc()).limit(50).all()
@@ -160,7 +181,9 @@ def cancel_batch(
 
         designs = db.query(Design).filter(Design.batch_id == batch_id).all()
         design_ids = [d.id for d in designs]
+        printify_deleted = 0
         if design_ids:
+            printify_deleted = _delete_printify_products(db, design_ids)
             db.query(MarketingAsset).filter(MarketingAsset.design_id.in_(design_ids)).delete(synchronize_session=False)
             db.query(FeedbackLog).filter(FeedbackLog.design_id.in_(design_ids)).delete(synchronize_session=False)
             db.query(Alert).filter(Alert.design_id.in_(design_ids)).delete(synchronize_session=False)
@@ -174,7 +197,7 @@ def cancel_batch(
         prod_count = len(design_ids)
         design_count = db.query(Design).filter(Design.batch_id == batch_id).delete(synchronize_session=False)
         trend_count = db.query(Trend).filter(Trend.batch_id == batch_id).delete(synchronize_session=False)
-        purged = {"designs_deleted": design_count, "products_deleted": prod_count, "trends_deleted": trend_count, "items_deleted": item_count}
+        purged = {"designs_deleted": design_count, "products_deleted": prod_count, "printify_products_deleted": printify_deleted, "trends_deleted": trend_count, "items_deleted": item_count}
 
     try:
         _redis.flushdb()
@@ -207,7 +230,9 @@ def delete_batch(
 
     designs = db.query(Design).filter(Design.batch_id == batch_id).all()
     design_ids = [d.id for d in designs]
+    printify_deleted = 0
     if design_ids:
+        printify_deleted = _delete_printify_products(db, design_ids)
         db.query(MarketingAsset).filter(MarketingAsset.design_id.in_(design_ids)).delete(synchronize_session=False)
         db.query(FeedbackLog).filter(FeedbackLog.design_id.in_(design_ids)).delete(synchronize_session=False)
         db.query(Alert).filter(Alert.design_id.in_(design_ids)).delete(synchronize_session=False)
@@ -222,12 +247,13 @@ def delete_batch(
     db.delete(batch)
     db.commit()
 
-    logger.info("Batch %s deleted (designs=%s trends=%s items=%s)", batch_id, designs_deleted, trends_deleted, items_deleted)
+    logger.info("Batch %s deleted (designs=%s trends=%s items=%s printify=%s)", batch_id, designs_deleted, trends_deleted, items_deleted, printify_deleted)
     return _envelope({
         "batch_id": str(batch_id),
         "deleted": True,
         "designs_deleted": designs_deleted,
         "products_deleted": len(design_ids),
+        "printify_products_deleted": printify_deleted,
         "trends_deleted": trends_deleted,
         "items_deleted": items_deleted,
     })

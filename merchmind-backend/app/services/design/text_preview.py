@@ -150,13 +150,17 @@ def _measure_widest_line(lines: list[str], font) -> int:
 
 
 def _fill_targets(word_count: int) -> tuple[float, float]:
-    """(min_fill, max_fill) as fractions of canvas width."""
+    """(min_fill, max_fill) as fractions of canvas width.
+
+    Pushed larger so text_only designs read as a bold chest print rather than a
+    small centered caption with dead space all around it.
+    """
     if word_count <= 3:
-        return 0.65, 0.80
+        return 0.78, 0.92
     elif word_count <= 7:
-        return 0.55, 0.70
+        return 0.68, 0.86
     else:
-        return 0.45, 0.60
+        return 0.55, 0.74
 
 
 def _fit_font_size(
@@ -169,7 +173,7 @@ def _fit_font_size(
     """Binary search for the largest font size that fits within the target fill zone."""
     _min_fill, max_fill = _fill_targets(word_count)
     wrap_width = int(canvas_w * max_fill)
-    max_height = int(canvas_h * 0.70)
+    max_height = int(canvas_h * 0.80)
 
     lo, hi = 60, min(int(canvas_w * 0.7), int(canvas_h * 0.45))
 

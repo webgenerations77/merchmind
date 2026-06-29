@@ -44,9 +44,25 @@ def _contrast_ratio(l1: float, l2: float) -> float:
     return (lighter + 0.05) / (darker + 0.05)
 
 
+def _harden_alpha(img: Image.Image, low: int = 50) -> Image.Image:
+    """Zero out faint semi-transparent pixels so rembg's ghost halos/smudges
+    (the orange/grey blotches it leaves around a subject) become fully
+    transparent and won't print. Edge anti-aliasing (alpha >= low) is preserved.
+    """
+    if img.mode != "RGBA":
+        img = img.convert("RGBA")
+    r, g, b, a = img.split()
+    a = a.point(lambda p: 0 if p < low else p)
+    img.putalpha(a)
+    return img
+
+
 def remove_background(image_bytes: bytes) -> Image.Image:
-    result = remove(image_bytes)
-    return Image.open(io.BytesIO(result)).convert("RGBA")
+    # post_process_mask=True drops stray mask islands rembg would otherwise keep;
+    # _harden_alpha then clears the faint semi-transparent halo it leaves behind.
+    result = remove(image_bytes, post_process_mask=True)
+    img = Image.open(io.BytesIO(result)).convert("RGBA")
+    return _harden_alpha(img)
 
 
 def _autocrop(img: Image.Image, threshold: int = 10) -> Image.Image:

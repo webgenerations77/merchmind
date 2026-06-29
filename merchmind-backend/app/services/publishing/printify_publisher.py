@@ -30,7 +30,9 @@ _MAX_RETRIES = 3
 _BLUEPRINT_MAP = {
     "tshirt": 5,
     "hoodie": 77,
-    "long_sleeve": 304,
+    # 304 was deprecated by Printify ("Blueprint 304 could not be found").
+    # 41 = Bella+Canvas Unisex Jersey Long Sleeve Tee, carried by provider 99.
+    "long_sleeve": 41,
     "mug": 68,
     "hat": 1447,
     "phone_case": 269,

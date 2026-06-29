@@ -607,15 +607,14 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                     raw_url = storage.upload(raw_path, raw_bytes)
                     design.raw_image_url = raw_url
 
-                    if archetype == "illustration":
-                        from app.services.design.post_processor import process_image as full_process, image_to_bytes as img2b
-                        canvas, report = full_process(raw_bytes)
-                        clean_bytes = img2b(canvas)
-                        color_palette = report.get("color_palette", [])
-                        logger.info("design_task[%s] illustration: rembg + canvas 4500x5400", trend_id[:8])
-                    else:
-                        from app.services.design.bg_remover import remove_white_background
-                        clean_bytes = remove_white_background(raw_bytes)
+                    # All visual archetypes (illustration, hybrid, text_icon) go
+                    # through full rembg + 4500x5400 canvas. The old lite Pillow
+                    # white-remover left grey/colored ghosts on hybrid outputs.
+                    from app.services.design.post_processor import process_image as full_process, image_to_bytes as img2b
+                    canvas, report = full_process(raw_bytes)
+                    clean_bytes = img2b(canvas)
+                    color_palette = report.get("color_palette", [])
+                    logger.info("design_task[%s] %s: rembg + canvas 4500x5400", trend_id[:8], archetype)
                     proc_path = storage.design_processed_path(design_id)
                     processed_url = storage.upload(proc_path, clean_bytes)
                     design.processed_image_url = processed_url
@@ -730,6 +729,17 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                         raw_bytes, api_used = generate_image(new_prompt, image_api)
                         processed_img, report = process_image(raw_bytes)
                         processed_bytes = image_to_bytes(processed_img)
+                        # Re-composite text — the regenerated image replaces the
+                        # one we composited onto earlier, so hybrid/text_icon would
+                        # otherwise lose their slogan entirely.
+                        if should_composite(archetype):
+                            processed_bytes = composite_text_on_image(
+                                processed_bytes,
+                                primary_text=text_content.get("primary_text", trend.raw_signal),
+                                secondary_text=text_content.get("secondary_text"),
+                                archetype=archetype,
+                                color_palette=report.get("color_palette", color_palette),
+                            )
                         processed_url = storage.upload(storage.design_processed_path(design_id), processed_bytes)
                         design.processed_image_url = processed_url
                         design.version = 2
