@@ -8,6 +8,8 @@ import ConfidenceBadge from '../components/shared/ConfidenceBadge';
 import MockupTabs from '../components/shared/MockupTabs';
 import { formatCurrency, formatProductType, formatDate, toTitleCase } from '../utils/formatters';
 import { calculateCostBreakdown } from '../utils/profitCalc';
+import EmptyState from '../components/empty/EmptyState';
+import EmptyCatalog from '../components/empty/EmptyCatalog';
 
 const filters = ['all', 'pending', 'live', 'published', 'failed', 'unpublished'] as const;
 
@@ -472,7 +474,10 @@ export default function ProductsPage() {
           </tbody>
         </table>
         {sorted.length === 0 && (
-          <div className="p-8 text-center text-text-tertiary text-sm">No products found</div>
+          <EmptyState
+            illustration={<EmptyCatalog />}
+            heading="No products found"
+          />
         )}
       </div>
     </div>

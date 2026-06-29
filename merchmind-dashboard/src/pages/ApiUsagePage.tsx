@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { getUsageSummary, getUsageHistory, getApiBalances, type UsageSummary, type UsageLogEntry, type ApiBalanceResult } from '../api/apiUsage';
 import { formatCurrency, formatCostPrecise } from '../utils/formatters';
+import EmptyState from '../components/empty/EmptyState';
+import EmptyData from '../components/empty/EmptyData';
 
 const PERIODS = [
   { value: 'day', label: 'Today' },
@@ -415,10 +417,11 @@ export default function ApiUsagePage() {
       )}
 
       {summary && summary.total_calls === 0 && (
-        <div className="text-center py-16 text-text-tertiary">
-          <p className="text-lg">No API usage recorded yet</p>
-          <p className="text-sm mt-1">Usage tracking starts with the next batch run or Drew's Mind design</p>
-        </div>
+        <EmptyState
+          illustration={<EmptyData />}
+          heading="No API usage recorded yet"
+          subtext="Usage tracking starts with the next batch run or Drew's Mind design"
+        />
       )}
     </div>
   );

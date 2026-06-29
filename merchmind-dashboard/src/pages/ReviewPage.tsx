@@ -16,6 +16,9 @@ import { calculateCostBreakdown } from '../utils/profitCalc';
 import { getBatchTrends, approveTrend, rejectTrend, bulkTrendAction, generateApproved, setTrendGenerator, type TrendOut } from '../api/trends';
 import { GENERATOR_OPTIONS, GENERATOR_DEFAULT_BY_ARCHETYPE, getGeneratorOption } from '../constants/generatorCosts';
 import { getLogoUrl } from '../assets/logos/logoConfig';
+import { ChevronDown, Star } from 'lucide-react';
+import EmptyState from '../components/empty/EmptyState';
+import EmptyCanvas from '../components/empty/EmptyCanvas';
 
 function BatchProgress({ batch, productCount, designCount, onCancel }: { batch: BatchOut; productCount: number; designCount: number; onCancel: () => void }) {
   const [elapsed, setElapsed] = useState(0);
@@ -167,14 +170,7 @@ function AiReasoningSection({ design, products }: { design: DesignOut; products:
           <span className="text-accent text-sm">&#9670;</span>
           <span className="text-sm font-medium text-text-primary">Why did the AI create this?</span>
         </div>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          className={`w-4 h-4 text-text-tertiary transition-transform ${open ? 'rotate-180' : ''}`}
-        >
-          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-        </svg>
+        <ChevronDown size={16} strokeWidth={2} className={`text-text-tertiary transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
@@ -349,9 +345,7 @@ function DesignCard({ item, action, onClick, onToggleFeatured }: {
               : 'bg-black/40 text-white/60 opacity-0 group-hover:opacity-100 hover:bg-black/60 hover:text-confidence-medium'
           }`}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-            <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clipRule="evenodd" />
-          </svg>
+          <Star size={16} className={item.is_featured ? 'fill-current' : ''} />
         </div>
 
         {/* Session action overlay */}
@@ -654,14 +648,7 @@ function TrendApprovalGate({ batchId, onGenerationStarted, onCancelled }: { batc
                 </span>
 
                 {/* Expand chevron */}
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  className={`w-4 h-4 text-text-tertiary shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                >
-                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                </svg>
+                <ChevronDown size={16} strokeWidth={2} className={`text-text-tertiary shrink-0 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
 
                 {/* Approve/Reject */}
                 {t.approval_status === 'pending_review' && (
@@ -1065,9 +1052,7 @@ function DesignDetail({ design, onBack, onApprove, onReject, onArchive, onRevisi
                 }`}
                 title={isFeatured ? 'Remove from Featured' : 'Mark as Featured'}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-                  <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.006 5.404.434c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.434 2.082-5.005Z" clipRule="evenodd" />
-                </svg>
+                <Star size={16} className={isFeatured ? 'fill-current' : ''} />
               </button>
             </div>
             <div className="flex items-center gap-2 mt-2">
@@ -1577,10 +1562,11 @@ export default function ReviewPage() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-16 text-text-tertiary">
-            <p className="text-lg">No batch designs to review</p>
-            <p className="text-sm mt-1">Click "Run Batch" to generate designs from trending topics</p>
-          </div>
+          <EmptyState
+            illustration={<EmptyCanvas />}
+            heading="No batch designs to review"
+            subtext='Click "Run Batch" to generate designs from trending topics'
+          />
         )
       )}
 
@@ -1602,10 +1588,11 @@ export default function ReviewPage() {
             </div>
           ))
         ) : (
-          <div className="text-center py-16 text-text-tertiary">
-            <p className="text-lg">No collection designs to review</p>
-            <p className="text-sm mt-1">Create a collection and generate designs from the Collections page</p>
-          </div>
+          <EmptyState
+            illustration={<EmptyCanvas />}
+            heading="No collection designs to review"
+            subtext="Create a collection and generate designs from the Collections page"
+          />
         )
       )}
 
@@ -1617,10 +1604,11 @@ export default function ReviewPage() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-16 text-text-tertiary">
-            <p className="text-lg">No Drew's Mind designs to review</p>
-            <p className="text-sm mt-1">Create ideas from the Drew's Mind page</p>
-          </div>
+          <EmptyState
+            illustration={<EmptyCanvas />}
+            heading="No Drew's Mind designs to review"
+            subtext="Create ideas from the Drew's Mind page"
+          />
         )
       )}
 
@@ -1640,10 +1628,11 @@ export default function ReviewPage() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-16 text-text-tertiary">
-            <p className="text-lg">No archived designs</p>
-            <p className="text-sm mt-1">Archived designs will appear here</p>
-          </div>
+          <EmptyState
+            illustration={<EmptyCanvas />}
+            heading="No archived designs"
+            subtext="Archived designs will appear here"
+          />
         )
       )}
 

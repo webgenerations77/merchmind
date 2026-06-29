@@ -3,6 +3,8 @@ import { listMarketingAssets, type MarketingAsset } from '../api/marketing';
 import StatusBadge from '../components/shared/StatusBadge';
 import ClickableImage from '../components/shared/ClickableImage';
 import { formatTimeAgo } from '../utils/formatters';
+import EmptyState from '../components/empty/EmptyState';
+import EmptyData from '../components/empty/EmptyData';
 
 const CHANNELS = ['all', 'instagram', 'tiktok', 'pinterest', 'email', 'blog'] as const;
 
@@ -132,10 +134,11 @@ export default function MarketingPage() {
       </div>
 
       {Object.entries(grouped).length === 0 ? (
-        <div className="text-center py-16 text-text-tertiary">
-          <p className="text-lg">No marketing assets yet</p>
-          <p className="text-sm mt-1">Marketing copy is generated automatically when designs are created</p>
-        </div>
+        <EmptyState
+          illustration={<EmptyData />}
+          heading="No marketing assets yet"
+          subtext="Marketing copy is generated automatically when designs are created"
+        />
       ) : (
         Object.entries(grouped).map(([designId, designAssets]) => (
           <div key={designId} className="space-y-2">

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { getBatchDetail, retryFailedItems } from '../../api/batches';
 import apiClient from '../../api/client';
 import type { BatchDetailOut, BatchItemOut } from '../../types/api';
@@ -268,12 +269,7 @@ function BatchItemRow({ item, expanded, onToggle }: { item: BatchItemOut; expand
           <span className="text-xs text-text-tertiary flex-shrink-0">{formatDuration(duration)}</span>
         )}
 
-        <svg
-          className={`w-4 h-4 text-text-tertiary transition-transform ${expanded ? 'rotate-180' : ''}`}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <ChevronDown size={16} strokeWidth={2} className={`text-text-tertiary transition-transform ${expanded ? 'rotate-180' : ''}`} />
       </div>
 
       {expanded && (

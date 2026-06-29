@@ -6,6 +6,8 @@ import type { DesignOut } from '../types/api';
 import StatusBadge from '../components/shared/StatusBadge';
 import ClickableImage from '../components/shared/ClickableImage';
 import { formatTimeAgo, toTitleCase } from '../utils/formatters';
+import EmptyState from '../components/empty/EmptyState';
+import EmptyCanvas from '../components/empty/EmptyCanvas';
 
 const ARCHETYPE_OPTIONS = [
   { value: '', label: 'Let AI decide' },
@@ -215,10 +217,11 @@ export default function DrewsMindPage() {
       )}
 
       {ideas.length === 0 && !generating && (
-        <div className="text-center py-12 text-text-tertiary">
-          <p className="text-lg">No ideas yet</p>
-          <p className="text-sm mt-1">Type something above and hit Generate or Save for Later</p>
-        </div>
+        <EmptyState
+          illustration={<EmptyCanvas />}
+          heading="No ideas yet"
+          subtext="Type something above and hit Generate or Save for Later"
+        />
       )}
     </div>
   );

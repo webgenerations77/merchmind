@@ -86,6 +86,18 @@
     repeating-linear-gradient(90deg, rgba(21, 19, 43, 0.05) 0 1px, transparent 1px 24px),
     var(--color-cream);
 }
+.bg-violet-mesh {
+  background:
+    radial-gradient(circle at 18% 22%, rgba(109, 74, 255, 0.24), transparent 56%),
+    radial-gradient(circle at 84% 30%, rgba(25, 211, 162, 0.22), transparent 56%),
+    radial-gradient(circle at 50% 94%, rgba(180, 164, 255, 0.28), transparent 56%),
+    var(--color-paper);
+}
+.dark .bg-violet-mesh {
+  background:
+    radial-gradient(at 80% 0%, rgba(124, 92, 255, 0.28), transparent 50%),
+    linear-gradient(160deg, #1C1A2E, #0F0E1A);
+}
 
 @keyframes slide-in-right {
   from { transform: translateX(100%); }
