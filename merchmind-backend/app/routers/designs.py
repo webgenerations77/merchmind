@@ -762,6 +762,39 @@ def fix_poster_product_types(db: Session = Depends(get_db), _: str = Depends(ver
     return _envelope({"fixed": updated})
 
 
+@router.post("/sanitize-descriptions")
+def sanitize_descriptions(db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """One-off backfill: strip AI-tell punctuation (em/en-dashes, smart quotes) from
+    existing designs' stored shopify_title and shopify_description so old copy reads
+    like a person wrote it. Idempotent — safe to run more than once."""
+    from app.services.design.shopify_copy_generator import sanitize_copy
+
+    designs = db.query(Design).filter(Design.is_deleted == False).all()
+    titles_changed = 0
+    descriptions_changed = 0
+    for d in designs:
+        if d.shopify_title:
+            cleaned = sanitize_copy(d.shopify_title)
+            if cleaned != d.shopify_title:
+                d.shopify_title = cleaned
+                titles_changed += 1
+        if d.shopify_description:
+            cleaned = sanitize_copy(d.shopify_description)
+            if cleaned != d.shopify_description:
+                d.shopify_description = cleaned
+                descriptions_changed += 1
+    db.commit()
+    logger.info(
+        "sanitize_descriptions: scanned=%d titles_changed=%d descriptions_changed=%d",
+        len(designs), titles_changed, descriptions_changed,
+    )
+    return _envelope({
+        "scanned": len(designs),
+        "titles_changed": titles_changed,
+        "descriptions_changed": descriptions_changed,
+    })
+
+
 @router.post("/{design_id}/rerender-preview")
 def rerender_preview(
     design_id: UUID,
