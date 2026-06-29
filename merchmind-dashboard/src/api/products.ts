@@ -15,7 +15,7 @@ export async function getProduct(id: string): Promise<ProductOut> {
   return data.data;
 }
 
-export async function updateProduct(id: string, updates: { retail_price?: number; publish_status?: string; target_store?: string }): Promise<ProductOut> {
+export async function updateProduct(id: string, updates: { retail_price?: number; publish_status?: string; target_store?: string; selected_color?: string }): Promise<ProductOut> {
   const { data } = await apiClient.patch<ApiResponse<ProductOut>>(`/products/${id}`, updates);
   return data.data;
 }

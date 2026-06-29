@@ -4,6 +4,13 @@ export interface ApiResponse<T> {
   error: string | null;
 }
 
+export interface CatalogColor {
+  name: string;
+  hex: string;
+  is_light: boolean;
+  has_mockup: boolean;
+}
+
 export interface DesignQueueItem {
   id: string;
   batch_id: string | null;
@@ -138,6 +145,8 @@ export interface ProductOut {
   margin_flag: boolean;
   variants: unknown[];
   mockup_urls: Record<string, string>;
+  selected_color?: string | null;
+  color_mockups?: Record<string, string>;
   publish_status: string;
   published_at: string | null;
   unpublished_at: string | null;
