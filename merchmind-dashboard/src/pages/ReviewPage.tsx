@@ -1332,9 +1332,12 @@ export default function ReviewPage() {
     }
   }, [location.state]);  // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Persistent poll: detect a batch whenever it appears (not just within the
+  // ~30s post-trigger bootstrap window below). Polls slowly while idle so a
+  // batch that takes a while to materialize still surfaces the banner, and
+  // faster once one is running to keep its progress fresh.
   useEffect(() => {
-    if (!runningBatch) return;
-    const interval = setInterval(checkBatchStatus, 5000);
+    const interval = setInterval(checkBatchStatus, runningBatch ? 5000 : 15000);
     return () => clearInterval(interval);
   }, [runningBatch, checkBatchStatus]);
 
