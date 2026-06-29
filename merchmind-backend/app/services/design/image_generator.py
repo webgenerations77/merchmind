@@ -136,7 +136,7 @@ class FluxSchnellService:
                         "aspect_ratio": aspect_ratio,
                         "output_format": "png",
                         "output_quality": 100,
-                        "num_inference_steps": 8,
+                        "num_inference_steps": 4,
                     },
                 },
             )
