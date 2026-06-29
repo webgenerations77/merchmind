@@ -8,6 +8,26 @@ interface Message {
   content: string;
 }
 
+const VIBE_OPTIONS = ['funny', 'minimal', 'nostalgic', 'dark', 'ironic', 'hopeful', 'bold', 'weird', 'clean'];
+const CHANGE_OPTIONS = ['concept', 'typography', 'layout', 'color palette', 'illustration style', 'everything'];
+const AUDIENCE_OPTIONS = ['teens', 'parents', 'gift buyers', 'hobbyists', 'niche community', 'gen z', 'millennials'];
+
+function Pill({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+        selected
+          ? 'bg-[#3aaa6e] text-white border border-transparent'
+          : 'bg-[#0d0f0e] text-[#f0ede6] border border-[#f0ede6]/30 hover:border-[#f0ede6]/60'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 export default function SuggestDrawer({
   design,
   onClose,
@@ -22,6 +42,9 @@ export default function SuggestDrawer({
   const [sending, setSending] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [vibe, setVibe] = useState<string[]>([]);
+  const [changeFocus, setChangeFocus] = useState<string | null>(null);
+  const [audience, setAudience] = useState<string[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -54,12 +77,25 @@ export default function SuggestDrawer({
     inputRef.current?.focus();
   };
 
+  const toggleVibe = (v: string) =>
+    setVibe((prev) =>
+      prev.includes(v) ? prev.filter((x) => x !== v) : prev.length < 3 ? [...prev, v] : prev,
+    );
+
+  const toggleAudience = (a: string) =>
+    setAudience((prev) => (prev.includes(a) ? prev.filter((x) => x !== a) : [...prev, a]));
+
   const handleRegenerate = async () => {
     if (regenerating || messages.length === 0) return;
     setRegenerating(true);
     setError(null);
+    const brief = {
+      vibe: vibe.length ? vibe : undefined,
+      change_focus: changeFocus ?? undefined,
+      audience: audience.length ? audience : undefined,
+    };
     try {
-      const res = await suggestRegenerate(design.id, messages);
+      const res = await suggestRegenerate(design.id, messages, brief);
       onRegenerated(res.version);
     } catch {
       setError('Regeneration failed. Try again.');
@@ -71,6 +107,9 @@ export default function SuggestDrawer({
     await clearChat(design.id).catch(() => null);
     setMessages([]);
     setError(null);
+    setVibe([]);
+    setChangeFocus(null);
+    setAudience([]);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -153,6 +192,41 @@ export default function SuggestDrawer({
 
         {/* Input + Regenerate */}
         <div className="border-t border-border p-3 space-y-2 shrink-0">
+          {/* Pre-populated question controls */}
+          <div className="space-y-2.5 max-h-48 overflow-y-auto">
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-text-secondary">What's the core vibe? <span className="font-normal text-text-tertiary">(pick 1–3)</span></p>
+              <div className="flex flex-wrap gap-1.5">
+                {VIBE_OPTIONS.map((v) => (
+                  <Pill key={v} label={v} selected={vibe.includes(v)} onClick={() => toggleVibe(v)} />
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-text-secondary">What should change most?</p>
+              <div className="flex flex-wrap gap-1.5">
+                {CHANGE_OPTIONS.map((c) => (
+                  <Pill
+                    key={c}
+                    label={c}
+                    selected={changeFocus === c}
+                    onClick={() => setChangeFocus((prev) => (prev === c ? null : c))}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-text-secondary">Who's this for?</p>
+              <div className="flex flex-wrap gap-1.5">
+                {AUDIENCE_OPTIONS.map((a) => (
+                  <Pill key={a} label={a} selected={audience.includes(a)} onClick={() => toggleAudience(a)} />
+                ))}
+              </div>
+            </div>
+          </div>
+
           <div className="flex gap-2">
             <textarea
               ref={inputRef}

@@ -78,8 +78,18 @@ export interface SuggestRegenerateResult {
   version: number;
 }
 
-export async function suggestRegenerate(designId: string, conversation: { role: string; content: string }[]): Promise<SuggestRegenerateResult> {
-  const { data } = await apiClient.post<ApiResponse<SuggestRegenerateResult>>(`/designs/${designId}/suggest-regenerate`, { conversation });
+export interface SuggestBrief {
+  vibe?: string[];
+  change_focus?: string;
+  audience?: string[];
+}
+
+export async function suggestRegenerate(
+  designId: string,
+  conversation: { role: string; content: string }[],
+  brief?: SuggestBrief,
+): Promise<SuggestRegenerateResult> {
+  const { data } = await apiClient.post<ApiResponse<SuggestRegenerateResult>>(`/designs/${designId}/suggest-regenerate`, { conversation, ...brief });
   return data.data;
 }
 

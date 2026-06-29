@@ -83,3 +83,6 @@ class ChatMessageIn(BaseModel):
 
 class SuggestRegenerateRequest(BaseModel):
     conversation: list[dict]
+    vibe: Optional[list[str]] = None
+    change_focus: Optional[str] = None
+    audience: Optional[list[str]] = None

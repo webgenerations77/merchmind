@@ -494,14 +494,29 @@ def suggest_regenerate(
     from app.utils.claude_client import claude
 
     synth_messages = [{"role": m["role"], "content": m["content"]} for m in body.conversation]
+
+    # Prepend a structured brief from the pre-populated question controls, if provided.
+    brief_parts = []
+    if body.vibe:
+        brief_parts.append(f"Vibe: {', '.join(body.vibe)}")
+    if body.change_focus:
+        brief_parts.append(f"Focus: {body.change_focus}")
+    if body.audience:
+        brief_parts.append(f"Audience: {', '.join(body.audience)}")
+    brief = (". ".join(brief_parts) + ".") if brief_parts else ""
+
+    synth_instruction = (
+        "Based on our conversation, write a concise design directive that captures "
+        "all the changes I requested. This will be fed directly to the image generation "
+        "pipeline. Include: desired concept changes, style/mood adjustments, text changes, "
+        "and any archetype preference. Reply with ONLY the directive, no preamble."
+    )
+    if brief:
+        synth_instruction = f"{brief}\n\n{synth_instruction}"
+
     synth_messages.append({
         "role": "user",
-        "content": (
-            "Based on our conversation, write a concise design directive that captures "
-            "all the changes I requested. This will be fed directly to the image generation "
-            "pipeline. Include: desired concept changes, style/mood adjustments, text changes, "
-            "and any archetype preference. Reply with ONLY the directive, no preamble."
-        ),
+        "content": synth_instruction,
     })
 
     try:
