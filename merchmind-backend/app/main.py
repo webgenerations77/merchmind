@@ -31,6 +31,7 @@ from app.routers import (
     health,
     custom_ideas,
     trends,
+    catalog as catalog_router,
 )
 
 # JSON structured logging for Railway log aggregation
@@ -91,6 +92,7 @@ app.include_router(onboarding.router)
 app.include_router(health.router)
 app.include_router(custom_ideas.router)
 app.include_router(trends.router)
+app.include_router(catalog_router.router)
 
 
 @app.on_event("startup")
