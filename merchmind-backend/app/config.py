@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     # (Custom flows — Drew's Mind, Collections — have their own paths and are unaffected.)
     REQUIRE_TREND_APPROVAL: bool = True
 
+    # Printify catalog cache
+    PRINTIFY_CATALOG_TTL_HOURS: int = 24
+    PRINTIFY_MAX_COLORS_PER_PRODUCT: int = 25
+
     # App
     APP_API_KEY: str = "dev-api-key"
     ENVIRONMENT: str = "development"
