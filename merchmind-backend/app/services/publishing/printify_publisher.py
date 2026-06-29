@@ -57,10 +57,12 @@ _FALLBACK_BASE_COSTS = {
     "sticker": 2.50,
 }
 
+# Apparel scaled to 0.85 (~15% smaller print) per Drew's feedback — designs
+# were filling the print area edge-to-edge; 0.85 leaves breathing room.
 _SCALE_MAP = {
-    "tshirt": 1.0,
-    "hoodie": 1.0,
-    "long_sleeve": 1.0,
+    "tshirt": 0.85,
+    "hoodie": 0.85,
+    "long_sleeve": 0.85,
     "mug": 1.0,
     "hat": 0.9,
     "phone_case": 1.0,

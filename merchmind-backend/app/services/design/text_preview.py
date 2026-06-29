@@ -201,14 +201,14 @@ def _draw_outlined_text(
     outline_color: tuple | None = None,
     outline_width: int = 3,
 ):
-    if outline_color:
-        x, y = pos
-        for dx in range(-outline_width, outline_width + 1):
-            for dy in range(-outline_width, outline_width + 1):
-                if dx == 0 and dy == 0:
-                    continue
-                draw.text((x + dx, y + dy), text, fill=outline_color, font=font)
-    draw.text(pos, text, fill=fill, font=font)
+    # Use Pillow's native stroke — drawing the glyph (2w+1)^2 times in a manual
+    # offset loop is O(w^2) and hangs for the thick, font-scaled outlines we now
+    # use on the 4500px canvas. stroke_width renders the same result in one pass.
+    if outline_color and outline_width > 0:
+        draw.text(pos, text, fill=fill, font=font,
+                  stroke_width=outline_width, stroke_fill=outline_color)
+    else:
+        draw.text(pos, text, fill=fill, font=font)
 
 
 def generate_text_preview(
@@ -228,15 +228,16 @@ def generate_text_preview(
     primary_font_name, secondary_font_name = _parse_font_pair(font_pair)
 
     if dark_mode:
+        # White text with a dark outline so it stays legible on BOTH dark AND
+        # light/white apparel. Pure white text (no outline) vanished on the
+        # default white t-shirt mockup.
         text_color = (255, 255, 255)
-        secondary_color = (200, 200, 200)
-        outline_color = None
-        outline_w = 0
+        secondary_color = (220, 220, 220)
+        outline_color = (24, 24, 24)
     else:
         text_color = (26, 26, 26)
         secondary_color = (80, 80, 80)
         outline_color = (255, 255, 255)
-        outline_w = 3
 
     img = Image.new("RGBA", (_CANVAS_W, _CANVAS_H), _BG_COLOR)
     draw = ImageDraw.Draw(img)
@@ -247,6 +248,10 @@ def generate_text_preview(
     primary_size, lines, primary_font = _fit_font_size(
         display_text, primary_font_name, _CANVAS_W, _CANVAS_H, word_count,
     )
+
+    # Outline width scaled to the font size — a fixed 3px is invisible on the
+    # 4500px canvas. ~4-5% of the glyph height reads cleanly as a border.
+    outline_w = max(6, primary_size // 22)
 
     line_height_factor = 1.4 if word_count > 7 else 1.3
     line_height = int(primary_size * line_height_factor)
