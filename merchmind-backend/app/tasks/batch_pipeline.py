@@ -29,7 +29,7 @@ from app.models.niche_cluster import NicheCluster
 from app.models.settings import AppSettings
 from app.models.batch_item import BatchItem
 
-from app.services.intelligence import google_trends, reddit_scraper, twitter_scraper, seasonal_calendar
+from app.services.intelligence import google_trends, reddit_scraper, twitter_scraper, seasonal_calendar, firecrawl_trends
 from app.services.intelligence.trend_dedup import normalize_concept, build_seen_set
 from app.services.intelligence.trend_scorer import score_trend_signal, score_merch_viability, check_risk
 from app.services.design.archetype_classifier import classify_archetype, select_image_api
@@ -123,7 +123,7 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
         active_clusters = db.query(NicheCluster).filter(NicheCluster.active == True).all()
 
         # Step 2: Scrape intelligence sources
-        enabled_sources = set(trend_sources) if trend_sources else {"google_trends", "reddit", "twitter", "seasonal"}
+        enabled_sources = set(trend_sources) if trend_sources else {"google_trends", "reddit", "twitter", "seasonal", "firecrawl"}
         _emit_progress(bid, 2, 8, f"Scraping trend sources: {', '.join(enabled_sources)}")
         raw_signals = []
 
@@ -180,6 +180,17 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                 raw_signals.extend(seasonal_calendar.get_upcoming_events())
             except Exception as e:
                 _log_batch_error(batch, db, f"Seasonal calendar failed: {e}")
+
+        # Firecrawl web-search trends (augments breadth; niche-aware via cluster names)
+        if "firecrawl" in enabled_sources:
+            try:
+                extra_queries = [f"trending {c.name} t-shirt designs" for c in active_clusters[:5]]
+                raw_signals.extend(_run_with_timeout(
+                    firecrawl_trends.fetch_trending_merch, extra_queries,
+                    label="firecrawl.trending_merch",
+                ))
+            except Exception as e:
+                _log_batch_error(batch, db, f"Firecrawl scraper failed: {e}")
 
         logger.info(f"Scraped {len(raw_signals)} raw signals")
 

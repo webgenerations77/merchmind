@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     # Ideogram
     IDEOGRAM_API_KEY: str = ""
 
+    # Firecrawl (web-search trend source)
+    FIRECRAWL_API_KEY: str = ""
+
     # Expo Push
     EXPO_ACCESS_TOKEN: str = ""
 

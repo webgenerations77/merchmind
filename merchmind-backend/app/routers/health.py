@@ -44,6 +44,7 @@ def health_integrations(_: str = Depends(verify_api_key)) -> dict:
         "google_trends": _check_google_trends,
         "reddit": _check_reddit,
         "twitter": _check_twitter,
+        "firecrawl": _check_firecrawl,
         "image_generator": _check_image_generator,
         "placeit": _check_placeit,
     }
@@ -99,6 +100,11 @@ def _check_pinterest() -> dict:
 def _check_klaviyo() -> dict:
     from app.services.marketing.klaviyo_service import get_klaviyo_service
     return get_klaviyo_service().health_check()
+
+
+def _check_firecrawl() -> dict:
+    from app.services.intelligence.firecrawl_trends import get_firecrawl_trends_service
+    return get_firecrawl_trends_service().health_check()
 
 
 def _check_google_trends() -> dict:
