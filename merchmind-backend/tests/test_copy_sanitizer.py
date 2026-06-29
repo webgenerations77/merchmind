@@ -103,6 +103,14 @@ def test_build_product_title_sanitizes_em_dash_from_base():
     assert title == "Trash Panda, Energy - Tshirt"
 
 
+def test_system_prompt_forbids_personalization_and_uploads():
+    s = shopify_copy_generator._SYSTEM.lower()
+    assert "upload" in s            # must warn against photo/file uploads
+    assert "personaliz" in s        # no personalization
+    assert "your pet" in s          # the exact forbidden phrasing is called out
+    assert "made-to-order" in s or "made to order" in s
+
+
 def test_generate_shopify_copy_sanitizes_model_output():
     payload = json.dumps({
         "shopify_title": "Trash Panda — Energy",

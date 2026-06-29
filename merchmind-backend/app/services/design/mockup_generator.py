@@ -96,6 +96,24 @@ def _smart_crop_to_aspect(img: Image.Image, target_w: int, target_h: int) -> Ima
     return img.resize((target_w, target_h), Image.LANCZOS)
 
 
+def _composite_design(canvas: Image.Image, design: Image.Image, area: tuple) -> None:
+    """Paste `design` into `area`, smart-cropped to the area's aspect ratio, using
+    the design's alpha channel as the paste mask so transparent/semi-transparent
+    edges blend into the garment instead of producing a hard rectangular box.
+
+    Always converts to RGBA first; a bare paste of a non-RGBA (or opaque-edged)
+    image is exactly what produced the box artifact.
+    """
+    if design.mode != "RGBA":
+        design = design.convert("RGBA")
+    area_w = area[2] - area[0]
+    area_h = area[3] - area[1]
+    resized = _smart_crop_to_aspect(design, area_w, area_h)
+    if resized.mode != "RGBA":
+        resized = resized.convert("RGBA")
+    canvas.paste(resized, (area[0], area[1]), mask=resized.split()[3])
+
+
 def _add_drop_shadow(canvas: Image.Image, shape_bbox: tuple, radius: int = 15, offset: tuple = (4, 6), color: tuple = (0, 0, 0, 60)):
     """Add a soft drop shadow behind a rectangular region."""
     shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
@@ -252,10 +270,7 @@ def generate_mockup(product_type: str, design_bytes: bytes, archetype: str | Non
         elif product_type == "hat":
             _draw_hat(canvas, draw, design, area)
         elif product_type == "tshirt":
-            area_w = area[2] - area[0]
-            area_h = area[3] - area[1]
-            design_resized = _smart_crop_to_aspect(design, area_w, area_h)
-            canvas.paste(design_resized, (area[0], area[1]), design_resized)
+            _composite_design(canvas, design, area)
 
             collar_color = (50, 50, 50)
             draw.arc([300, 15, 500, 120], start=200, end=340, fill=collar_color, width=3)
@@ -263,10 +278,7 @@ def generate_mockup(product_type: str, design_bytes: bytes, archetype: str | Non
             draw.line([(600, 200), (700, 300), (700, 400), (600, 350)], fill=collar_color, width=2)
             draw.rounded_rectangle([150, 180, 650, 900], radius=20, outline=collar_color, width=2)
         elif product_type == "hoodie":
-            area_w = area[2] - area[0]
-            area_h = area[3] - area[1]
-            design_resized = _smart_crop_to_aspect(design, area_w, area_h)
-            canvas.paste(design_resized, (area[0], area[1]), design_resized)
+            _composite_design(canvas, design, area)
 
             outline = (50, 50, 50)
             draw.rounded_rectangle([140, 180, 660, 920], radius=20, outline=outline, width=2)
@@ -278,10 +290,7 @@ def generate_mockup(product_type: str, design_bytes: bytes, archetype: str | Non
             # Kangaroo pocket
             draw.rounded_rectangle([260, 650, 540, 760], radius=15, outline=outline, width=2)
         elif product_type == "long_sleeve":
-            area_w = area[2] - area[0]
-            area_h = area[3] - area[1]
-            design_resized = _smart_crop_to_aspect(design, area_w, area_h)
-            canvas.paste(design_resized, (area[0], area[1]), design_resized)
+            _composite_design(canvas, design, area)
 
             outline = (50, 50, 50)
             draw.arc([300, 15, 500, 120], start=200, end=340, fill=outline, width=3)
@@ -292,10 +301,7 @@ def generate_mockup(product_type: str, design_bytes: bytes, archetype: str | Non
             draw.rectangle([55, 680, 145, 710], outline=outline, width=2)
             draw.rectangle([655, 680, 745, 710], outline=outline, width=2)
         else:
-            area_w = area[2] - area[0]
-            area_h = area[3] - area[1]
-            design_resized = _smart_crop_to_aspect(design, area_w, area_h)
-            canvas.paste(design_resized, (area[0], area[1]), design_resized)
+            _composite_design(canvas, design, area)
 
         label_font = _load_font(14)
         label = template.get("label", product_type)

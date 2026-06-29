@@ -8,7 +8,6 @@ import logging
 from dataclasses import dataclass, field
 from functools import lru_cache
 from PIL import Image
-from rembg import remove
 
 from app.utils.exceptions import PostProcessingError, ContrastCheckFailedError, BleedZoneViolationError, StorageUploadError
 from app.utils.storage import storage
@@ -58,11 +57,34 @@ def _harden_alpha(img: Image.Image, low: int = 50) -> Image.Image:
 
 
 def remove_background(image_bytes: bytes) -> Image.Image:
+    # Imported lazily: rembg pulls in onnxruntime and is only present in the
+    # Docker image, so the pure-Pillow helpers in this module stay importable
+    # (and testable) in environments without it.
+    from rembg import remove
+
     # post_process_mask=True drops stray mask islands rembg would otherwise keep;
     # _harden_alpha then clears the faint semi-transparent halo it leaves behind.
     result = remove(image_bytes, post_process_mask=True)
     img = Image.open(io.BytesIO(result)).convert("RGBA")
     return _harden_alpha(img)
+
+
+def has_transparency(img: Image.Image) -> bool:
+    """True if the image carries an alpha channel with at least one non-opaque
+    pixel. A design with no transparency composites as a hard rectangular box on
+    the garment, so this is the signal for a box-prone export."""
+    if img.mode != "RGBA":
+        return False
+    return img.split()[3].getextrema()[0] < 255
+
+
+def log_composite(design_id: str, img: Image.Image, background_removed: bool) -> None:
+    """Per-design confirmation that the export carries the expected transparency.
+    has_alpha=False means the design will print as a box on the garment."""
+    logger.info(
+        "design=%s Design composited: mode=%s, has_alpha=%s, background_removed=%s",
+        design_id[:8], img.mode, has_transparency(img), background_removed,
+    )
 
 
 def _autocrop(img: Image.Image, threshold: int = 10) -> Image.Image:

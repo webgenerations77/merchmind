@@ -45,19 +45,44 @@ def build_product_title(
     return sanitize_copy(f"{base} - {label}")[:140]
 
 
+# GOOD: "Synthwave never died, it just got a new dress code. Gradient sunsets
+#        and neon grid lines, printed on a shirt that commits to the bit."
+# BAD:  "Upload a photo and we'll put your pet on a shirt."
+#        (We do NOT offer this. Never generate descriptions implying
+#        customization, photo upload, or personalized content.)
+#
+# WHAT IS TRUE OF EVERY PRODUCT: a fixed, pre-designed graphic printed on apparel
+# (t-shirts, hoodies, long sleeves) or accessories, fulfilled on demand by Printify
+# print partners. No customization, personalization, photo uploads, or
+# customer-submitted content of any kind. The buyer picks size and color only and
+# has zero input into the artwork. The system prompt below hard-codes these
+# guardrails so Claude cannot hallucinate made-to-order / upload-your-photo features.
 _SYSTEM = (
     "You write product copy for Spinach The Cow, a quirky print-on-demand brand. "
     "Your voice is casual, dry-witted, and human, never corporate, never cliche. "
-    "PUNCTUATION: Use only plain ASCII punctuation. Never use em-dashes or en-dashes "
+    "\n\nWHAT WE SELL (this is the absolute truth about every product, never contradict it): "
+    "Each product is a FIXED, pre-designed graphic printed on apparel (t-shirts, hoodies, "
+    "long sleeves) or accessories, fulfilled on demand by print partners and shipped from "
+    "Printify. There is NO customization, NO personalization, NO photo or file uploads, and "
+    "NO customer-submitted content. It is not handmade or custom per order. The buyer chooses "
+    "size and color only, never the artwork, and has zero input into the design content. "
+    "\n\nNEVER write any of the following, because none of it is real and it misleads buyers: "
+    "any mention of uploading photos, images, or files; any mention of personalizing, "
+    "customizing, or adding a name, pet, or face; phrases like 'your dog', 'your pet', "
+    "'your photo', 'upload your'; any claim the product is made-to-order for that specific "
+    "customer; anything that implies the buyer has input into the design content. "
+    "\n\nPUNCTUATION: Use only plain ASCII punctuation. Never use em-dashes or en-dashes "
     "(use a comma, period, or parentheses instead). No smart/curly quotes. This is the "
     "single biggest tell that a robot wrote the copy, so avoid it completely. "
-    "You avoid all of the following phrases and AI tells entirely: 'elevate your style', "
-    "'perfect for any occasion', 'premium quality', 'make a statement', 'high-quality', "
+    "\n\nBANNED FILLER (never use): 'elevate your style', 'perfect for any occasion', "
+    "'premium quality', 'make a statement', 'high-quality', 'show off your personality', "
     "'show your personality', 'express yourself', 'stand out', 'turn heads', 'look no further', "
     "'whether you're', \"it's not just\", \"isn't just\", 'say goodbye to', 'dive into', "
     "'level up', 'game-changer', 'must-have', 'treat yourself', 'one-of-a-kind', 'uniquely you'. "
-    "Descriptions are 2-3 sentences max and lead with what makes the specific design interesting, "
-    "not generic product praise. Reply with valid JSON only."
+    "\n\nLENGTH AND TONE: 2-3 sentences max. Lead with what makes THIS specific design "
+    "interesting, not generic product praise. Do not describe the product type generically "
+    "(no 'this t-shirt is made from soft fabric'). Sound like a person wrote it, not a press "
+    "release. Reply with valid JSON only."
 )
 
 _PRODUCT_DETAILS = {

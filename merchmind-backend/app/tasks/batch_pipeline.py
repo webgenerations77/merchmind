@@ -610,11 +610,12 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                     # All visual archetypes (illustration, hybrid, text_icon) go
                     # through full rembg + 4500x5400 canvas. The old lite Pillow
                     # white-remover left grey/colored ghosts on hybrid outputs.
-                    from app.services.design.post_processor import process_image as full_process, image_to_bytes as img2b
+                    from app.services.design.post_processor import process_image as full_process, image_to_bytes as img2b, log_composite
                     canvas, report = full_process(raw_bytes)
                     clean_bytes = img2b(canvas)
                     color_palette = report.get("color_palette", [])
                     logger.info("design_task[%s] %s: rembg + canvas 4500x5400", trend_id[:8], archetype)
+                    log_composite(design_id, canvas, background_removed=True)
                     proc_path = storage.design_processed_path(design_id)
                     processed_url = storage.upload(proc_path, clean_bytes)
                     design.processed_image_url = processed_url
@@ -704,6 +705,10 @@ def _generate_design_for_trend(self, trend_id: str, batch_id: str, pipeline_sett
                 light_variant_url = storage.upload(light_path, light_bytes, "image/png")
                 db.commit()
                 logger.info(f"design_task[{trend_id[:8]}] text preview: dark + light variants generated")
+                import io as _io
+                from PIL import Image as _Image
+                from app.services.design.post_processor import log_composite
+                log_composite(design_id, _Image.open(_io.BytesIO(preview_bytes)), background_removed=False)
             except Exception as preview_err:
                 logger.warning(f"Text preview generation failed for design {design_id}: {preview_err}")
 

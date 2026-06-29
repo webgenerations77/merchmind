@@ -163,6 +163,10 @@ def generate_and_store(
         "ideogram.store design=%s raw=%d processed=%d",
         design_id[:8], len(image_bytes), len(clean_bytes),
     )
+    import io
+    from PIL import Image
+    from app.services.design.post_processor import log_composite
+    log_composite(design_id, Image.open(io.BytesIO(clean_bytes)), background_removed=True)
     return raw_url, processed_url, prompt
 
 
