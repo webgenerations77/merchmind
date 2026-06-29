@@ -20,6 +20,7 @@ from app.utils.exceptions import (
 )
 from app.utils.rate_limiter import printify_limiter
 from app.utils.storage import storage
+from app.services.catalog.catalog_service import get_catalog_service
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +159,19 @@ class PrintifyService:
         logger.info("printify.upload_image id=%s file=%s", image_id, file_name)
         return str(image_id)
 
+    def _select_enabled_variant_ids(self, blueprint_id: int, provider_id: int, all_variants: list[dict]) -> list[int]:
+        """Enable variants spread across colors (one mockup per color) when the catalog
+        has data; otherwise fall back to the legacy first-20 slice."""
+        try:
+            spread = get_catalog_service().get_enabled_variant_ids(
+                blueprint_id, provider_id, settings.PRINTIFY_MAX_COLORS_PER_PRODUCT
+            )
+            if spread:
+                return spread
+        except Exception as e:
+            logger.warning("printify.color_spread fallback (catalog unavailable): %s", e)
+        return [v["id"] for v in all_variants[:20]]
+
     def create_product(
         self,
         product_type: str,
@@ -178,9 +192,10 @@ class PrintifyService:
         printify_image_id = self.upload_image(image_url, f"{product_type}_design.png")
 
         all_variants = self.get_blueprint_variants(product_type, print_provider_id)
+        enabled_ids = self._select_enabled_variant_ids(blueprint_id, print_provider_id, all_variants)
         variants = [
-            {"id": v["id"], "price": int(retail_price * 100), "is_enabled": True}
-            for v in all_variants[:20]
+            {"id": vid, "price": int(retail_price * 100), "is_enabled": True}
+            for vid in enabled_ids
         ]
 
         # Printify placement: x/y are normalized 0.0–1.0 within the print area.
@@ -217,7 +232,7 @@ class PrintifyService:
             "variants": variants,
             "print_areas": [
                 {
-                    "variant_ids": [v["id"] for v in all_variants[:20]],
+                    "variant_ids": enabled_ids,
                     "placeholders": placeholders,
                 }
             ],
