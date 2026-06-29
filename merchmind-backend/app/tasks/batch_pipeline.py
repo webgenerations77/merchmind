@@ -967,6 +967,18 @@ def generate_approved_designs(self, batch_id: str, style_filter: Optional[str] =
         if not batch:
             raise ValueError(f"Batch {batch_id} not found")
 
+        # Idempotency: a duplicate/retried delivery of this task (Celery is
+        # at-least-once) can land on a batch that already finished. Treat any
+        # terminal status as a no-op instead of raising — otherwise the except
+        # handler below flips the already-successful batch to "failed" and
+        # retries, crashing in a loop.
+        if batch.status in ("complete", "failed", "cancelled"):
+            logger.info(
+                "generate_approved_designs: batch %s already terminal (%s) — "
+                "skipping duplicate generation", batch_id, batch.status,
+            )
+            return
+
         if batch.status not in ("pending_approval", "running"):
             raise ValueError(f"Batch {batch_id} is in status '{batch.status}', cannot generate designs")
 
