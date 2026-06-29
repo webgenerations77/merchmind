@@ -255,6 +255,15 @@ class PrintifyService:
         )
         logger.info("printify.unpublish_product product_id=%s", printify_product_id)
 
+    def update_title(self, printify_product_id: str, title: str) -> None:
+        """Update only the title of an existing Printify product (partial update)."""
+        self._request(
+            "PUT",
+            f"/shops/{settings.PRINTIFY_SHOP_ID}/products/{printify_product_id}.json",
+            json={"title": title},
+        )
+        logger.info("printify.update_title product_id=%s title=%r", printify_product_id, title)
+
     def delete_product(self, printify_product_id: str) -> None:
         try:
             self._request("DELETE", f"/shops/{settings.PRINTIFY_SHOP_ID}/products/{printify_product_id}.json")
@@ -402,6 +411,10 @@ def create_product(
 
 def delete_product(printify_product_id: str) -> None:
     _get().delete_product(printify_product_id)
+
+
+def update_title(printify_product_id: str, title: str) -> None:
+    _get().update_title(printify_product_id, title)
 
 
 def generate_mockups(printify_product_id: str, design_id: str | None = None, product_type: str | None = None) -> dict:

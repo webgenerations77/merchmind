@@ -17,7 +17,7 @@ from app.services.design.image_generator import generate_image
 from app.services.design.quality_scorer import assign_product_bundle, select_primary_product_type, default_primary_product_type
 from app.services.design.font_selector import select_font_pair
 from app.services.design.text_compositor import composite_text_on_image, should_composite
-from app.services.design.shopify_copy_generator import generate_shopify_copy
+from app.services.design.shopify_copy_generator import generate_shopify_copy, build_product_title
 from app.utils.text import to_title_case
 from app.services.pricing.pricing_engine import calculate_price
 from app.services.publishing.printify_publisher import get_base_cost, _DUAL_PRINT_SURCHARGE
@@ -224,12 +224,15 @@ def generate_idea_design(self, idea_id: str):
             svc = _get_printify()
             for product in db.query(Product).filter(Product.design_id == design.id).all():
                 try:
-                    product_label = product.product_type.replace("_", " ").title()
                     product_back_logo = back_logo_url if (back_logo_enabled and product.product_type in back_logo_products) else None
                     use_image = light_variant_url if (light_variant_url and product.product_type in _LIGHT_PRODUCT_TYPES) else image_url
                     printify_id = svc.create_product(
                         product_type=product.product_type,
-                        title=f"{design.shopify_title or design.concept_name} — {product_label}",
+                        title=build_product_title(
+                            product.product_type,
+                            shopify_title=design.shopify_title,
+                            concept_name=design.concept_name,
+                        ),
                         description=design.shopify_description or "",
                         image_url=use_image,
                         retail_price=float(product.retail_price),

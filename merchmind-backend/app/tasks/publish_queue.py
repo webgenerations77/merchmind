@@ -12,6 +12,7 @@ from app.models.marketing_asset import MarketingAsset
 from app.models.alert import Alert
 from app.services.publishing.printify_publisher import create_product, delete_product, generate_mockups
 from app.services.publishing.shopify_publisher import create_product_draft, activate_product
+from app.services.design.shopify_copy_generator import build_product_title
 
 logger = logging.getLogger(__name__)
 
@@ -67,11 +68,13 @@ def _publish_single_design(design: Design, db):
         printify_id = None
         try:
             image_url = design.processed_image_url or design.raw_image_url or ""
-            product_label = product.product_type.replace("_", " ").title()
-            base_name = design.concept_name or design.shopify_title or "Design"
             printify_id = create_product(
                 product_type=product.product_type,
-                title=f"{base_name} — {product_label}",
+                title=build_product_title(
+                    product.product_type,
+                    shopify_title=design.shopify_title,
+                    concept_name=design.concept_name,
+                ),
                 description=design.shopify_description or "",
                 image_url=image_url,
                 retail_price=float(product.retail_price),

@@ -27,6 +27,24 @@ def sanitize_copy(text: str) -> str:
     return text.strip()
 
 
+def build_product_title(
+    product_type: str,
+    *,
+    shopify_title: str | None = None,
+    concept_name: str | None = None,
+) -> str:
+    """Build the customer-facing store/Printify product title.
+
+    Prefers the punchy, brand-voiced ``shopify_title`` over the raw scraped
+    ``concept_name`` (which reads AI-generated), joins the humanized product type
+    with a plain ASCII " - " (never an em-dash), and runs the result through
+    ``sanitize_copy`` so any em/en-dash from upstream is scrubbed.
+    """
+    base = (shopify_title or concept_name or "Design").strip() or "Design"
+    label = product_type.replace("_", " ").title()
+    return sanitize_copy(f"{base} - {label}")[:140]
+
+
 _SYSTEM = (
     "You write product copy for Spinach The Cow, a quirky print-on-demand brand. "
     "Your voice is casual, dry-witted, and human, never corporate, never cliche. "

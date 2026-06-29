@@ -795,6 +795,44 @@ def sanitize_descriptions(db: Session = Depends(get_db), _: str = Depends(verify
     })
 
 
+@router.post("/backfill-product-titles")
+def backfill_product_titles(db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
+    """Backfill: rewrite existing Printify product titles to the brand-voiced
+    shopify_title with an ASCII separator (dropping the old concept_name + em-dash
+    titles). Idempotent — re-running on already-correct titles is a no-op on Printify.
+    Per-product failures are logged and skipped; they do not abort the batch."""
+    from app.models.product import Product
+    from app.services.design.shopify_copy_generator import build_product_title
+    from app.services.publishing.printify_publisher import update_title
+
+    products = (
+        db.query(Product)
+        .join(Design, Product.design_id == Design.id)
+        .filter(
+            Product.printify_product_id.isnot(None),
+            Product.publish_status.notin_(["retired", "unpublished"]),
+            Design.is_deleted == False,
+        )
+        .all()
+    )
+    updated = 0
+    failed = 0
+    for p in products:
+        title = build_product_title(
+            p.product_type,
+            shopify_title=p.design.shopify_title if p.design else None,
+            concept_name=p.design.concept_name if p.design else None,
+        )
+        try:
+            update_title(p.printify_product_id, title)
+            updated += 1
+        except Exception as e:
+            failed += 1
+            logger.warning("backfill_product_titles failed product_id=%s printify_id=%s: %s", p.id, p.printify_product_id, e)
+    logger.info("backfill_product_titles scanned=%d updated=%d failed=%d", len(products), updated, failed)
+    return _envelope({"scanned": len(products), "updated": updated, "failed": failed})
+
+
 @router.post("/{design_id}/rerender-preview")
 def rerender_preview(
     design_id: UUID,

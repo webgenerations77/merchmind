@@ -3,7 +3,11 @@ import json
 from unittest.mock import patch
 
 from app.services.design import shopify_copy_generator
-from app.services.design.shopify_copy_generator import sanitize_copy, generate_shopify_copy
+from app.services.design.shopify_copy_generator import (
+    sanitize_copy,
+    generate_shopify_copy,
+    build_product_title,
+)
 
 
 def test_em_dash_with_spaces_becomes_comma():
@@ -65,6 +69,38 @@ def test_none_returns_none():
 
 def test_plain_text_unchanged():
     assert sanitize_copy("A soft cotton tee with a funny dog on it.") == "A soft cotton tee with a funny dog on it."
+
+
+def test_build_product_title_prefers_shopify_title():
+    title = build_product_title("tshirt", shopify_title="Meeting Survivor", concept_name="Sarcastic Office Coffee Mug Sayings")
+    assert title == "Meeting Survivor - Tshirt"
+
+
+def test_build_product_title_uses_ascii_separator_no_em_dash():
+    title = build_product_title("hoodie", shopify_title="Feral Raccoon Energy")
+    assert "—" not in title and "–" not in title
+    assert title == "Feral Raccoon Energy - Hoodie"
+
+
+def test_build_product_title_humanizes_product_label():
+    title = build_product_title("long_sleeve", shopify_title="Cozy Season")
+    assert title == "Cozy Season - Long Sleeve"
+
+
+def test_build_product_title_falls_back_to_concept_name():
+    title = build_product_title("tshirt", shopify_title=None, concept_name="Trash Panda Energy")
+    assert title == "Trash Panda Energy - Tshirt"
+
+
+def test_build_product_title_falls_back_to_design_when_empty():
+    title = build_product_title("mug", shopify_title="", concept_name="")
+    assert title == "Design - Mug"
+
+
+def test_build_product_title_sanitizes_em_dash_from_base():
+    title = build_product_title("tshirt", shopify_title="Trash Panda — Energy")
+    assert "—" not in title
+    assert title == "Trash Panda, Energy - Tshirt"
 
 
 def test_generate_shopify_copy_sanitizes_model_output():
