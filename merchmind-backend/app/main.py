@@ -110,6 +110,16 @@ async def on_startup():
     # This catches cases where a migration ran but its DDL didn't commit (COMMIT/BEGIN pattern).
     _apply_critical_schema_fallback()
 
+    # Warm the Printify catalog cache in the background — never block startup.
+    import asyncio
+    async def _warm_catalog():
+        try:
+            from app.services.catalog.catalog_service import get_catalog_service
+            await asyncio.to_thread(get_catalog_service().ensure_fresh)
+        except Exception as e:
+            logger.warning(f"Catalog warm failed (non-fatal): {e}")
+    asyncio.create_task(_warm_catalog())
+
 
 def _apply_critical_schema_fallback():
     """Ensure critical tables/columns exist if Alembic migration failed."""

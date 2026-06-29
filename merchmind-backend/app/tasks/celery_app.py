@@ -20,6 +20,7 @@ celery_app = Celery(
         "app.tasks.collection_generator",
         "app.tasks.idea_generator",
         "app.tasks.drop_publisher",
+        "app.tasks.catalog_refresh",
     ],
 )
 
@@ -111,6 +112,10 @@ celery_app.conf.beat_schedule = {
     "check-scheduled-drops": {
         "task": "app.tasks.drop_publisher.check_scheduled_drops",
         "schedule": crontab(minute="*/5"),                       # Every 5 minutes
+    },
+    "daily-catalog-refresh": {
+        "task": "app.tasks.catalog_refresh.refresh_printify_catalog",
+        "schedule": crontab(hour=3, minute=0),                   # daily 3am UTC
     },
     # "health-monitor": {
     #     "task": "tasks.health_monitor",
