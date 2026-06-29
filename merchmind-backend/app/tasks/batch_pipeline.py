@@ -30,6 +30,7 @@ from app.models.settings import AppSettings
 from app.models.batch_item import BatchItem
 
 from app.services.intelligence import google_trends, reddit_scraper, twitter_scraper, seasonal_calendar
+from app.services.intelligence.trend_dedup import normalize_concept, build_seen_set
 from app.services.intelligence.trend_scorer import score_trend_signal, score_merch_viability, check_risk
 from app.services.design.archetype_classifier import classify_archetype, select_image_api
 from app.services.design.prompt_builder import build_image_prompt, generate_text_content, get_product_format
@@ -52,6 +53,10 @@ logger = logging.getLogger(__name__)
 
 from app.config import settings as _settings
 _redis = redis.from_url(_settings.REDIS_URL)
+
+# Rotating archetype bias for balanced batches (image-only → text →
+# image+text → image_with_text). Applied per queued trend by index.
+_BIAS_ROTATION = ("image_only", "text", "image_text", "image_with_text")
 
 
 def _emit_progress(batch_id: str, step: int, total: int, message: str, data: dict = None):
@@ -178,17 +183,26 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
 
         logger.info(f"Scraped {len(raw_signals)} raw signals")
 
-        # Pre-filter: deduplicate and remove low-value signals before scoring
-        seen = set()
+        # Pre-filter: drop already-seen concepts (cross-batch de-dup against
+        # existing designs + last-8-weeks trends) and low-value signals, all
+        # before scoring so we don't spend Claude calls on concepts we discard.
+        try:
+            seen = build_seen_set(db, weeks=8)
+        except Exception as e:
+            logger.warning("build_seen_set failed (%s) — within-scrape dedup only", e)
+            seen = set()
+        before = len(raw_signals)
         filtered_signals = []
         for signal in raw_signals:
-            text = signal["raw_signal"].lower().strip()
+            text = normalize_concept(signal["raw_signal"])
             if text in seen or len(text) < 3 or len(text.split()) > 12:
                 continue
             seen.add(text)
             filtered_signals.append(signal)
-        logger.info(f"Pre-filter: {len(raw_signals)} → {len(filtered_signals)} signals")
         raw_signals = filtered_signals
+        logger.info(
+            "Pre-filter (incl. cross-batch dedup): %d → %d signals", before, len(raw_signals)
+        )
 
         if max_trends and len(raw_signals) > max_trends:
             raw_signals = raw_signals[:max_trends]
@@ -288,8 +302,11 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                 trend.status = "rejected"
         db.commit()
 
-        # Pre-classify archetype for each queued trend (for display in approval gate)
-        for trend in queued_trends:
+        # Pre-classify archetype for each queued trend (for display in approval
+        # gate). Rotate the archetype bias so each batch offers a varied mix
+        # (illustration→Flux, text, hybrid/text_icon, image_with_text→Ideogram)
+        # instead of the unbiased classifier's heavy image_with_text skew.
+        for i, trend in enumerate(queued_trends):
             if not trend.proposed_archetype:
                 try:
                     niche_name = ""
@@ -297,7 +314,8 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                         cluster = db.query(NicheCluster).filter(NicheCluster.id == trend.niche_cluster_id).first()
                         if cluster:
                             niche_name = cluster.name
-                    result = classify_archetype(trend.raw_signal, trend.source, niche_name)
+                    bias = _BIAS_ROTATION[i % len(_BIAS_ROTATION)]
+                    result = classify_archetype(trend.raw_signal, trend.source, niche_name, bias=bias)
                     archetype = result["archetype"] if isinstance(result, dict) else result
                     trend.proposed_archetype = archetype
                     if not trend.selected_generator:
@@ -341,7 +359,6 @@ def run_weekly_batch(self, batch_id: Optional[str] = None, max_designs: Optional
                     f"Designing {i + 1}/{len(queued_trends)}: {trend.raw_signal[:40]}",
                     {"current": i + 1, "total": len(queued_trends)},
                 )
-                _BIAS_ROTATION = ("image_only", "text", "image_text", "image_with_text")
                 archetype_bias = _BIAS_ROTATION[i % len(_BIAS_ROTATION)]
                 logger.info(f"Running design generation inline for trend {trend.id} (bias={archetype_bias})")
                 pipeline_cfg = {
@@ -1009,7 +1026,6 @@ def generate_approved_designs(self, batch_id: str, style_filter: Optional[str] =
 
         _emit_progress(batch_id, 4, 8, f"Generating {len(approved_trends)} approved designs")
         approved_count = 0
-        _BIAS_ROTATION = ("image_only", "text", "image_text", "image_with_text")
 
         for i, trend in enumerate(approved_trends):
             concept = to_title_case(trend.raw_signal[:100])
