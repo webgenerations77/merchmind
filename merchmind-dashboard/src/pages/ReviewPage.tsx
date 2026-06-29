@@ -467,32 +467,60 @@ function TrendApprovalGate({ batchId, onGenerationStarted, onCancelled }: { batc
   const rejected = trends.filter((t) => t.approval_status === 'rejected');
 
   const handleApprove = async (t: TrendOut) => {
-    const updated = await approveTrend(t.id, t.selected_generator || undefined).catch(() => null);
-    if (updated) setTrends((prev) => prev.map((x) => x.id === t.id ? updated : x));
+    try {
+      const updated = await approveTrend(t.id, t.selected_generator || undefined);
+      setTrends((prev) => prev.map((x) => x.id === t.id ? updated : x));
+      setErr('');
+    } catch (e) {
+      setErr((e as Error).message || `Failed to approve "${t.raw_signal.slice(0, 30)}"`);
+    }
   };
 
   const handleReject = async (t: TrendOut) => {
-    const updated = await rejectTrend(t.id).catch(() => null);
-    if (updated) setTrends((prev) => prev.map((x) => x.id === t.id ? updated : x));
+    try {
+      const updated = await rejectTrend(t.id);
+      setTrends((prev) => prev.map((x) => x.id === t.id ? updated : x));
+      setErr('');
+    } catch (e) {
+      setErr((e as Error).message || 'Failed to reject trend');
+    }
   };
 
   const handleGeneratorChange = async (t: TrendOut, gen: string) => {
     setTrends((prev) => prev.map((x) => x.id === t.id ? { ...x, selected_generator: gen } : x));
-    await setTrendGenerator(t.id, gen).catch(() => null);
+    try {
+      await setTrendGenerator(t.id, gen);
+    } catch (e) {
+      setErr((e as Error).message || 'Failed to set generator');
+    }
   };
 
+  // Bulk actions re-fetch from the server instead of optimistically marking
+  // trends approved/rejected — so the UI can never show "approved" when the
+  // server didn't actually persist it (which made failed approvals invisible
+  // and left batches stuck at pending_approval).
   const handleBulkApprove = async () => {
     const ids = pending.map((t) => t.id);
     if (!ids.length) return;
-    await bulkTrendAction(ids, 'approve').catch(() => null);
-    setTrends((prev) => prev.map((t) => ids.includes(t.id) ? { ...t, approval_status: 'approved' } : t));
+    try {
+      await bulkTrendAction(ids, 'approve');
+      await load();
+      setErr('');
+    } catch (e) {
+      setErr((e as Error).message || 'Failed to approve trends');
+    }
   };
 
   const handleBulkReject = async () => {
     const ids = pending.map((t) => t.id);
     if (!ids.length) return;
-    await bulkTrendAction(ids, 'reject').catch(() => null);
-    setTrends((prev) => prev.map((t) => ids.includes(t.id) ? { ...t, approval_status: 'rejected' } : t));
+    try {
+      await bulkTrendAction(ids, 'reject');
+      await load();
+      setErr('');
+    } catch (e) {
+      setErr((e as Error).message || 'Failed to reject trends');
+    }
   };
 
   const handleGenerate = async () => {
@@ -1332,9 +1360,12 @@ export default function ReviewPage() {
     }
   }, [location.state]);  // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Persistent poll: detect a batch whenever it appears (not just within the
+  // ~30s post-trigger bootstrap window below). Polls slowly while idle so a
+  // batch that takes a while to materialize still surfaces the banner, and
+  // faster once one is running to keep its progress fresh.
   useEffect(() => {
-    if (!runningBatch) return;
-    const interval = setInterval(checkBatchStatus, 5000);
+    const interval = setInterval(checkBatchStatus, runningBatch ? 5000 : 15000);
     return () => clearInterval(interval);
   }, [runningBatch, checkBatchStatus]);
 
