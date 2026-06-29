@@ -269,7 +269,7 @@ function BatchItemRow({ item, expanded, onToggle }: { item: BatchItemOut; expand
           <span className="text-xs text-text-tertiary flex-shrink-0">{formatDuration(duration)}</span>
         )}
 
-        <ChevronDown size={18} strokeWidth={2} className={`text-text-tertiary transition-transform ${expanded ? 'rotate-180' : ''}`} />
+        <ChevronDown size={16} strokeWidth={2} className={`text-text-tertiary transition-transform ${expanded ? 'rotate-180' : ''}`} />
       </div>
 
       {expanded && (
