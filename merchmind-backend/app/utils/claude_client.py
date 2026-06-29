@@ -49,7 +49,17 @@ class ClaudeClient:
     """Routes to Haiku for fast/cheap tasks, Sonnet for creative/vision tasks."""
 
     def __init__(self):
-        self._client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+        # Bound every request so a stalled call can't hang a Celery task forever.
+        # Without this the SDK default is 600s/attempt; a hung scoring call would
+        # wedge a batch at status="running" with no recovery (observed 2026-06-29).
+        # On timeout the SDK raises APITimeoutError, which _call() retries and then
+        # surfaces as ClaudeTimeoutError for callers to fall back on. max_retries=1
+        # keeps the SDK's own retry from compounding our retry loop's wait.
+        self._client = anthropic.Anthropic(
+            api_key=settings.ANTHROPIC_API_KEY,
+            timeout=90.0,
+            max_retries=1,
+        )
         self._haiku = settings.HAIKU_MODEL
         self._sonnet = settings.SONNET_MODEL
 
