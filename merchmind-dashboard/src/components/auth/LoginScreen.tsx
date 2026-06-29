@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { signInWithGoogle } from '../../firebase';
 import Logo from '../brand/Logo';
+import LogoMark from '../brand/LogoMark';
 
 export default function LoginScreen() {
   const [error, setError] = useState('');
@@ -18,8 +19,9 @@ export default function LoginScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-app-shell flex items-center justify-center p-4">
-      <div className="bg-bg-secondary border border-border rounded-2xl p-8 w-full max-w-sm text-center shadow-[0_1px_2px_rgba(21,19,43,.08),0_18px_44px_rgba(21,19,43,.08)]">
+    <div className="min-h-screen bg-violet-mesh flex items-center justify-center p-4 relative overflow-hidden">
+      <LogoMark size={420} className="absolute -left-24 -bottom-24 opacity-[0.06] pointer-events-none select-none" />
+      <div className="relative bg-bg-secondary border border-border rounded-2xl p-8 w-full max-w-sm text-center shadow-[0_1px_2px_rgba(21,19,43,.08),0_18px_44px_rgba(21,19,43,.08)]">
         <div className="flex justify-center mb-2">
           <Logo markSize={40} wordmarkClassName="text-2xl" />
         </div>
